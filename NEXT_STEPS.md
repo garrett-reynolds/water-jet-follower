@@ -28,10 +28,10 @@ Reach the Pi with `ssh pi@water-jets.local` (key-based, no password). OLA's web 
 
 ## Open tickets
 
-- **#12 — Prototype: does one RPLIDAR A2 survive two walkers crossing?** **Items 1, 2, 4, 5
-  and 6 done; 7 half done.** One unit is enough, a standing person is held 99% of the time,
-  and position jitter is 7-13 mm against a 50 mm jet pitch. **Only item 3 is outstanding**, and
-  it needs the water modules connected.
+- **#12 — Prototype: does one RPLIDAR A2 survive two walkers crossing?** **Items 1-6 done;
+  7 half done.** One unit is enough, a standing person is held 99% of the time, and position
+  jitter is 7-13 mm against a 50 mm jet pitch. **Item 3 closed 2026-09-04**: DMX value 5 on
+  channel 5 made jet 1 spray. Ready to close once item 7's absolute accuracy is measured.
 - **#10 — Write the build-ready spec.** Blocked by #12.
 
 ## Done since the last update
@@ -89,7 +89,10 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    once: the Pi to Enttec to cable to module chain carries DMX; **module 1 is at DMX address
    1**, so no readdressing is needed; the datasheet's channel map is right, with channel 1 as
    red; and `olad` held `slots: 512 nonzero: [(1, 40)]` while it was lit, so the full-frame
-   send works against a real fixture. **The pump on channel 5 is still untouched.**
+   send works against a real fixture. **#12 item 3 is closed.** `jog --channel 5` at DMX value **5** produced *"a very little
+   spray"* from jet 1, confirmed by Garrett at the bench 2026-09-04. The Pi now drives water.
+   Every link in the chain - LiDAR, tracker, Pi, OLA, Enttec, DMX, module, pump - has been
+   exercised on real hardware. The DMX-value-to-height mapping is being measured; see below.
 
    **Stop layer (a) is proven on real hardware.** Garrett killed the jog process with the LED
    lit and the LED went out. So the tool's zero-on-exit reaches a real fixture, not just
