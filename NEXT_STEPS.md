@@ -130,8 +130,25 @@ Once step 4 lands, #12 closes and #10 unblocks.
 - **How the baseline stays fresh in an unattended hallway.** A baseline captured at boot goes
   stale the moment anything moves, and each stale object becomes a permanent person. Wants a
   rolling baseline. Not built.
-- **Whether the modules answer standard E1.20 RDM.** The Enttec does RDM, so commissioning may
-  need neither the HB-Laser dongle nor a Windows machine. Untested.
+- **Whether the modules answer standard E1.20 RDM.** ~~Untested.~~ **Half answered 2026-09-04,
+  and the half that landed is good news.** `ola_rdm_discover -u 1 -f` returns an empty UID list,
+  but `systemctl status olad --no-pager -n 40` shows discovery really running on the wire and
+  **being answered**: DUB packets go out through `EnttecUsbProWidget`, wide UID ranges come back
+  `BranchComplete, got 0`, and the branch narrowing on `2421:2112018x` comes back
+  `BranchComplete, got 25`. Answering some ranges and not others is a real responder, not an
+  open line picking up noise. **ESTA manufacturer ID 0x2421 is "HB-Laserkomponenten GmbH"** —
+  the modules' own maker. So they are connected, powered, and speaking RDM.
+
+  What fails is resolving a UID. The preamble byte is wrong and varies (`0x14`, `0x36`, `0x92`,
+  `0xcb`) where a DUB reply should start `0xFE`, and every run ends `Discovery tree is
+  corrupted`. Two readings, not yet separated: two responders sharing one UID from the factory
+  (the datasheet's auto-addressing makes that plausible), or a non-standard DUB encoding. **The
+  test is physical:** power only one module and rerun discovery. A UID that resolves means the
+  first reading and RDM is usable one module at a time. Still corrupt on one module means the
+  second, and the next thing to check is a 120 ohm terminator at the end of the DMX line.
+
+  This blocks nothing. Plain DMX is one-way and does not care. It only blocks reading the
+  stored fountain-height calibration, which is why the jog ceiling stays a DMX number.
 
 ## Traps that already cost time
 
