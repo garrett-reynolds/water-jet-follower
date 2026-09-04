@@ -77,3 +77,11 @@ Garrett confirmed the unit is an **RPLIDAR A2M8**. The sensing decision had used
 Since the sample budget is fixed, resolution trades directly against scan rate. At 15 Hz that is 533 samples per turn, 0.68 degrees, and by arithmetic 12 to 35 mm of lateral error from 1 m to 3 m. The earlier estimate was 17 to 52 mm. Against a 50 mm jet pitch, both scan rates are comfortably inside one jet, so slowing to 10 Hz to buy resolution would cost 33 ms of latency and gain nothing the wave can use. **15 Hz stands.**
 
 One caveat carried to the prototype ticket: the datasheet states the 8,000 samples/s mode uses an extended high-speed protocol and requires the matched SDK or a modified driver. A Python driver speaking the older 4,000/s protocol would halve the resolution to 1.35 degrees at 15 Hz, about 70 mm at 3 m, which is wider than a jet pitch. The driver's reported sample rate must be checked on the bench rather than assumed.
+
+## [2026-09-04] Every part is owned; nothing needs buying
+
+Garrett confirmed the whole parts list is on the shelf: RPLIDAR A2M8, Raspberry Pi 5, Enttec DMX USB Pro Mk2 with its 15-pin breakout cable, an Enttec Open DMX USB as spare, the 24 V supply that shipped with the modules, and every cable. The build has a **CAD $0 bill of materials**, which is unusual enough to record. The control-path research had been heading for a CAD $227 Enttec purchase.
+
+Two of the five inventory items asked for a value rather than a yes or no, and "I have them all" does not answer those: the 24 V supply's **current rating**, and the **XLR gender** on the module cable. Both were moved to the bench prototype ticket rather than kept as a blocker, because that ticket already puts every one of these parts on a bench. The risks are real but small and late-binding: two modules draw up to 6.4 A, so an undersized supply means a second one; and the Enttec outputs 5-pin female, so a female module end would need a gender changer.
+
+With the inventory closed, the bench prototype is the only ticket standing between the map and the build-ready spec. Detail on GitHub issues #3 and #12.
