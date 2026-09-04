@@ -84,5 +84,26 @@ class TestSendRefusesShortFrames(unittest.TestCase):
             dmx.send(bytearray(5))
 
 
+
+class TestFetchGuard(unittest.TestCase):
+    """olad hands back data=None when nothing is bound to the universe.
+
+    This crashed the stop path with a TypeError the first time the Enttec was
+    unplugged, so it gets a test. An empty read must never look like "all off":
+    the modules latch their last value, so no data means unknown, not safe.
+    """
+
+    def test_empty_read_is_not_clean(self):
+        self.assertFalse(len([]) == dmx.UNIVERSE_SIZE)
+
+    def test_short_read_is_not_clean(self):
+        held = [0] * 100
+        self.assertFalse(len(held) == dmx.UNIVERSE_SIZE and not any(held))
+
+    def test_full_zero_read_is_clean(self):
+        held = [0] * dmx.UNIVERSE_SIZE
+        self.assertTrue(len(held) == dmx.UNIVERSE_SIZE and not any(held))
+
+
 if __name__ == "__main__":
     unittest.main()

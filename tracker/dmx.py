@@ -99,7 +99,12 @@ def send(frame, universe=1):
 
 
 def fetch(universe=1):
-    """Read back what olad holds. Returns a list of ints."""
+    """Read back what olad holds. Returns a list of ints, empty if olad has none.
+
+    olad hands the callback `data=None` when the request fails - which happens when
+    the universe has no device bound to it, for instance because the interface was
+    unplugged. Guard it, because this runs inside the stop path.
+    """
     from ola.ClientWrapper import ClientWrapper
 
     wrapper = ClientWrapper()
@@ -107,7 +112,7 @@ def fetch(universe=1):
 
     def got(status, _universe, data):
         result["ok"] = status.Succeeded()
-        result["data"] = list(data)
+        result["data"] = list(data) if data else []
         wrapper.Stop()
 
     wrapper.Client().FetchDmx(universe, got)
@@ -127,7 +132,16 @@ def zero(universe=1, verbose=True):
     held = fetch(universe)
     clean = len(held) == UNIVERSE_SIZE and not any(held)
     if verbose:
-        nonzero = [(i + 1, v) for i, v in enumerate(held) if v]
-        print(f"zero: sent={ok} slots_held={len(held)} "
-              f"{'ALL ZERO' if clean else f'STILL SET {nonzero[:10]}'}")
+        if not held:
+            # Not "everything is off". olad could not tell us anything at all,
+            # usually because nothing is bound to the universe. The modules latch
+            # their last value, so silence here means the jets may still be up.
+            print(f"zero: sent={ok} but olad returned NO DATA for universe "
+                  f"{universe} - is the interface plugged in? "
+                  f"THE MODULES MAY STILL BE HOLDING A VALUE. Check ola_dev_info, "
+                  f"and use the 24 V switch if anything is up.")
+        else:
+            nonzero = [(i + 1, v) for i, v in enumerate(held) if v]
+            print(f"zero: sent={ok} slots_held={len(held)} "
+                  f"{'ALL ZERO' if clean else f'STILL SET {nonzero[:10]}'}")
     return clean
