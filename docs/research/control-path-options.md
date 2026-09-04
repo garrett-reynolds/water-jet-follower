@@ -30,7 +30,7 @@ From issue #2's resolved research (already in the repo) plus the DMX standard:
 | DMX bit time | 3.92 / 4 / 4.08 µs (min/typ/max) | [ANSI E1.11-2008 (R2018) Table 6](https://tsp.esta.org/tsp/documents/docs/ANSI-ESTA_E1-11_2008R2018.pdf) |
 | Minimum update time, 513 slots | 22.7 ms | E1.11 Table 6 |
 | Maximum refresh rate, 513 slots | 44 updates/s | E1.11 Table 6 |
-| BREAK (transmitter) | min 92 µs, max 176 µs | E1.11 Table 6 |
+| BREAK (transmitter) | min 92 µs, typical 176 µs (Table 6 gives no max) | E1.11 Table 6 |
 | MAB (transmitter) | min 12 µs | E1.11 Table 6 |
 | BREAK-to-BREAK | min 1204 µs, max 1.00 s | E1.11 Table 6 |
 
