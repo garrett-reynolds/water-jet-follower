@@ -80,7 +80,7 @@ One caveat carried to the prototype ticket: the datasheet states the 8,000 sampl
 
 ## [2026-09-04] Every part is owned; nothing needs buying
 
-Garrett confirmed the whole parts list is on the shelf: RPLIDAR A2M8, Raspberry Pi 5, Enttec DMX USB Pro Mk2 with its 15-pin breakout cable, an Enttec Open DMX USB as spare, the 24 V supply that shipped with the modules, and every cable. The build has a **CAD $0 bill of materials**, which is unusual enough to record. The control-path research had been heading for a CAD $227 Enttec purchase.
+Garrett confirmed the whole parts list is on the shelf: RPLIDAR A2M8, Raspberry Pi 5, Enttec DMX USB Pro Mk2 with its 15-pin breakout cable, an Enttec Open DMX USB as spare, the 24 V supply that shipped with the modules, and every cable. The build has a **CAD $0 bill of materials** - unless one of the two unread values breaks it: a supply under 6.4 A means buying a second or larger one, and a female XLR on the module cable means buying a gender changer. The control-path research had been heading for a CAD $227 Enttec purchase.
 
 Two of the five inventory items asked for a value rather than a yes or no, and "I have them all" does not answer those: the 24 V supply's **current rating**, and the **XLR gender** on the module cable. Both were moved to the bench prototype ticket rather than kept as a blocker, because that ticket already puts every one of these parts on a bench. The risks are real but small and late-binding: two modules draw up to 6.4 A, so an undersized supply means a second one; and the Enttec outputs 5-pin female, so a female module end would need a gender changer.
 
