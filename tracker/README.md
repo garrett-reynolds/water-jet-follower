@@ -2,7 +2,8 @@
 
 Finds people in the RPLIDAR A2M8 scan and follows them, in plain Python with no
 dependencies beyond `pyrplidar`. This is step 1 and step 2 of `NEXT_STEPS.md`. It
-does **not** drive DMX yet.
+It also has the first DMX output: a hand-driven `jog` for the very first
+power-up of the water modules, and a `zero` that is the emergency stop.
 
 ## What is in here
 
@@ -14,6 +15,7 @@ does **not** drive DMX yet.
 | `geometry.py` | polar scan to world x/y, background subtraction, position to jet number |
 | `tracking.py` | cluster, pair legs, follow people with a constant-velocity Kalman filter |
 | `merge.py` | two one-person clips into one two-person clip, by nearest return per ray |
+| `dmx.py` | DMX out through olad; always full 512-slot frames, and the zero path |
 | `viewer.py` | web page served from the Pi, because Pi OS Lite has no window |
 | `run.py` | the command line |
 | `tests/` | synthetic walkers, so the maths can be checked with nobody in the room |
@@ -225,3 +227,59 @@ Only recordings of the real room answer issue #12.
 
 - `~/wj-venv` has `include-system-site-packages = false`, so `import ola` fails
   inside it. That blocks DMX output, which is the next piece, not this one.
+
+## Driving the water modules, the first time
+
+The jets have never been commanded. Do this in order and do not skip ahead.
+
+**Before anything: have a hand on the mains switch of the 24 V supply.** It is the
+only stop that does not depend on software. Everything below is layers on top of it.
+
+**1. Find the modules and their DMX addresses.**
+
+```
+ssh pi@water-jets.local
+ola_rdm_discover -u 1
+```
+
+The modules auto-address, so they may not start at 1. RDM discovery answers that and
+also settles whether they speak standard E1.20 at all — an open question in
+`NEXT_STEPS.md`. It reads; it does not set levels.
+
+**2. Prove the stop works, on an LED, before touching a pump.**
+
+Channel 1 is nozzle 1's **red LED**. Channels 1 to 4 are colour and only channel 5 is
+the pump, so the whole DMX path can be proven with light instead of water.
+
+```
+~/wj-venv/bin/python -m tracker.run jog --channel 1 --max 40
+```
+
+ENTER steps up by 5, `-` steps down, a number jumps to it, `q` quits. The red LED on
+nozzle 1 should come up. Now **kill it rudely** — close the laptop lid, or from another
+terminal `pkill -HUP -f tracker.run` — and watch the LED. If it goes out, the software
+stop works. If it stays lit, only the mains switch stops this system, and that changes
+how the jets get tested.
+
+**3. Only then, the pump.** Channel 5 is nozzle 1's fountain height.
+
+```
+~/wj-venv/bin/python -m tracker.run jog --channel 5 --max 40
+```
+
+`--max 40` is a deliberate ceiling. The datasheet range is 5 cm to 1.5 m and the
+mapping from DMX value to height is RDM-calibrated and unread, so a middle value may
+already be a tall jet. Raise `--max` on purpose, a little at a time, never as a guess.
+
+Watch the water level as well as the jet. A 24 in x 16 in basin at 9 cm has only about
+2 L above the module's 8 cm minimum, so splash-out is the limit long before the jet is.
+
+**Layer (b), the stop you keep in a second terminal:**
+
+```
+ssh pi@water-jets.local "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
+```
+
+It drives all 512 slots to zero and then reads the universe back to prove it, rather
+than printing "sent" and hoping. Short to type on purpose — a 512-value
+`ola_set_dmx` string is exactly the paste Git Bash mangles.

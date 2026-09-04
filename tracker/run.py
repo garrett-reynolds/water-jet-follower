@@ -137,6 +137,88 @@ def cmd_merge(args):
     return 0
 
 
+def cmd_zero(args):
+    """Layer (b) of the stop path: the command the second terminal holds ready.
+
+    A subcommand rather than a pasted `ola_set_dmx 1 0,0,0,...` string, because a
+    512-zero paste is exactly the kind that Git Bash mangles, and because this one
+    reads the universe back instead of hoping.
+    """
+    from tracker import dmx
+    return 0 if dmx.zero(args.universe) else 1
+
+
+def cmd_jog(args):
+    """Walk one DMX channel up by hand, and put it back to zero whatever happens.
+
+    Starts at 0, never exceeds --max, and drives all 512 slots on every frame.
+    The exit path is deliberately belt and braces: a signal handler for the three
+    signals that actually arrive (SIGINT from Ctrl-C, SIGTERM from kill, SIGHUP
+    when the ssh session drops - which is the one that would otherwise skip the
+    finally block entirely), a finally, and an atexit backstop. None of them help
+    if olad dies or the process is SIGKILLed, which is why there is also a switch
+    on the mains lead. See NEXT_STEPS.md step 4.
+    """
+    import atexit
+    import signal
+    from tracker import dmx
+
+    def stop(reason):
+        try:
+            dmx.zero(args.universe)
+        except Exception as exc:                # never let the kill path throw
+            print(f"\nZERO FAILED ({reason}): {exc}\n"
+                  f"PULL THE POWER.", file=sys.stderr)
+
+    atexit.register(stop, "atexit")
+
+    def on_signal(signum, _frame):
+        print(f"\ncaught {signal.Signals(signum).name}")
+        raise SystemExit(0)                     # lets the finally below run
+
+    for name in ("SIGINT", "SIGTERM", "SIGHUP"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), on_signal)
+
+    channel = args.channel
+    ceiling = dmx.clamp(args.max)
+    value = 0
+
+    print(f"jog: universe {args.universe}, channel {channel}, "
+          f"ceiling {ceiling}, step {args.step}")
+    print("     ENTER steps up, '-' steps down, a number jumps to it, "
+          "'q' or Ctrl-C quits at zero")
+    if not dmx.zero(args.universe):
+        print("jog: refusing to start, olad is not holding 512 zeros",
+              file=sys.stderr)
+        return 1
+
+    try:
+        while True:
+            try:
+                reply = input(f"  ch{channel} = {value:3d}  > ").strip().lower()
+            except EOFError:
+                break
+            if reply in ("q", "quit", "exit"):
+                break
+            if reply == "-":
+                value = dmx.clamp(value - args.step, high=ceiling)
+            elif reply == "":
+                value = dmx.clamp(value + args.step, high=ceiling)
+            elif reply.lstrip("+-").isdigit():
+                value = dmx.clamp(int(reply), high=ceiling)
+            else:
+                print("     ENTER, '-', a number, or 'q'")
+                continue
+            ok = dmx.send(dmx.frame_with(channel, value), args.universe)
+            if not ok:
+                print("     SEND FAILED - going to zero", file=sys.stderr)
+                break
+    finally:
+        stop("exit")
+    return 0
+
+
 def cmd_offline(args):
     """Replay with no viewer and no waiting. Prints a summary. For quick checks."""
     cfg = _load_config(args)
@@ -212,6 +294,24 @@ def build_parser():
                             "decides where the two walkers cross")
     merge.add_argument("--out", required=True)
     merge.set_defaults(func=cmd_merge)
+
+    zero = subparsers.add_parser("zero", help="drive all 512 DMX slots to zero")
+    zero.add_argument("--universe", type=int, default=1)
+    zero.set_defaults(func=cmd_zero)
+
+    jog = subparsers.add_parser("jog", help="walk one DMX channel up by hand")
+    # Required on purpose. There is no sensible default: the only defaults worth
+    # having would be channel 1 (a red LED, harmless) or channel 5 (a pump), and
+    # guessing wrong in that direction puts water on the ceiling.
+    jog.add_argument("--channel", type=int, required=True,
+                     help="1-based DMX channel. Nozzle n is 5n-4 red, 5n-3 green, "
+                          "5n-2 blue, 5n-1 white, 5n fountain height")
+    jog.add_argument("--max", type=int, default=40,
+                     help="ceiling, 0-255. Default 40 because the height mapping "
+                          "is RDM-calibrated and unread; raise it deliberately")
+    jog.add_argument("--step", type=int, default=5)
+    jog.add_argument("--universe", type=int, default=1)
+    jog.set_defaults(func=cmd_jog)
 
     offline = subparsers.add_parser("offline", help="replay fast, no viewer, summary only")
     offline.add_argument("scan")

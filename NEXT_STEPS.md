@@ -83,9 +83,35 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    5-15 Hz band; PWM 760 gives 15.09 Hz. See the correction entry in `DECISIONS.md`.
 4. **Connect the water modules** and complete #12 item 3: set module 1 channel 5 and watch jet 1
    move. This is the only untested link in the whole chain.
-5. **Write the wave and the DMX output.** Blocked on nothing but ordering. Note first that
-   `~/wj-venv` was made with `include-system-site-packages = false`, so `import ola` fails
-   inside it — `ola-python` is a system package. Flip that flag before starting.
+
+   **Start low, and have three ways to stop it.** Garrett's rule, 2026-09-04. Channel 5 is
+   0-255 against a 5 cm to 1.5 m throw, and the mapping is RDM-calibrated and unread, so open
+   at about 5-10 and step up. Three kill layers, because the first two are unproven: (a) the
+   test tool traps SIGINT and `atexit` and sends an all-zero frame before exit; (b) a second
+   terminal holds a ready zero command, verified to clear all 50 channels rather than assumed
+   to; (c) a physical switch on the 24 V supply's mains lead, in arm's reach. Layers (a) and
+   (b) both assume `olad` stops holding the last frame and that the modules do not latch on
+   signal loss — **test that on purpose**: command a low value, kill the client, watch whether
+   the jet drops or holds.
+
+   **The tool is written and the stop path is proven.** `tracker.run jog --channel N` and
+   `tracker.run zero`, in `tracker/dmx.py`. Verified on the Pi 2026-09-04: `zero` reports
+   `slots_held=512 ALL ZERO`, and a `jog` holding channel 512 at 10 went back to all-zero
+   after a `SIGHUP`. Channel 512 was used so nothing on the modules could move. The bench
+   order — RDM discover, then prove the stop on nozzle 1's **red LED** (channel 1), then the
+   pump (channel 5) — is in `tracker/README.md`. **Nothing non-zero has been sent to a
+   module.** The `~/wj-venv` `include-system-site-packages` trap is fixed; it is now `true`
+   and the venv imports both `ola` and `pyrplidar`.
+
+   The test basin is 24 in x 16 in with 9 cm of water, which clears the 8 cm minimum by 1 cm —
+   roughly 2 L of splash margin before the pumps are below their rated level. The module
+   drawing shows a "Water level sensor M3" on board; whether it cuts the pumps when dry is
+   **unverified** and worth checking, because it would settle the margin question.
+5. **Write the wave and the DMX output.** Blocked on nothing but ordering. ~~`~/wj-venv` was
+   made with `include-system-site-packages = false`, so `import ola` fails inside it.~~
+   **Fixed 2026-09-04**: the flag is `true`, the old file is kept at `~/wj-venv/pyvenv.cfg.bak`,
+   and the venv imports `ola` and `pyrplidar`. `tracker/dmx.py` already has the send, fetch and
+   zero primitives the wave needs.
 
 Once step 4 lands, #12 closes and #10 unblocks.
 
