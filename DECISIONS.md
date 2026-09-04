@@ -69,3 +69,11 @@ Read the ENTTEC *DMX USB PRO MK2 User Manual* (doc ID 134658, December 2021) aft
 **RDM:** *"RDM (E1.20) is supported as standard on the DMX USB PRO Mk2."* The modules use RDM for auto-addressing and fountain-height recalibration, which the module datasheet gates behind an optional programming connector and separate software. Since OLA is an RDM controller and the chosen interface speaks RDM, commissioning may need neither the HB-Laser dongle nor a Windows machine. Whether the modules answer standard E1.20 parameters or a vendor-specific set is unknown. This does not change the control-path decision; it narrows the commissioning fog on the map.
 
 Also noted: Mark-After-Break is settable 10-1355 us and Break 96-1355 us in the interface's own hardware, which gives tuning room if the modules prove fussy about timing.
+
+## [2026-09-04] LiDAR variant is the A2M8; 15 Hz confirmed as the right setting
+
+Garrett confirmed the unit is an **RPLIDAR A2M8**. The sensing decision had used the datasheet's conservative "<=1 degree" angular figure. The A2M8 datasheet (rev 2.6) is more specific and better: 8,000 samples per second, scan rate freely adjustable 5-15 Hz, and 0.45 degrees of angular resolution at the typical 10 Hz, adjusted automatically with rotation speed.
+
+Since the sample budget is fixed, resolution trades directly against scan rate. At 15 Hz that is 533 samples per turn, 0.68 degrees, and by arithmetic 12 to 35 mm of lateral error from 1 m to 3 m. The earlier estimate was 17 to 52 mm. Against a 50 mm jet pitch, both scan rates are comfortably inside one jet, so slowing to 10 Hz to buy resolution would cost 33 ms of latency and gain nothing the wave can use. **15 Hz stands.**
+
+One caveat carried to the prototype ticket: the datasheet states the 8,000 samples/s mode uses an extended high-speed protocol and requires the matched SDK or a modified driver. A Python driver speaking the older 4,000/s protocol would halve the resolution to 1.35 degrees at 15 Hz, about 70 mm at 3 m, which is wider than a jet pitch. The driver's reported sample rate must be checked on the bench rather than assumed.
