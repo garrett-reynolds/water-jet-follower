@@ -205,11 +205,12 @@ def cmd_jog(args):
                 value = dmx.clamp(value - args.step, high=ceiling)
             elif reply == "":
                 value = dmx.clamp(value + args.step, high=ceiling)
-            elif reply.lstrip("+-").isdigit():
-                value = dmx.clamp(int(reply), high=ceiling)
             else:
-                print("     ENTER, '-', a number, or 'q'")
-                continue
+                try:
+                    value = dmx.clamp(int(reply), high=ceiling)
+                except ValueError:
+                    print("     ENTER, '-', a number, or 'q'")
+                    continue
             ok = dmx.send(dmx.frame_with(channel, value), args.universe)
             if not ok:
                 print("     SEND FAILED - going to zero", file=sys.stderr)

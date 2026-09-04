@@ -518,3 +518,53 @@ So the rule is not "use a high percentile for standing clips". It is: **never bu
 baseline from a clip in which anybody stands still.** Score standing clips against a
 walking clip's baseline. With `data/base-rl.json` the coverage is 100% for every second
 of the clip after the first.
+
+## [2026-09-04] First DMX output: full 512-slot frames, jog starts at zero, LED before pump
+
+Garrett filled a 24 in x 16 in test basin to 9 cm — above the 8 cm minimum the maker's
+FAQ gives — and set the rule for the first power-up: *"please start at a very low number
+and ensure there is a way to shut them off quickly."* Three things were decided writing
+`tracker/dmx.py`.
+
+**Every frame is a full 512 slots**, never a short one. A short DMX frame updates only
+the slots it carries, and most fixtures hold the rest of the universe at their last
+value. A five-slot "all off" would therefore leave slot 5 — nozzle 1's pump — exactly
+where it was. Sending 512 every time makes that question moot by construction instead of
+answering it by experiment with water in the basin. `zero()` then reads the universe back
+with `FetchDmx`, because "I sent zeros" and "olad holds 512 zeros" are different claims.
+
+**OLA's Python client, not shelling out to `ola_set_dmx`.** The shell tool is proven and
+synchronous, which is attractive for a safety path, but it buys nothing on the one hazard
+that matters — a short frame — and the wave needs the Python client anyway, so the plumbing
+is better proven now. `ClientWrapper` is an event loop, so `send()` passes a callback that
+stops the loop and turns it back into a blocking call. Frames are `array.array("B")` and
+not `bytearray`: OLA calls `.tobytes()` on what it is given, and `bytearray` has no such
+method. That cost one failed run on the Pi.
+
+**The bench order proves the stop on an LED, not a pump.** Channels 1-4 of a nozzle are
+red, green, blue and white; only channel 5 is fountain height. So the entire DMX path,
+including the emergency stop, can be proven with light. `--channel` is required for that
+reason — the only defaults worth having are a harmless LED or a pump, and guessing wrong
+in that direction puts water on the ceiling. `--max` defaults to 40 because the datasheet
+range is 5 cm to 1.5 m and the DMX-value-to-height mapping is RDM-calibrated and unread.
+
+Stop layers, in the order they are trusted: the tool zeroes through a signal handler, a
+`finally` and an `atexit`; `tracker.run zero` is the second terminal's command; and a
+switch on the 24 V supply's mains lead is the only one that does not depend on software.
+**SIGHUP is handled on purpose** — it is what a dropped ssh sends, and the one signal that
+would otherwise skip the `finally` entirely.
+
+Verified on the Pi with nothing non-zero ever sent to a module: `zero` reports
+`slots_held=512 ALL ZERO`, and a jog holding **channel 512** at 10 returned the universe
+to all-zero after a `SIGHUP`. Channel 512 was chosen because two HD modules occupy 1-100,
+so no fixture listens to it.
+
+**Still unknown, and it is the failure that matters:** whether the modules latch on DMX
+signal loss, and whether the Enttec Pro Mk2's onboard frame buffer — chosen as a feature —
+keeps repeating the last frame if `olad` dies. Every software stop above assumes neither
+happens. `tracker/README.md` step 2b tests it by stopping `olad` with an LED lit, before
+any pump runs.
+
+Also fixed: `~/wj-venv` had `include-system-site-packages = false`, which made `import ola`
+fail inside the venv. It is now `true`, the original is at `~/wj-venv/pyvenv.cfg.bak`, and
+the venv imports both `ola` and `pyrplidar`.

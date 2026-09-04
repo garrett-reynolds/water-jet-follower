@@ -256,10 +256,35 @@ the pump, so the whole DMX path can be proven with light instead of water.
 ```
 
 ENTER steps up by 5, `-` steps down, a number jumps to it, `q` quits. The red LED on
-nozzle 1 should come up. Now **kill it rudely** — close the laptop lid, or from another
-terminal `pkill -HUP -f tracker.run` — and watch the LED. If it goes out, the software
-stop works. If it stays lit, only the mains switch stops this system, and that changes
-how the jets get tested.
+nozzle 1 should come up. There are then two different failures to check, and they are
+not the same test.
+
+**2a. The client dies.** Bring the LED to 40. From a second terminal:
+
+```
+ssh pi@water-jets.local "pkill -HUP -f 'tracker.run jog'"
+```
+
+The LED should go out. This is the path already proven at the olad level on channel
+512; 2a only confirms a real fixture follows it.
+
+**2b. `olad` itself dies.** This is the one nothing has tested, and it is the failure
+that decides whether the software stops are worth anything. Bring the LED to 40, then:
+
+```
+sudo systemctl stop olad
+```
+
+Watch the LED. If it goes out, DMX signal loss turns the modules off. **If it stays
+lit**, either the modules latch on signal loss or the Enttec Pro Mk2's onboard frame
+buffer keeps repeating the last frame — it was chosen for that buffer — and in that
+case the mains switch is the only thing that covers an `olad` crash. Either answer is
+worth knowing before a pump runs. Then:
+
+```
+sudo systemctl start olad
+~/wj-venv/bin/python -m tracker.run zero
+```
 
 **3. Only then, the pump.** Channel 5 is nozzle 1's fountain height.
 
