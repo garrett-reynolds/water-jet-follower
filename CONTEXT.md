@@ -12,3 +12,6 @@
 - **Attract**: what the strip does when nobody is there. One slow, half-height hill rolls end to end.
 - **Hold**: the hill staying under a walker who has stopped beside the strip.
 - **Base colour**: the dim colour on every pixel outside a hill.
+- **Scan plane**: the flat, level slice the LiDAR sweeps. Anything above or below it is invisible.
+- **Track**: the running guess at one walker's position and speed. One track per walker. A track starts when the walker is first seen and ends when they leave.
+- **Shadow**: the space a track cannot be seen in, because something nearer to the sensor blocks it.

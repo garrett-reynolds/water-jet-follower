@@ -25,3 +25,17 @@ The modules terminate in 5-pin XLR. A 24 V supply came with the system, rating u
 ## [2026-09-04] Sensing and control path research salvaged; C4001 ruled out
 
 Both research tickets were resolved from sources recovered out of killed agents' transcripts, not from fresh fetching. Sensing shortlist: HLK-LD2450 radar, then VL53L5CX 8x8 ToF, then RealSense D435. The DFRobot C4001 Garrett already owns is ruled out because it reports distance and speed with no angle, so it cannot separate two walkers; the two-hill wave decision is what disqualifies it. Control path: ESP32 with esp_dmx into RS-485, unless an owned dongle proves OLA-drivable, in which case Raspberry Pi with OLA wins. QLC+, TouchDesigner and Enttec S-Play ruled out. Detail on GitHub issues #5 and #6.
+
+## [2026-09-04] Sensing method: one RPLIDAR A2, tracking legs
+
+Sensor choice is a **Slamtec RPLIDAR A2** that Garrett already owns: one unit at one end of the strip, sweeping a level scan plane at shin height, running off-the-shelf `leg_tracker` to follow walkers by their legs. 15 Hz gives a 67 ms scan period and roughly 17–52 mm of position error across the room, against a 50 mm jet pitch. Speed comes from the tracker differentiating position, which satisfies the speed-driven hill colour from the wave decision.
+
+The runner-up was the overhead depth camera Garrett also owns. It is faster (~11 ms of sensor latency against 67 ms), has no occlusion, and sees a person standing still. It was my recommendation. **Garrett chose the A2 instead**, and that stands. The A2 needs almost no compute, so one Raspberry Pi can run both the tracker and the DMX output — which matters for the control path ticket.
+
+The HLK-LD2450 radar is ruled out on its own datasheet: 0.75 m distance resolution against a 1 m strip. VL53L5CX/L8CX ToF is ruled out on geometry: about 280 mm per zone from a normal ceiling, wider than the whole 250 mm hill. Neither was ruled out on water.
+
+Two constraints fall out and are now a prototype ticket: `leg_tracker` will not open a track until a leg pair has moved 0.5 m, which fights the hold-when-stopped rule; and one end-mounted LiDAR can be blocked by the nearer of two crossing walkers, which the wave decision explicitly requires. Detail on GitHub issues #8 and #12.
+
+## [2026-09-04] Water is out of the sensor selection criteria
+
+Garrett: *"You have made an assumption that water is going to affect the sensor we select. Please never assume. I will make sure that the sensor is protected."* Two rounds of grilling had been built on whether a sensor could see the water columns, reasoned from automotive rain-clutter papers rather than from any test of a fountain. Physical protection and mounting are Garrett's to solve. Sensors are now selected on measured specs only — resolution, update rate, target count, interface, and what is already owned. Whether the jets appear in the scan data stays on the map as an open question for the tracker's filtering, not as a selection criterion.
