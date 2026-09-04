@@ -21,3 +21,7 @@ Wave is a 5-jet hill that follows each walker, with one hill per walker, an attr
 ## [2026-09-04] Kit contents: 5-pin XLR, 24 V supply, two USB DMX dongles
 
 The modules terminate in 5-pin XLR. A 24 V supply came with the system, rating unread. Two USB dongles shipped: an HB-Laser USB-DMX-RDM and a MADRIX USB ONE. This may remove the need to buy any DMX interface, so the control path research ticket now covers both dongles and MADRIX as an option. Detail on GitHub issue #11.
+
+## [2026-09-04] Sensing and control path research salvaged; C4001 ruled out
+
+Both research tickets were resolved from sources recovered out of killed agents' transcripts, not from fresh fetching. Sensing shortlist: HLK-LD2450 radar, then VL53L5CX 8x8 ToF, then RealSense D435. The DFRobot C4001 Garrett already owns is ruled out because it reports distance and speed with no angle, so it cannot separate two walkers; the two-hill wave decision is what disqualifies it. Control path: ESP32 with esp_dmx into RS-485, unless an owned dongle proves OLA-drivable, in which case Raspberry Pi with OLA wins. QLC+, TouchDesigner and Enttec S-Play ruled out. Detail on GitHub issues #5 and #6.
