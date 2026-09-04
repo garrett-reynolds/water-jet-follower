@@ -117,3 +117,404 @@ Caught at session end rather than when made. Two configuration choices on the Pi
 **OLA restricted to one device and one plugin.** `ola-usbserial.conf` had three `device_prefix` entries covering all of `ttyUSB*`; these were replaced with a single `device_prefix = ttyENTTEC`. Every plugin except `usbserial` was set to `enabled = false`. Before this, OLA's StageProfi plugin was locking the LiDAR's serial port every few seconds, probing it, failing and releasing, which would have fought the LiDAR driver permanently.
 
 **A related fault that will recur.** OLA writes `/var/lock/LCK..ttyUSB0` holding the locking PID, and the file survives a restart. When a recycled PID matches, `olad` reads its own PID back and refuses to open the port, reporting `locked by PID N and process exists`. This cost most of an hour tonight and produces no visible symptom beyond silent jets. The unattended build must clear stale OLA lock files at boot.
+
+## [2026-09-04] Tracker written: plain Python, record-and-replay first
+
+The tracker and the web scan viewer are written and run on the Pi. Code is in
+`tracker/`, driven by `python -m tracker.run`. No numpy, no Flask, no ROS - the
+whole thing is the standard library plus `pyrplidar`.
+
+**Recording came before tracking.** The Pi runs OS Lite with no window to plot in,
+and a walk-past cannot be repeated on demand. So `tracker.run record` writes scans
+to JSON Lines and `tracker.run replay` plays them back in real time through the
+same code path as the live sensor. Every parameter can now be tuned against a
+recorded walk instead of against a person standing in a hallway.
+
+**Background subtraction replaces leg_tracker's trained classifier.** `leg_tracker`
+uses a random forest to tell a leg from a chair leg. Here `tracker.run baseline`
+takes the nearest return per 1-degree bin over an empty-room recording, and
+anything later found 0.15 m nearer than that is a person. Simpler than a
+classifier and it needs no training data.
+
+Tested properly, on a clip the baseline had never seen: two 20-second recordings
+of the same still bench, baseline built from the first, tracker run on the second.
+Result **2 false people without the baseline, 0 with it**. (Scoring a baseline
+against the recording it was built from proves nothing - every point is background
+by construction. The first attempt did exactly that and was thrown out.)
+
+**Nothing behind the sensor.** The first honest cross-clip run left **one** false
+person that sat at x -0.35 to -0.05 for all 273 scans: bench clutter beside the
+LiDAR, in baseline bins the first clip happened never to fill. Sweeping `roi_x_min`
+showed -0.50 keeps it and 0.00 removes it, so the default is now **0.00**. The cost
+is that the sensor is blind behind itself, which is acceptable while it sits at one
+end of the strip. Note the general shape of the fault for later: a baseline bin
+that was never filled is treated as "anything here is a person", so intermittent
+near-field returns become permanent people. Widening the region of interest again
+means recording a longer baseline.
+
+**A lone cluster counts as a person.** At a normal standing stance the legs are
+about 0.20 m apart centre to centre, so their surfaces are 0.09 m apart - under
+`cluster_dist_euclid` (0.13 m). A standing person is therefore **one** cluster, not
+two. Requiring a pair would lose the walker exactly during Hold. Two clusters only
+appear mid-stride. This is a test in `tracker/tests/test_tracking.py`.
+
+**Hold is handled by a second confirmation rule.** `leg_tracker` opens a track only
+after 0.5 m of travel (`dist_travelled_together_to_initiate_leg_pair`), which #12
+item 6 flags as fighting Hold. The config keeps that parameter and its 0.5 m value,
+and adds `min_times_seen_to_initiate` (default 8 scans, about 0.5 s). A track
+confirms on **either**. Both behaviours are covered by tests, including one that
+shows the distance rule alone misses a standing person.
+
+**Filter is leg_tracker's constant-velocity Kalman, written out by hand.** Its
+4-state filter has no cross terms between x and y, so two 2-state filters are
+equivalent and need no matrix library. Noise values are lifted unchanged:
+`std_obs` 0.1, `std_process_noise` 0.03333, association variance `(0.1 + 0.4)^2`.
+
+Verified: 10 unit tests pass on the laptop and on the Pi; `live` runs at 16.18 Hz
+against the real A2M8 with the viewer reachable at `http://water-jets.local:8080/`;
+0 false tracks on a 273-scan clip the baseline had not seen. What is **not**
+verified is anything about real walkers - that needs #12 items 5-7 and a recording
+of two people.
+
+## [2026-09-04] Correction: PWM 800 is 16.25 Hz, not 14.57 Hz, and is out of spec
+
+Re-measuring the motor PWM sweep with the new code contradicts the numbers logged
+earlier today. The earlier figures were low by about 10 percent across the board.
+
+| PWM | Logged 2026-09-04 | Re-measured | Samples/s now |
+|---|---|---|---|
+| 660 | 11.19 Hz | 12.74 Hz | 7,996 |
+| 700 | - | 13.71 Hz | 7,995 |
+| 730 | - | 14.39 Hz | 8,003 |
+| 760 | - | **15.09 Hz** | 8,000 |
+| 800 | 14.57 Hz | **16.25 Hz** | 8,000 |
+
+Two things say the new numbers are the right ones. The offset is consistent at
+every PWM value, which is a measurement fault rather than a hardware change. And
+the sample rate now lands on **8,000/s exactly**, the datasheet figure, instead of
+the 7,350 logged earlier - the device was never 8 percent short of its own spec.
+
+The likely cause is the old sweep script's clock. `bench/lidar_pwm_sweep.py` sets
+`t0` immediately after `start_scan_express()` returns, then measures for **5
+seconds**. The device does not begin streaming the moment that command is
+acknowledged - it has to lock rotation phase first - so the dead time before the
+first capsule is counted as scanning time. Working backwards from the offset that
+dead time is roughly 0.4 to 0.7 seconds, which against a 5-second window is the
+10 percent seen. The new `tracker.run check` starts its clock after the first
+complete revolution and measures for 12 to 15 seconds, so both the dead time and
+the partial first turn fall outside the window. This is the likely cause, not a
+proven one; the old script is kept in `bench/` as the record.
+
+**What this changes.** The PWM 800 decision was taken on the stated grounds that it
+was "the rated setting" inside Slamtec's 5-15 Hz band. At a true 16.25 Hz it is
+**not** inside that band. PWM 760 gives 15.09 Hz, which is. The cost of moving is
+6.4 ms of extra latency; the gain is 2.7 mm less error at 3 m and running the
+bearing where the manufacturer rates it.
+
+Angular resolution is unaffected by which one is picked: 0.679 degrees at PWM 760
+and 0.731 at PWM 800, giving 35.6 mm and 38.3 mm of lateral error at 3 m, both
+comfortably inside the 50 mm jet pitch. Nothing about the sensing decision on #8 is
+overturned either way. `config.py` still defaults to **PWM 800**, the logged value,
+pending Garrett's call.
+
+## [2026-09-04] Two walkers from one walker: merge two clips by nearest return
+
+Garrett has no second person to test with. Issue #12 item 5 - does one A2M8 hold
+both tracks through a crossing - needs two people **in the data**, not two people in
+the room.
+
+**A 2D LiDAR reports only the nearest thing on each ray.** So take a left-to-right
+recording and a right-to-left recording, and on every ray keep whichever return is
+nearer. That is exactly the scan the sensor would have produced with both walkers
+present, shadows included, because a nearer body wins the ray under the same rule
+the hardware uses. This is not an approximation of occlusion; it is the mechanism.
+
+Built as `tracker/merge.py` and `tracker.run merge A B --shift-b S --out C`.
+Verified two ways: a unit test merges two synthetic one-person clips and asserts the
+result **matches a real two-person scan point for point**; and the CLI ran on two
+real 20-second bench recordings, producing a valid file that replays.
+
+One limit on that "point for point". The test's rays sit on an exact grid, so every
+return lands in its own slot. Real A2 angles jitter, so two real returns less than
+half a ray apart compete for one slot and the farther one is dropped. That is inside
+the sensor's own resolution and does not matter, but it is why the merge is faithful
+rather than exact.
+
+**`--shift-b` is the point of the tool.** It slides the second clip in time, which
+decides where the two walkers meet. One pair of recordings therefore gives the whole
+sweep: crossing right in front of the sensor (worst shadow), crossing at the far end
+(mildest), or never meeting (the control). `merge` prints the closest approach and
+when it happens, so the shift can be aimed rather than guessed.
+
+**Two things it cannot do**, both stated so nobody forgets. The recorded people never
+react to each other - no stepping aside, no slowing down; the ticket asks about the
+sensor, not about manners. And rays are matched by rounding the angle to the sensor's
+own sample spacing (360/503 = 0.7157 degrees), so two returns only compete when they
+are genuinely the same ray. Truncating instead of rounding was a real bug found by
+the test: floating point put two neighbouring rays in one slot and silently threw
+away a third of the points.
+
+**Items 6 and 7 never needed two people at all.** Track initiation for a standing
+person and real latency and accuracy all come from one person. Two-thirds of #12 is
+unblocked with no trick.
+
+## [2026-09-04] USB hub swapped; over-current fault ended with it
+
+Garrett changed the powered USB hub. Checked afterwards, and it is good.
+
+The udev rules held: `/dev/ttyLIDAR` and `/dev/ttyENTTEC` both still resolve, even
+though the underlying names swapped over - the Enttec moved from `ttyUSB1` to
+`ttyUSB0` and the LiDAR from `ttyUSB0` to `ttyUSB1`. That swap is exactly the failure
+the rules were written to prevent, and they prevented it. The match is on serial
+number, so which hub or port a device lands on does not matter.
+
+**The over-current fault stopped dead at the swap.** The kernel log holds 1,091
+over-current events between uptime 1,288 s and 4,400.9 s, and **none after
+4,400.9 s** - the moment the new hub enumerated. A 12-second Boost-mode LiDAR run
+afterwards added none. The new hub is a Genesys Logic USB2.1/3.1 unit.
+
+The underlying supply problem is unchanged and still logged: `max_current` is 3000
+and `usb_max_current_enable` is 0, because the 65 W supply offers only 3 A at 5 V.
+The powered hub makes that irrelevant for the LiDAR, which is why it was the
+recommended fix.
+
+Measured on the new hub: 16.04 Hz, 7,995 samples/s, 499 samples/scan, 0.722 degrees.
+
+## [2026-09-04] Baseline is a low percentile, so the room never has to be empty
+
+Garrett: *"I don't have an empty room."* The background baseline was built from the
+**nearest** return per bearing, which silently assumes nobody is in the scan while it
+records. Somebody walking through a bearing would set that bearing's horizon to their
+own body, and a person standing there later would then be invisible.
+
+**The horizon is now a percentile of each bearing's returns, not the minimum.** Sort a
+bin's distances nearest first. A person on that bearing for a fraction f of the clip
+owns the first f of the list, so a percentile p above f steps straight over them,
+while a static object that answers for more than p of the clip is still captured. p is
+`background_percentile`, and p = 0.0 is exactly the old rule.
+
+**Default is 0.35**, chosen from measurement rather than taste. A synthetic walker
+crossing in front of the sensor holds any one bearing for **12%** of a clip, so 0.35
+has roughly three times the margin. The failure mode is real and was measured too: a
+short 2-second clip where the walker ends up parked on a far bearing reaches **34.5%**
+occupancy, because angular speed collapses with distance. That is why the recording
+must be 60 s and the walker must keep moving.
+
+The cost was checked, though the check has a limit worth stating. A sweep over the two
+real 20-second bench recordings - baseline from the first, tracker on the second -
+gave **0 false tracks at every percentile from 0.0 to 0.7**. But both clips are a
+still bench, and the cost of a high percentile is a *static object answering
+intermittently* being pushed past the horizon and becoming foreground. This bench has
+exactly such an object - the near-field clutter - and it is already excluded by
+`roi_x_min = 0.00`, so the sweep could not see the failure mode. The honest claim is
+therefore: no cost measurable **inside the region of interest on a still bench**. If
+the real room holds intermittent clutter inside the region of interest, it will show
+as ghost points, and the fix is a lower `--percentile`.
+
+`tracker.run baseline --percentile` exposes it, and the recording plan now ends with a
+self-check: replay the baseline's own clip through `tracker.run offline`. Garrett was
+walking in it, so he should come out as a track. If he does not, he was absorbed into
+the baseline and the clip needs redoing.
+
+## [2026-09-04] First real person tracked; the room mapped from its own baseline
+
+Garrett recorded 60 seconds of the real room with himself walking about in it:
+924 scans at 15.40 Hz, `~/data/room.jsonl` on the Pi.
+
+**The percentile baseline works on real data.** All **360 of 360 bins filled**, and
+the self-check gave **16.2 moving points per scan** against a "must be over 10"
+threshold and a still-bench reference of 0.6. He was not absorbed into the room he
+was standing in. With no baseline the same clip reads 80.9 moving points per scan.
+
+**It tracked him.** Over the 924 scans:
+
+| Confirmed tracks alive | Share of scans |
+|---|---|
+| 1 | **78.0%** |
+| 0 | 14.9% |
+| 2 | 3.8% |
+| 3 or 4 | 3.2% |
+
+One person, one track, most of the time. The longest single track held him for
+**17.1 seconds over 4.81 m**, and three others ran 10 s or more. Six short-lived
+clusters appeared and correctly **never confirmed** - 1 to 2 seconds each with under
+0.1 m of travel - which is the confirmation rule doing its job. This is the first
+evidence of the tracker following a real human rather than a synthetic one.
+
+The track broke about eight times across the minute. He was deliberately walking
+everywhere, including through the excluded clutter zone, so re-entry accounts for
+most of it. Whether it also happens on a clean walk past the strip is what clips 2
+and 3 will show.
+
+**The room, read off the baseline.** Two halves, and they match what Garrett said:
+
+- **Bearings 105 to 300 degrees: clutter, 0.23 m to 1.4 m.** Closest at 150-180
+  degrees (0.35 m) and 105-135 degrees (0.85 m). This is the "bunch of stuff directly
+  behind the sensor".
+- **Bearings 300 through 0 to 90 degrees: open.** A wall at about 2.3 m across 30-90
+  degrees - his "about 2 m of open space" - opening out to 3 to 8 m towards 0 and 300
+  degrees, which is presumably a corridor.
+
+**The frame is the right way round.** Rotating `mount_angle_offset_deg` by 180
+degrees drops the moving points kept from 16.2 to 3.9 per scan, so the default 0
+already points the tracked half-plane into the open space. Fine adjustments are
+worth little until the strip is physically mounted: 0, +15 and -15 degrees give 16.2,
+17.1 and 14.8 points per scan. **`mount_angle_offset_deg` stays at 0** and gets set
+properly against the strip, not against a bench.
+
+The region of interest does clip him. About 80% of his moving points fall in the open
+half-plane, but only 66% survive the full box, because `roi_y` is +/-2.0 m and he
+walked wider than that. Left alone on purpose: the wave only cares about walkers
+near a 1 m strip, so a person 2.5 m away is not wanted.
+
+## [2026-09-04] Two real faults found on the first real walk: cluster width, and a stale baseline
+
+Garrett recorded 30 seconds of himself walking his line, `~/data/walk-left-right.jsonl`,
+433 scans at 14.41 Hz. He walked past twice. Scored against the room baseline recorded
+minutes earlier, the tracker reported **four to six people at once, for the whole clip**.
+Two separate faults, both real, both now fixed.
+
+### Fault 1: `max_cluster_width` was throwing a real person away
+
+Four of the phantom tracks were static: they sat at fixed points for all 433 scans with
+a median speed of 0.00-0.02 m/s. But the walker himself was also being lost. During his
+second pass the tracker saw **20 to 50 foreground points per scan and produced no
+detection at all**.
+
+Instrumenting the cluster stage found it immediately. **A real person reads 0.45 to
+0.62 m wide** at close range - both legs, the gap between them, and clothing - against a
+`max_cluster_width` of 0.45 that had been guessed from theory as "two legs merged". Every
+scan over the limit dropped him silently: the cluster existed, it just was not a leg
+candidate. His second pass was over 0.45 the entire time, so no track ever formed.
+
+A sweep put the knee at **0.65**, and it is now the default. On the walk clip it takes the
+tracks from 1 to 2 - both passes caught instead of one - and the longest track from 38 to
+70 scans. On the 60-second room clip it does not add phantoms; it **removes** them, from 8
+tracks to 7 and from 4 simultaneous to 3. Above 0.65 nothing changes at all.
+
+### Fault 2: a baseline goes stale the moment the room changes
+
+The other phantoms were the room itself. Something moved between the 60-second room
+recording and the walk recording, so objects that had been farther away were now nearer
+than the stored horizon, and each became a permanent person - confirmed in 8 scans by
+`min_times_seen_to_initiate` and then held forever. That rule exists so a standing person
+is not missed, and this is its cost.
+
+**The fix is to build each clip's baseline from that clip itself.** The percentile design
+already makes this legal: a walker occupies any one bearing for far less than 35% of a
+clip, so he does not become part of his own baseline. Measured on the walk clip:
+
+| Baseline | Confirmed tracks | Result |
+|---|---|---|
+| the earlier room clip | 8, four of them permanent | wrong |
+| **the walk clip itself** | **1** | right |
+
+With both fixes, the walk clip reads exactly one person during each of his two passes and
+nothing at all between them.
+
+**The exception is the standing-still clip.** Somebody who stands on one bearing for more
+than 35% of a clip *would* be absorbed into a baseline built from it. That clip must be
+scored against a baseline from a different, walking clip.
+
+**For the installation, neither fix is sufficient.** A baseline captured at boot goes
+stale as soon as anything in the hallway moves. That wants a rolling baseline that keeps
+updating, which is not built and is now noted on the map.
+
+## [2026-09-04] #12 item 5 answered: one A2M8 holds both walkers through a crossing
+
+Garrett walked his line twice, once each way, 30 seconds each, alone. Merging the two
+clips by nearest return per ray gives the scan two people would have made. Answer:
+**one RPLIDAR A2M8 is enough. No second unit.**
+
+Each clip alone tracks cleanly first - one confirmed person, 0.91 and 0.92 m/s median
+speed, nothing when he is out of shot. Merged with time shifts of 0, 1, 2, 3 and 4
+seconds, so the pair meet at five different points, the tracker held **two confirmed
+tracks at once in every case**, for 57 to 73 scans - about 4 to 5 seconds each.
+
+Walked through at shift 2 s, scan by scan, the crossing looks like this:
+
+| | Track 1 | Track 2 |
+|---|---|---|
+| y from | +1.61 | -1.64 |
+| y to | **-2.94** | **+2.95** |
+| Scans held | 80 | 82 |
+| Median speed | 0.96 m/s | 0.92 m/s |
+
+They pass at 4.7-5.1 s at x about 0.8 m from the sensor, closest **0.05 m between
+track centres**. Both **keep their own id straight through** and carry on in their
+original directions afterwards - no swap, no drop, no merge into one. Track 1 stalls
+briefly at 5.1-5.3 s, speed dipping to 0.72 m/s while it coasts on prediction through
+the shadow, then recovers. That is the constant-velocity filter doing exactly the job
+it was put there for.
+
+This is the hardest case, not the easiest: they crossed within 0.15 m of each other at
+under 1 m from the sensor, where each body subtends about 44 degrees and the occlusion
+is near total.
+
+**One bug found and fixed on the way.** `merge` used to report a "closest approach"
+computed from the nearest raw return of each clip. That is whatever clutter sits by the
+sensor, not a person, so it printed the same 0.08 m for every time shift and was
+useless. Replaced with `crossing_report`, which subtracts the background, runs the
+tracker, and reports scans holding two tracks, the most at once, and the real gap
+between the two people.
+
+**Still open on #12:** items 6 and 7 need the standing-still clip, and item 3 needs the
+water modules connected.
+
+## [2026-09-04] #12 item 6 answered, item 7 half answered: standing works, 7-13 mm jitter
+
+Garrett stood still at three spots on his line, 596 scans over 40.1 s,
+`~/data/standing.jsonl`.
+
+### Item 6: a standing person is tracked, and leg_tracker's rule alone would miss him
+
+| Rule | Scans with the standing person confirmed |
+|---|---|
+| `min_times_seen_to_initiate = 8` (this build) | **589 of 596, 99%** |
+| distance travelled only (leg_tracker's rule) | 442 of 596, 74% |
+
+The 25-point gap is the whole of his **first ten-second stand**. He was already standing
+when the clip began, so under leg_tracker's
+`dist_travelled_together_to_initiate_leg_pair` he had not walked 0.5 m and was never
+opened as a track at all. This is exactly the Hold failure #12 predicted from reading
+the source, now measured on hardware. The local rule fixes it.
+
+### Item 7, precision half: 7 to 13 mm of jitter
+
+Position reported while genuinely standing still, one standard deviation:
+
+| Spot | Scans | x | y | Range | Jitter |
+|---|---|---|---|---|---|
+| A | 127 | 0.875 +/- 0.008 | -1.205 +/- 0.010 | 1.489 m | **12.6 mm** |
+| B | 139 | 0.693 +/- 0.003 | -0.001 +/- 0.007 | 0.693 m | **8.2 mm** |
+| C | 165 | 0.740 +/- 0.004 | +0.882 +/- 0.005 | 1.151 m | **6.6 mm** |
+
+Against a 50 mm jet pitch this is four to eight times better than needed. It grows with
+range, as expected.
+
+The three spots are collinear to within 0.5%: A-B 1.218 m plus B-C 0.884 m is 2.102 m
+against a measured A-C of 2.091 m. That is an internal consistency check and it passes.
+**Absolute accuracy is still unmeasured** - it needs Garrett's tape measure, and it
+carries an unknown offset because the A2's mirror does not sit at the centre of its
+case.
+
+### Item 7, latency half: the tracker costs 0.26 ms
+
+Measured on the Pi 5 over 596 real scans: median **0.26 ms** per scan, 95th percentile
+0.27 ms, worst 0.45 ms. Against a 67.2 ms scan period that is **0.4% of the budget**.
+The sensor is the entire latency; the software is free. The plain-Python-not-ROS
+decision is vindicated. End-to-end latency still needs a timed external event.
+
+### A sharper rule about baselines
+
+Scored against a baseline built from **its own clip**, the third stand vanished
+completely - and raising `background_percentile` to 0.5 or 0.6 did not bring it back.
+The percentile arithmetic is not the whole story. Behind spot C there was nothing in
+range, so **his body was the only thing that bearing ever saw**; the percentile of a
+list containing only his returns is his own distance, whatever the percentile. A person
+standing in front of open space is absorbed at any setting.
+
+So the rule is not "use a high percentile for standing clips". It is: **never build a
+baseline from a clip in which anybody stands still.** Score standing clips against a
+walking clip's baseline. With `data/base-rl.json` the coverage is 100% for every second
+of the clip after the first.

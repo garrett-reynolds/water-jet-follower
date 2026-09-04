@@ -1,0 +1,227 @@
+# tracker
+
+Finds people in the RPLIDAR A2M8 scan and follows them, in plain Python with no
+dependencies beyond `pyrplidar`. This is step 1 and step 2 of `NEXT_STEPS.md`. It
+does **not** drive DMX yet.
+
+## What is in here
+
+| File | Does |
+|---|---|
+| `config.py` | every tunable number, in one place |
+| `lidar.py` | the A2M8: connect with retry, flush the buffer, force Boost mode |
+| `scanfile.py` | record scans to a file, play them back, build the empty-room baseline |
+| `geometry.py` | polar scan to world x/y, background subtraction, position to jet number |
+| `tracking.py` | cluster, pair legs, follow people with a constant-velocity Kalman filter |
+| `merge.py` | two one-person clips into one two-person clip, by nearest return per ray |
+| `viewer.py` | web page served from the Pi, because Pi OS Lite has no window |
+| `run.py` | the command line |
+| `tests/` | synthetic walkers, so the maths can be checked with nobody in the room |
+
+Parameter names copied from `angusleigh/leg_tracker` keep that project's spelling.
+It is a reference for the algorithm, not a dependency — it targets ROS 1 Noetic,
+which is end of life.
+
+## Put it on the Pi
+
+On the laptop, in Git Bash:
+
+```
+scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets.local:~/
+```
+
+## Use it on the Pi
+
+Everything runs from the home directory, in the venv:
+
+```
+ssh pi@water-jets.local
+cd ~
+```
+
+**1. Is the LiDAR alive and in Boost mode?**
+
+```
+~/wj-venv/bin/python -m tracker.run check
+```
+
+Expect about 16 Hz and about 500 samples per scan at the default PWM 800. Under 400
+samples per scan means it is not in Boost, and the whole approach fails at that
+resolution.
+
+**2. Record the room, then build the baseline.**
+
+The baseline is what stops the walls and the basin from looking like people. It does
+**not** need an empty room. Clutter is exactly what it is for, and you can be in the
+room while it records — just **keep moving and do not stand still**.
+
+```
+~/wj-venv/bin/python -m tracker.run record --seconds 60 --out data/room.jsonl --notes "the room, me walking about"
+~/wj-venv/bin/python -m tracker.run baseline --scan data/room.jsonl --out data/baseline.json
+```
+
+Why moving works: for each bearing the baseline takes the 35th-nearest-percent of
+what it saw, not the nearest. Somebody walking normally sits on any one bearing for
+about 12% of a clip, so they fall below that line and never become part of the room.
+Standing still on one spot for a third of the clip **would** bake you in, which is
+why the clip is 60 s and why you keep walking.
+
+**Check it worked** — replay the same clip through the tracker and read the
+**`moving points per scan`** line. You were walking in that clip, so you should still
+show up as moving:
+
+```
+~/wj-venv/bin/python -m tracker.run offline data/room.jsonl --baseline data/baseline.json
+```
+
+| `moving points per scan` | Means |
+|---|---|
+| **over 10** | good — you are still visible, the room is not |
+| **under 3** | you were absorbed into the baseline |
+| **over 80** | the baseline is not doing its job at all |
+
+Measured on a still bench for scale: 0.6 to 0.9 with a baseline, 118.8 with none.
+
+If you were absorbed, record again and keep moving, or raise the line with
+`--percentile 0.5`.
+
+Read this line, not the track count. A still room can still throw the odd ghost
+track; the points figure is the direct measure and does not go through the tracker's
+confirmation rules.
+
+**3. Record yourself walking. One person is enough — see "Two people, on your own".**
+
+Walk your line, past the whole strip and out the far end.
+
+```
+~/wj-venv/bin/python -m tracker.run record --seconds 30 --out data/walk-left-right.jsonl --notes "one person, left to right"
+~/wj-venv/bin/python -m tracker.run record --seconds 30 --out data/walk-right-left.jsonl --notes "one person, right to left"
+```
+
+**4. Record yourself standing still.** This one answers #12 items 6 and 7 on its own.
+
+Stand 10 seconds at each of three spots, measured along the strip from the LiDAR:
+**0.2 m, then 0.6 m, then 1.0 m**. Stand beside the strip, on the same line you
+walked, not on top of it. Count the seconds out loud so the clip can be read later.
+
+```
+~/wj-venv/bin/python -m tracker.run record --seconds 40 --out data/standing.jsonl --notes "10s each at 0.2m, 0.6m, 1.0m along the strip"
+```
+
+**5. Watch it live, any time.**
+
+```
+~/wj-venv/bin/python -m tracker.run live --baseline data/baseline.json
+```
+
+Open `http://water-jets.local:8080/` on a laptop. Green dot = a confirmed
+person. Grey = a new track that is not confirmed yet. Red = a track coasting
+through an occlusion. Orange rings = leg clusters. Blue dots = moving points, dark
+grey = the room.
+
+**6. Replay a recording, as many times as you like.**
+
+```
+~/wj-venv/bin/python -m tracker.run replay data/walk-left-right.jsonl --baseline data/baseline.json --loop
+```
+
+Or with no viewer, just a count:
+
+```
+~/wj-venv/bin/python -m tracker.run offline data/walk-left-right.jsonl --baseline data/baseline.json
+```
+
+## Two people, on your own
+
+Issue #12 asks whether one LiDAR survives two walkers crossing. That needs two
+people **in the data**, not two people in the room.
+
+A 2D LiDAR reports only the nearest thing on each ray. So take your left-to-right
+clip and your right-to-left clip, and on every ray keep whichever return is nearer.
+The result is exactly the scan the sensor would have made with both walkers there,
+shadows and all — because a nearer body wins the ray, which is the same rule the
+hardware uses. A unit test proves it: merging two one-person clips gives a scan that
+matches a real two-person one point for point. (Real angles jitter, so two returns
+less than half a ray apart compete for one slot. That is inside the sensor's own
+resolution.)
+
+```
+~/wj-venv/bin/python -m tracker.run merge data/walk-left-right.jsonl data/walk-right-left.jsonl --shift-b 4.0 --out data/crossing-4s.jsonl
+~/wj-venv/bin/python -m tracker.run replay data/crossing-4s.jsonl --baseline data/baseline.json --loop
+```
+
+`--shift-b` slides the second clip in time, which is what decides **where** the two
+walkers meet. That one pair of recordings gives the whole sweep:
+
+| `--shift-b` | What it tests |
+|---|---|
+| tuned so they cross close to the sensor | worst case — the biggest shadow |
+| tuned so they cross at the far end | mildest case |
+| large, so they never meet | the control — two tracks, no interaction |
+
+`merge` prints the closest approach and when it happens, so you can aim the shift
+instead of guessing. Try a few values and watch the viewer.
+
+**What this cannot do:** the two recorded people never react to each other — no
+stepping aside, no slowing down. The ticket asks about the sensor, not about
+manners, so that is a fair trade. It is worth one real two-person recording later
+if a second person ever turns up.
+
+## Build each clip's baseline from that clip
+
+A baseline goes stale the moment anything in the room moves. Measured 2026-09-04: a
+room baseline recorded minutes before a walk gave **8 confirmed people, four of them
+permanent**, because things had shifted. The same walk scored against **its own**
+baseline gave **1**.
+
+So for any clip with somebody walking in it, do this:
+
+```
+~/wj-venv/bin/python -m tracker.run baseline --scan data/walk-left-right.jsonl --out data/base-lr.json
+~/wj-venv/bin/python -m tracker.run offline data/walk-left-right.jsonl --baseline data/base-lr.json
+```
+
+This is only legal because the baseline is a percentile, not a minimum — a walker
+holds any one bearing for well under 35% of a clip, so he does not end up in his own
+baseline.
+
+**Never build a baseline from a clip in which anybody stands still.** Score standing
+clips against a walking clip's baseline instead:
+
+```
+~/wj-venv/bin/python -m tracker.run offline data/standing.jsonl --baseline data/base-rl.json
+```
+
+Raising `--percentile` does **not** rescue this, and it is worth knowing why. If there
+is open space behind the person, their body is the only thing that bearing ever sees.
+The percentile of a list containing nothing but their own returns is their own
+distance, at any percentile. Measured 2026-09-04: a third standing spot vanished
+entirely from its own baseline at 0.35, 0.5 and 0.6 alike, and came back at 100%
+coverage against a walking clip's baseline.
+
+## Lining the sensor up
+
+The world frame puts the LiDAR at `(0, 0)`, `+x` along the strip and `+y` across the
+hallway. If the scan comes out rotated or mirrored in the viewer, change
+`mount_angle_offset_deg` and `mirror` in `config.py`. There is no way to get these
+right on paper; look at the picture.
+
+`roi_x_min` is `0.00`, so **the sensor is blind behind itself**. That is on purpose:
+clutter beside the LiDAR on the bench held a false person for a whole recording.
+Raise the region of interest again only with a longer empty-room baseline.
+
+## Tests
+
+On the laptop, in Git Bash:
+
+```
+cd "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower" && python -m unittest discover -s tracker/tests -t .
+```
+
+They use fake scans with real ray occlusion. They prove the maths, not the hardware.
+Only recordings of the real room answer issue #12.
+
+## Known, and not fixed here
+
+- `~/wj-venv` has `include-system-site-packages = false`, so `import ola` fails
+  inside it. That blocks DMX output, which is the next piece, not this one.

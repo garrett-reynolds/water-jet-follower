@@ -1,1 +1,7 @@
 .claude/worktrees/
+__pycache__/
+*.pyc
+
+# Scan recordings are bench artifacts. They live on the Pi and are megabytes each.
+# The baselines built from them (data/*.json) are small and are kept.
+data/*.jsonl
