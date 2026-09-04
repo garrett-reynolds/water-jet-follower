@@ -17,3 +17,7 @@ No hallway measurements will come, so the map assumes 10 ft long by 10 ft wide, 
 ## [2026-09-04] Wave defined: 5-jet hill, colour by walker speed
 
 Wave is a 5-jet hill that follows each walker, with one hill per walker, an attract roll when empty, and hold when a walker stops. Hill colour follows walker speed, slow blue to fast white, on a dim base. This adds two sensor rules: track two people at once, and give speed. Detail is on GitHub issue #7.
+
+## [2026-09-04] Kit contents: 5-pin XLR, 24 V supply, two USB DMX dongles
+
+The modules terminate in 5-pin XLR. A 24 V supply came with the system, rating unread. Two USB dongles shipped: an HB-Laser USB-DMX-RDM and a MADRIX USB ONE. This may remove the need to buy any DMX interface, so the control path research ticket now covers both dongles and MADRIX as an option. Detail on GitHub issue #11.
