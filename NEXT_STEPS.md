@@ -91,6 +91,16 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    red; and `olad` held `slots: 512 nonzero: [(1, 40)]` while it was lit, so the full-frame
    send works against a real fixture. **The pump on channel 5 is still untouched.**
 
+   **Stop layer (a) is proven on real hardware.** Garrett killed the jog process with the LED
+   lit and the LED went out. So the tool's zero-on-exit reaches a real fixture, not just
+   `olad`. Layer (b), `tracker.run zero`, is the same code path and the same frame.
+
+   **Still open: what happens when `olad` itself dies.** The first attempt ran in the wrong
+   order - the tracker was killed first, which zeroed the universe, so stopping `olad`
+   afterwards proved nothing. Redone properly: channel 1 set to 40 and left lit, then `olad`
+   stopped underneath it. Note that `sudo -n` works on this Pi without a password, so this is
+   scriptable. The answer was not read back before the test moved on.
+
    **Start low, and have three ways to stop it.** Garrett's rule, 2026-09-04. Channel 5 is
    0-255 against a 5 cm to 1.5 m throw, and the mapping is RDM-calibrated and unread, so open
    at about 5-10 and step up. Three kill layers, because the first two are unproven: (a) the
