@@ -608,26 +608,34 @@ Untested at the time of writing: whether cycling the 24 V clears the latch, and 
 modules come back off or resume the held value. That is the next thing on the bench, and it is
 also the only stop procedure this system has, so it needs proving before a pump ever runs.
 
-## [2026-09-04] First measurement of the DMX-to-height mapping: about 7.6 mm per DMX unit
+## [2026-09-04] DMX-to-height is linear: 7.62 mm per DMX unit, full scale about 1.94 m
 
 Measured at the bench on jet 1, channel 5, in the 24 in x 16 in test basin.
 
-| DMX value | Jet height |
-|---|---|
-| 5 | "a very little spray" |
-| 40 | **12 in = 30.5 cm** |
+| DMX value | Jet height | cm per DMX unit |
+|---|---|---|
+| 5 | "a very little spray" | - |
+| 20 | **6 in = 15.2 cm** | 0.762 |
+| 40 | **12 in = 30.5 cm** | 0.762 |
 
-One properly measured point and one qualitative one. Taking it as linear through the origin
-gives **0.762 cm per DMX unit**, so one press of the jog tool's default step of 5 is about
-**3.8 cm, or 1.5 inches**. Extrapolated to 255 that is **194 cm**.
+**Two measured points, and they agree exactly.** Double the DMX value, double the height, so
+the line passes through the origin with no offset. **0.762 cm per DMX unit**, which makes one
+press of the jog tool's default step of 5 about **3.8 cm, or 1.5 inches**. Extrapolated to 255
+that is **194 cm**.
+
+The 20 in point was taken as a prediction and then checked, not fitted after the fact: 6 inches
+was predicted from the 40 reading and 6 inches is what came back.
 
 That extrapolation lands almost exactly on the maker's website claim of *"A maximum water
 height of 2 m can be reached (height can vary between 5 cm and 2 m)"*, and above the module
 datasheet's more conservative *"Fountainheight from 5 cm up to 1,5m"*. Two independent sources
-agreeing with one bench measurement is decent evidence that the mapping is roughly linear over
-a 2 m range. **It is still one point.** Linearity is assumed, not measured, and the low end is
-where a fountain is most likely to be non-linear — the "very little spray" at 5 would be 3.8 cm
-under this fit, against a datasheet minimum of 5 cm, which is the right order but not a match.
+agreeing with two bench measurements is good evidence that the mapping is linear over a 2 m
+range.
+
+Still unmeasured: the bottom of the range. The "very little spray" at DMX 5 would be 3.8 cm
+under this fit, against a datasheet minimum of 5 cm — the right order, but a fountain is most
+likely to depart from a straight line right where it starts, and nothing between 0 and 20 has
+been measured. That only matters if the wave ever wants very short jets.
 
 **Why this matters more than it looks.** DMX 255 is roughly two metres of water. In a hallway
 that is the ceiling. Combined with the latch behaviour logged above — the modules hold their
