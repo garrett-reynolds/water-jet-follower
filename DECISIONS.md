@@ -85,3 +85,13 @@ Garrett confirmed the whole parts list is on the shelf: RPLIDAR A2M8, Raspberry 
 Two loose values were then closed without a bench, because both were already answerable from evidence gathered earlier in the same session. The **24 V supply came with the jets**, so it is the manufacturer's supply for this exact load and the 6.4 A concern was unfounded. The **module cable is 5-pin male**, and the Enttec Pro Mk2's breakout carries one male DMX input and two female DMX outputs - quoted verbatim from the Enttec manual earlier the same day. Male into female mates directly. Both had been put to Garrett as questions and both should have been reasoned out instead; he said so, and he was right.
 
 With the inventory closed, the bench prototype is the only ticket standing between the map and the build-ready spec. Detail on GitHub issues #3 and #12.
+
+## [2026-09-04] Raspberry Pi OS Lite 64-bit, headless
+
+The Pi 5 gets **Raspberry Pi OS Lite, 64-bit**, the current Debian 13 (Trixie) release dated 18 June 2026, installed headless and reached over SSH.
+
+Lite rather than Desktop because this Pi ends up running unattended in a hallway: a desktop is more surface to update, more to go wrong, and nothing the finished installation uses. Trixie rather than the Legacy Bookworm image because nothing here needs the older base - OLA is packaged in Trixie main as `ola` 0.10.9.nojsmin-7.1, with `ola-python` and `ola-rdm-tests` alongside it. 32-bit was never a real option on a Pi 5.
+
+The cost of choosing Lite is that there is no local window to plot LiDAR scans in. Debugging the tracker therefore needs a small web viewer served from the Pi and opened on a laptop. That is a consequence to build, not a reason to take the desktop image, and it is noted on the prototype ticket.
+
+SSH is set up with password authentication to start with, for speed at the bench. It should move to key-only before the system goes into a wall.
