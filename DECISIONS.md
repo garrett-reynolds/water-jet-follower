@@ -59,3 +59,13 @@ The Pro Mk2 beat the also-owned Open DMX USB on one point: it is the only owned 
 The MADRIX USB ONE is out: Windows-only drivers and a paid MADRIX KEY required for DMX output. The bench test ticket raised for the two unknown dongles is closed as moot without being run.
 
 One thread survives elsewhere. The HB-Laser USB-DMX-RDM is probably the "optional programming connector" the module datasheet requires for auto-addressing and RDM fountain-height recalibration. That is commissioning rather than runtime, and it is now fog on the map, not a ticket, because it is not yet known whether the modules need addressing by hand at all. Detail on GitHub issue #9.
+
+## [2026-09-04] Enttec manual closes the connector question and may retire the HB-Laser dongle
+
+Read the ENTTEC *DMX USB PRO MK2 User Manual* (doc ID 134658, December 2021) after choosing the interface. Two things it settles.
+
+**Connectors:** *"1\* 5-Pin Male XLR for DMX Input, 2\* 5-Pin Female XLR for DMX Output"*, carried on a 15-pin breakout cable. Female output is the E1.11 convention and mates with a standard fixture's male input, so a stock 5-pin DMX cable should join the Enttec to the modules with nothing to fabricate. What must be confirmed on the shelf is that the breakout cable is in the kit, and the gender on the module cable end.
+
+**RDM:** *"RDM (E1.20) is supported as standard on the DMX USB PRO Mk2."* The modules use RDM for auto-addressing and fountain-height recalibration, which the module datasheet gates behind an optional programming connector and separate software. Since OLA is an RDM controller and the chosen interface speaks RDM, commissioning may need neither the HB-Laser dongle nor a Windows machine. Whether the modules answer standard E1.20 parameters or a vendor-specific set is unknown. This does not change the control-path decision; it narrows the commissioning fog on the map.
+
+Also noted: Mark-After-Break is settable 10-1355 us and Break 96-1355 us in the interface's own hardware, which gives tuning room if the modules prove fussy about timing.
