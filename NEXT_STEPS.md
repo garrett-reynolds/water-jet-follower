@@ -82,7 +82,14 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
 3. **Decide the motor PWM.** PWM 800 measures 16.25 Hz, which is outside the A2M8's rated
    5-15 Hz band; PWM 760 gives 15.09 Hz. See the correction entry in `DECISIONS.md`.
 4. **Connect the water modules** and complete #12 item 3: set module 1 channel 5 and watch jet 1
-   move. This is the only untested link in the whole chain.
+   move. ~~This is the only untested link in the whole chain.~~
+
+   **The DMX path is proven end to end, 2026-09-04.** `tracker.run jog --channel 1 --max 40`
+   lit **nozzle 1's red LED**, confirmed by Garrett at the bench. That settles four things at
+   once: the Pi to Enttec to cable to module chain carries DMX; **module 1 is at DMX address
+   1**, so no readdressing is needed; the datasheet's channel map is right, with channel 1 as
+   red; and `olad` held `slots: 512 nonzero: [(1, 40)]` while it was lit, so the full-frame
+   send works against a real fixture. **The pump on channel 5 is still untouched.**
 
    **Start low, and have three ways to stop it.** Garrett's rule, 2026-09-04. Channel 5 is
    0-255 against a 5 cm to 1.5 m throw, and the mapping is RDM-calibrated and unread, so open
