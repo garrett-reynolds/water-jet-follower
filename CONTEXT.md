@@ -8,3 +8,7 @@
 - **Wave**: the group of jets and pixels that is up around the walker's position, with a small lead ahead and lag behind, moving with them.
 - **Follow**: the strip keeping the wave under the walker as they move.
 - **Control path**: everything between a sensor reading and the DMX frames the modules receive.
+- **Hill**: the wave's shape. The middle jet is highest and the edge jets are lower.
+- **Attract**: what the strip does when nobody is there. One slow, half-height hill rolls end to end.
+- **Hold**: the hill staying under a walker who has stopped beside the strip.
+- **Base colour**: the dim colour on every pixel outside a hill.
