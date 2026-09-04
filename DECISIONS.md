@@ -95,3 +95,15 @@ Lite rather than Desktop because this Pi ends up running unattended in a hallway
 The cost of choosing Lite is that there is no local window to plot LiDAR scans in. Debugging the tracker therefore needs a small web viewer served from the Pi and opened on a laptop. That is a consequence to build, not a reason to take the desktop image, and it is noted on the prototype ticket.
 
 SSH is set up with password authentication to start with, for speed at the bench. It should move to key-only before the system goes into a wall.
+
+## [2026-09-04] LiDAR measured on hardware; motor PWM 800
+
+The A2M8 ran on the Pi for the first time. The sensing decision was made from datasheets and it survives contact with the hardware.
+
+**Measured against predicted:** 14.57 Hz against 15 Hz, 68.6 ms against 67 ms, ~7,350 samples/s against the claimed 8,000, 0.715 degrees against 0.715, and 13/25/37 mm of lateral error at 1/2/3 m against a predicted 12/24/35. Slightly optimistic, which is the right direction.
+
+**Boost mode is mandatory, not optional.** The device reports three modes: Standard at 2,000 samples/s, Express at 4,000, and Boost at 8,000. Only Boost reaches the datasheet's headline figure. Standard mode would give 2.6 degrees at this scan rate, about 137 mm at 3 m, nearly three jet pitches, and would sink the whole approach. The driver must decode `ULTRA_CAPSULED` frames.
+
+**Motor PWM 800 chosen, giving 14.57 Hz.** A PWM sweep showed the unit will spin to 19.39 Hz at full power, well above Slamtec's rated 5-15 Hz band, for 17 ms less latency. Garrett took the rated setting. The sample rate is constant at about 7,350 dots per second regardless of spin speed, so scan rate and angular resolution trade one-for-one: at 19.39 Hz the error at 3 m is 49.7 mm against a 50 mm jet pitch, which is no margin at all. The 17 ms is also likely invisible against the still-unmeasured time a jet takes to rise. Revisit only if the water proves fast.
+
+**Two hardware facts came out of the bench.** First, the Pi 5's USB ports were current-limited to 600 mA because its 65 W supply offers only 3 A at 5 V, and a Pi 5 needs a fixed 5 V / 5 A profile to unlock 1.6 A. The LiDAR browned out the bus every time its motor started. A powered USB hub fixed it completely and is now part of the build. Second, `pyrplidar` 0.10.9 does not drain its serial buffer on stop, and threw protocol sync errors on reconnect twice; production code needs retry and an explicit flush or the installation will fail to start at random.
