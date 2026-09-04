@@ -147,8 +147,25 @@ Once step 4 lands, #12 closes and #10 unblocks.
   first reading and RDM is usable one module at a time. Still corrupt on one module means the
   second, and the next thing to check is a 120 ohm terminator at the end of the DMX line.
 
-  This blocks nothing. Plain DMX is one-way and does not care. It only blocks reading the
-  stored fountain-height calibration, which is why the jog ceiling stays a DMX number.
+  The two modules are **hardwired together**, so powering one alone is not possible and that
+  test is off the table. Two routes were then tried and closed off from the laptop:
+  `ola_rdm_get -u 1 --uid 2421:21120181 DEVICE_INFO` returns `Error: The RDM device could not
+  be found` — OLA will not address a UID that discovery never resolved — and
+  `/etc/ola/ola-usbserial.conf` has no RDM or timing knobs for this widget
+  (`tri_use_raw_rdm` is for the RDM-TRI, not the Pro Mk2).
+
+  What is left, if RDM is ever wanted: a **120 ohm terminator** across pins 2 and 3 of a
+  5-pin XLR on the last module's DMX out, which is the usual cure for corrupted RDM on an
+  unterminated bus; and OLA's Python `RDMGet` / `SendRawRDMDiscovery`, which may address a UID
+  the CLI refuses, and could send a directed `DISC_MUTE` to silence responders one at a time —
+  the same-UID test without unplugging anything. Also worth knowing for diagnosis: whether the
+  two modules are joined by the manufacturer's longitudinal connector or by a cable splice, and
+  whether that splice is a chain or a Y. A Y-wired bus corrupts RDM while still passing one-way
+  DMX perfectly well.
+
+  **This blocks nothing and is not worth chasing now.** Plain DMX is one-way and does not care.
+  It only blocks reading the stored fountain-height calibration, which is why the jog ceiling
+  stays a DMX number rather than a height in cm.
 
 ## Traps that already cost time
 
