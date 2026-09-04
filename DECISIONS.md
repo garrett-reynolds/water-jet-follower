@@ -568,3 +568,42 @@ any pump runs.
 Also fixed: `~/wj-venv` had `include-system-site-packages = false`, which made `import ola`
 fail inside the venv. It is now `true`, the original is at `~/wj-venv/pyvenv.cfg.bak`, and
 the venv imports both `ola` and `pyrplidar`.
+
+## [2026-09-04] The modules fail frozen, not fail safe. The 24 V switch is the only stop.
+
+Tested on real hardware with nozzle 1's **red LED** lit at DMX value 40, so nothing could get
+wet while finding this out. Two cuts, in order:
+
+| Cut | Expected | What happened |
+|---|---|---|
+| `sudo systemctl stop olad` | LED goes out | **LED stayed lit** |
+| Enttec USB pulled from the Pi | LED goes out | **LED stayed lit** |
+
+So the modules **hold their last commanded value indefinitely when DMX stops**. They do not
+fall back to off. Cutting the signal at any point in the chain — daemon, driver, USB, cable —
+changes nothing once a value has landed.
+
+This is the important safety property of the whole build and it was not in the datasheet:
+**the system fails frozen, not fail safe.** If the Pi crashes with a jet at full height, the
+jet stays at full height until somebody cuts the 24 V.
+
+**What still works.** The software stop is real, but only as an *action*, not as a *fallback*.
+`tracker.run zero` and the jog tool's zero-on-exit both turn a lit LED off — proven earlier the
+same session — because they actively send a zero frame the modules then latch. They work while
+the whole chain is alive. They do nothing once any link in it is dead.
+
+**What this retires.** `DECISIONS.md` chose the Enttec Pro Mk2 partly for its onboard frame
+buffer, on the reasoning that hardware DMX timing beats Linux scheduling on a busy Pi. That
+reasoning stands for timing and is wrong for safety: the buffer keeps transmitting the last
+frame after the host dies. But the second test settles that it does not matter which device is
+at fault — with the Enttec unpowered and transmitting nothing at all, the LED still stayed lit.
+**The latch is in the modules.** Swapping to the host-timed Open DMX USB would not help.
+
+**What this forces into the build spec (#10).** A hardware kill on the 24 V supply is not a
+nicety, it is the only stop that exists. For an unattended hallway installation that means a
+switched contactor on the 24 V feed, dropped by a watchdog when the control software stops
+heartbeating — otherwise a software crash is a flood. Raise as its own ticket.
+
+Untested at the time of writing: whether cycling the 24 V clears the latch, and whether the
+modules come back off or resume the held value. That is the next thing on the bench, and it is
+also the only stop procedure this system has, so it needs proving before a pump ever runs.
