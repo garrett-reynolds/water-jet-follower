@@ -88,10 +88,25 @@ function draw() {
   ctx.strokeStyle = '#2a6'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(t.sx(a[0]), t.sy(a[1]));
   ctx.lineTo(t.sx(b[0]), t.sy(b[1])); ctx.stroke();
+  // Each jet is drawn at the size of the height it has actually been commanded,
+  // so the hill is visible. Without this every jet is the same dot and the only
+  // thing the page can tell you is that something is happening.
+  const H = FRAME.heights || [];
   for (let j = 0; j < CFG.jet_count; j++) {
     const f = j / (CFG.jet_count - 1);
-    dot(ctx, t, a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, 2.5, '#2a6');
+    const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f;
+    const h = H[j] || 0;
+    const up = CFG.height_max > 0 ? Math.min(1, h / CFG.height_max) : 0;
+    dot(ctx, t, x, y, 2.5 + 9 * up, up > 0 ? '#4cf' : '#2a6');
+    if (h > 0) {
+      ctx.fillStyle = '#9ef'; ctx.font = '10px system-ui';
+      ctx.fillText(h, t.sx(x) - 6, t.sy(y) - 14);
+    }
   }
+  const peak = H.length ? Math.max.apply(null, H) : 0;
+  ctx.fillStyle = peak > 0 ? '#4cf' : '#666'; ctx.font = '13px system-ui';
+  ctx.fillText('tallest jet ' + peak + ' / ' + CFG.height_max
+               + '  (' + (peak * 0.762).toFixed(1) + ' cm)', 12, 22);
 
   // the LiDAR itself
   dot(ctx, t, 0, 0, 6, '#ff0');
@@ -176,6 +191,7 @@ def make_handler(state, cfg):
                     "strip_start": list(cfg.strip_start),
                     "strip_end": list(cfg.strip_end),
                     "jet_count": cfg.jet_count,
+                    "height_max": cfg.height_max,
                 }), "application/json")
             elif self.path in ("/", "/index.html"):
                 self._send(PAGE, "text/html; charset=utf-8")
