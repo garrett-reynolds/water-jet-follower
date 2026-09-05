@@ -690,3 +690,41 @@ calibration, and that number has since been measured directly on the bench inste
 DMX unit. Nothing else in the build needs RDM: plain DMX is one-way and does not use it. What is
 left to try, if it is ever wanted, is a 120 ohm terminator on the last module's DMX out, and
 OLA's Python `RDMGet` / `SendRawRDMDiscovery`, which may address a UID the CLI refuses.
+
+## [2026-09-05] The AGENTS.md that kept coming back is Codex, and the sync is now off
+
+`AGENTS.md` had been deleted from this repo several times and kept returning as a byte-for-byte
+copy of `CLAUDE.md`. It is not a Claude Code hook, skill, or harness behaviour, and it was never
+tracked by git, which is why the deletions left no trace to follow.
+
+The **Codex desktop app** copies `CLAUDE.md` to `AGENTS.md` on launch, in every repo it has
+marked trusted, because Codex reads only `AGENTS.md`. The proof is Codex's own record: the table
+`external_agent_config_imports` in `C:\Users\garrett.reynolds\.codex\state_5.sqlite` logs
+`item_type: AGENTS_MD`, source `...\water-jet-follower\CLAUDE.md`, target
+`...\water-jet-follower\AGENTS.md`, at 2026-09-04 14:48:28 and again at 2026-09-05 08:52:15 --
+the second of those four seconds before the file's own birth timestamp.
+
+**Decided:** Codex is not used on this repo, so the copy is unwanted. The import sync was turned
+off -- `external-agent-import-sync-enabled = false` under `[desktop]` in
+`C:\Users\garrett.reynolds\.codex\config.toml`, backup at `config.toml.bak-2026-09-05` -- and
+`AGENTS.md` was deleted.
+
+**Unverified:** that this key is what gates the copy, and that the edit survives a Codex restart.
+Codex rewrites its own `config.toml` from `~/.claude/settings.json` during the same sync, so a
+hand edit there may be overwritten. The test is to launch Codex and see whether `AGENTS.md`
+returns. If it does, the toggle has to be set inside the Codex app instead.
+
+## [2026-09-05] Global config no longer contradicts this project's General logging mode
+
+An `autoMode.environment` block in `C:\Users\garrett.reynolds\.claude\settings.json` described a
+different project entirely and asserted that *"DECISIONS.md is an SR&ED evidence trail, so failed
+experiments and dated entries must never be deleted or rewritten."* This project's `CLAUDE.md`
+sets the logging mode to **General**, where a superseded entry can be corrected in place. An
+agent taking the settings block as binding would have refused to correct a wrong entry in this
+file and appended a contradiction underneath it instead.
+
+**Removed**, along with two other stale items found in the same sweep: a `SessionStart` hook
+still enforcing a superseded version of global CLAUDE.md section 6, and two `skillOverrides`
+trying to disable `create-readme` and `decision-log` -- the two wonderMakr skills that this
+repo's own `CLAUDE.md` and `NEXT_STEPS.md` instruct agents to use. Two duplicate personal copies
+of those skills were deleted in favour of the plugin versions. General mode now stands unopposed.

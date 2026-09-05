@@ -1,6 +1,7 @@
 # Next steps
 
-Last updated 2026-09-04, end of the session that first put water in the air.
+Last updated 2026-09-05. The 2026-09-05 session did **no bench work** — the Pi was
+unreachable all day. It went on tooling and records instead; see the last section.
 
 ## Where the plan actually lives
 
@@ -10,7 +11,7 @@ pointer and a cold-start summary, not a second source of truth. Decisions live i
 
 ## State
 
-Every decision that can be made in a conversation has been made. **10 of 13 tickets closed.**
+Every decision that can be made in a conversation has been made. **11 of 13 tickets closed.**
 The design is settled, every part is owned, and **the whole chain has now run end to end with
 water in the air.** What remains is aim, not build: the software does not know where the strip
 physically is. See step 1.
@@ -33,12 +34,15 @@ Reach the Pi with `ssh pi@water-jets.local` (key-based, no password). OLA's web 
 
 ## Open tickets
 
-- **#12 — Prototype: does one RPLIDAR A2 survive two walkers crossing?** **Items 1-6 done, 7
-  half done.** One unit is enough, a standing person is held 99% of the time, and position
-  jitter is 7-13 mm against a 50 mm jet pitch. **Item 3 closed 2026-09-04**: DMX value 5 on
-  channel 5 made jet 1 spray. Only item 7's absolute accuracy is left, and step 1 below takes
-  the same measurements.
-- **#10 — Write the build-ready spec.** Blocked by #12.
+- **#10 — Write the build-ready spec.** The only open work ticket. #12 no longer blocks it;
+  the calibration in step 1 does.
+
+**#12 was closed on 2026-09-05, with no closing comment.** Items 1-6 were done and item 7 half
+done: one unit is enough, a standing person is held 99% of the time, and position jitter is
+7-13 mm against a 50 mm jet pitch. Item 3 closed on 2026-09-04 when DMX value 5 on channel 5 made
+jet 1 spray — but **that result was never written into the ticket**, so #12's last checklist
+still reads *"blocked: modules not connected"*. Item 7's absolute accuracy was never measured; it
+is step 3 below.
 
 ## Done since the last update
 
@@ -252,6 +256,13 @@ ssh pi@water-jets.local "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
 Expect `slots_held=512 ALL ZERO`. If the interface is not plugged in it will say so plainly
 rather than reporting success.
 
+**Still unreachable on 2026-09-05.** `ping water-jets.local` from the laptop returns
+`Ping request could not find host water-jets.local`. That is a name-resolution failure on
+Windows, so it does **not** prove the Pi is off — but **no IP address for the Pi is recorded
+anywhere in this repo**, so there is no second way in. Get it from `arp -a` on the laptop or from
+the router, and **write it into this file**, so the next session is not stopped by the same
+thing.
+
 ## Traps that already cost time
 
 - **`pyrplidar` does not drain its serial buffer on `stop()`.** It throws
@@ -280,3 +291,17 @@ so a BOM would be a list of things already on the bench. Worth adding if this is
 in Setup step 1. OLA is installed and working on the Pi, and `ola-python` is the package that
 puts `ola` in `/usr/lib/python3/dist-packages`, but the original install command was not run
 again to confirm it. Everything else in Setup comes from `DECISIONS.md` or was checked live.
+
+## Tooling, sorted 2026-09-05
+
+None of this touched the jets. It is here so the same time is not spent twice.
+
+- **`AGENTS.md` will stop reappearing.** It was never a Claude Code hook or skill -- the Codex
+  desktop app was copying `CLAUDE.md` over it on every launch. The sync is off and the file is
+  gone. **Untested across a Codex restart**; if `AGENTS.md` comes back, the toggle has to be set
+  inside the Codex app instead. Full evidence in `DECISIONS.md`.
+- **Global config cleaned.** A stale block in `C:\Users\garrett.reynolds\.claude\settings.json`
+  had been telling agents that `DECISIONS.md` is an SR&ED evidence trail that must never be
+  rewritten, which contradicts this project's **General** mode. Removed, with two other stale
+  items. See `DECISIONS.md`.
+- **Restart Claude Code** to pick up the edited settings; they are read at session start.
