@@ -88,6 +88,47 @@ class Config:
     std_process_noise: float = 0.03333   # leg_tracker's value for 15 Hz
     max_association_dist: float = 0.6    # local: hard gate on top of the covariance gate
 
+    # --- the wave --------------------------------------------------------
+    # Heights are DMX values, 0-255. Measured on the bench 2026-09-04:
+    # **0.762 cm per DMX unit**, linear through the origin, from two points
+    # (DMX 20 -> 6 in, DMX 40 -> 12 in). So DMX 255 is about 1.94 m. Convert
+    # before changing anything here: cm = dmx * 0.762, dmx = cm / 0.762.
+    #
+    # height_max is the safety cap and is not a design knob. dmx.clamp_heights
+    # applies it to every height slot as the last step before a frame goes out,
+    # so it holds even if the wave logic is wrong. The modules latch their last
+    # value forever when DMX stops (see DECISIONS.md), so one bad height written
+    # once stays up until somebody cuts the 24 V. 40 is 12 inches, which is what
+    # has actually been run in the test basin.
+    height_max: int = 40                 # 30.5 cm - the hard cap, tested
+    hill_peak: int = 30                  # 22.9 cm - what the hill aims for
+    hill_jets: int = 5                   # jets across one hill, from the wave decision
+    # Where the hill sits relative to the walker. Positive leads them, which is
+    # what the wave decision asks for. Lag is not modelled: the hill is symmetric
+    # about a lead-shifted centre, which is close enough for v1.
+    lead_seconds: float = 0.15
+
+    # Attract: the empty-hallway roll. **Off by default and it must stay off**
+    # until there is a contactor on the 24 V that a watchdog can drop. Attract is
+    # unattended by definition, and the modules latch, so a crash mid-roll leaves
+    # jets up in an empty room with nobody there to see it.
+    attract_enabled: bool = False
+    attract_height: int = 15             # 11.4 cm, about half the hill
+    attract_seconds: float = 8.0         # one pass along the strip
+
+    # Colour. Slow is blue, fast is white, on a dim base - the wave decision.
+    # RGBW, 0-255 each.
+    base_colour: tuple = (0, 0, 40, 0)
+    slow_colour: tuple = (0, 0, 255, 0)
+    fast_colour: tuple = (255, 255, 255, 255)
+    fast_speed: float = 1.6              # m/s that counts as "fast"
+    colour_tau: float = 0.5              # EMA seconds; raw speed is too jumpy
+
+    # How often to re-send even when nothing changed. The modules latch, so a
+    # repeat is not needed to hold a value - it is here so that a future watchdog
+    # has a heartbeat to watch. Also keeps olad's buffer warm.
+    resend_seconds: float = 0.5
+
     # --- viewer ----------------------------------------------------------
     viewer_host: str = "0.0.0.0"
     viewer_port: int = 8080

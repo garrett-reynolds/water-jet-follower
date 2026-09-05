@@ -2,8 +2,8 @@
 
 Finds people in the RPLIDAR A2M8 scan and follows them, in plain Python with no
 dependencies beyond `pyrplidar`. This is step 1 and step 2 of `NEXT_STEPS.md`. It
-It also has the first DMX output: a hand-driven `jog` for the very first
-power-up of the water modules, and a `zero` that is the emergency stop.
+It also drives the water: `show` is the installation, `jog` is the hand-driven
+tool for a first power-up, and `zero` is the stop.
 
 ## What is in here
 
@@ -16,6 +16,7 @@ power-up of the water modules, and a `zero` that is the emergency stop.
 | `tracking.py` | cluster, pair legs, follow people with a constant-velocity Kalman filter |
 | `merge.py` | two one-person clips into one two-person clip, by nearest return per ray |
 | `dmx.py` | DMX out through olad; always full 512-slot frames, and the zero path |
+| `wave.py` | tracks in, one DMX frame out: hills, colour by speed, attract |
 | `viewer.py` | web page served from the Pi, because Pi OS Lite has no window |
 | `run.py` | the command line |
 | `tests/` | synthetic walkers, so the maths can be checked with nobody in the room |
@@ -308,3 +309,62 @@ ssh pi@water-jets.local "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
 It drives all 512 slots to zero and then reads the universe back to prove it, rather
 than printing "sent" and hoping. Short to type on purpose — a 512-value
 `ola_set_dmx` string is exactly the paste Git Bash mangles.
+
+## Running the show
+
+`tracker.run show` is the installation: LiDAR in, people tracked, hills of water
+following them, colour by speed. Three ways to run it, and they are meant to be used
+in this order.
+
+**1. Dry run.** No DMX at all. Watch it in the browser against a recorded walk.
+
+```
+ssh pi@water-jets.local
+cd ~ && ~/wj-venv/bin/python -m tracker.run show --replay ~/data/crossing.jsonl --baseline ~/data/baseline.json --dry-run
+```
+
+**2. Lights only.** Real DMX, but every fountain channel is forced to zero. The pixels
+chase a walker and **nothing gets wet.** This is how the whole behaviour gets watched
+on real hardware before any water moves.
+
+```
+cd ~ && ~/wj-venv/bin/python -m tracker.run show --baseline ~/data/baseline.json --lights-only
+```
+
+**3. The real thing.** Water moves.
+
+```
+cd ~ && ~/wj-venv/bin/python -m tracker.run show --baseline ~/data/baseline.json
+```
+
+Add `--attract` to roll a hill when nobody is there. **It is off by default and should
+stay off** until there is a contactor on the 24 V that a watchdog can drop — attract
+runs with nobody watching, and the modules latch.
+
+### The height cap
+
+`--height-max` is a hard ceiling applied to every fountain channel as the last step
+before a frame goes out, in `dmx.clamp_heights`. It holds even if the wave logic is
+wrong. Default 40.
+
+**1 DMX unit is 7.62 mm**, measured on the bench. So:
+
+| DMX | Height |
+|---|---|
+| 15 | 11 cm — the attract height |
+| 30 | 23 cm — what a hill aims for |
+| 40 | **30 cm — the cap, and the tallest ever run** |
+| 255 | 194 cm — do not |
+
+Raise it deliberately and in small steps. The modules **latch their last value forever**
+when DMX stops, so a height written once by mistake stays up until the 24 V is cut.
+
+### Stopping it
+
+`show` and `jog` both run inside `dmx.safe_output`, which zeroes the line on the way in
+and on the way out — on Ctrl-C, on `kill`, and on SIGHUP when the ssh session drops.
+That path was tested on hardware with a real LED.
+
+**It does not save you if `olad` dies, the interface is unplugged, or the process is
+SIGKILLed.** All three were tested and the modules held their value. The only stop that
+covers those is the switch on the 24 V supply. Keep a hand on it.

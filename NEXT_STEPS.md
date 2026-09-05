@@ -127,11 +127,19 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    roughly 2 L of splash margin before the pumps are below their rated level. The module
    drawing shows a "Water level sensor M3" on board; whether it cuts the pumps when dry is
    **unverified** and worth checking, because it would settle the margin question.
-5. **Write the wave and the DMX output.** Blocked on nothing but ordering. ~~`~/wj-venv` was
-   made with `include-system-site-packages = false`, so `import ola` fails inside it.~~
-   **Fixed 2026-09-04**: the flag is `true`, the old file is kept at `~/wj-venv/pyvenv.cfg.bak`,
-   and the venv imports `ola` and `pyrplidar`. `tracker/dmx.py` already has the send, fetch and
-   zero primitives the wave needs.
+5. ~~**Write the wave and the DMX output.**~~ **Written 2026-09-04.** `tracker/wave.py` and
+   `tracker.run show`. Hills that follow each walker, one per person, combined with **max and
+   never sum** so two overlapping hills cannot climb past the cap. Hold falls out for free - a
+   stopped walker still has a track. Colour runs slow blue to fast white over a dim base, with
+   the speed smoothed so it does not strobe. Attract is written but **off by default**.
+
+   **65 tests pass** on laptop and Pi, and it has been run against the recorded two-walker
+   crossing clip. **No water has been through it yet** - `--lights-only` is the next step, and
+   it forces every fountain channel to zero so the pixels can be watched chasing a walker with
+   nothing wet.
+
+   The venv trap is fixed too: `include-system-site-packages` is `true`, the old file is at
+   `~/wj-venv/pyvenv.cfg.bak`, and the venv imports `ola` and `pyrplidar`.
 
 Once step 4 lands, #12 closes and #10 unblocks.
 

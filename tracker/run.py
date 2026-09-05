@@ -152,33 +152,10 @@ def cmd_jog(args):
     """Walk one DMX channel up by hand, and put it back to zero whatever happens.
 
     Starts at 0, never exceeds --max, and drives all 512 slots on every frame.
-    The exit path is deliberately belt and braces: a signal handler for the three
-    signals that actually arrive (SIGINT from Ctrl-C, SIGTERM from kill, SIGHUP
-    when the ssh session drops - which is the one that would otherwise skip the
-    finally block entirely), a finally, and an atexit backstop. None of them help
-    if olad dies or the process is SIGKILLed, which is why there is also a switch
-    on the mains lead. See NEXT_STEPS.md step 4.
+    The stop path lives in dmx.safe_output, which `show` uses too, so there is only
+    one such path and it is the one that was tested on hardware with a real LED.
     """
-    import atexit
-    import signal
     from tracker import dmx
-
-    def stop(reason):
-        try:
-            dmx.zero(args.universe)
-        except Exception as exc:                # never let the kill path throw
-            print(f"\nZERO FAILED ({reason}): {exc}\n"
-                  f"PULL THE POWER.", file=sys.stderr)
-
-    atexit.register(stop, "atexit")
-
-    def on_signal(signum, _frame):
-        print(f"\ncaught {signal.Signals(signum).name}")
-        raise SystemExit(0)                     # lets the finally below run
-
-    for name in ("SIGINT", "SIGTERM", "SIGHUP"):
-        if hasattr(signal, name):
-            signal.signal(getattr(signal, name), on_signal)
 
     channel = args.channel
     ceiling = dmx.clamp(args.max)
@@ -188,36 +165,151 @@ def cmd_jog(args):
           f"ceiling {ceiling}, step {args.step}")
     print("     ENTER steps up, '-' steps down, a number jumps to it, "
           "'q' or Ctrl-C quits at zero")
-    if not dmx.zero(args.universe):
-        print("jog: refusing to start, olad is not holding 512 zeros",
-              file=sys.stderr)
-        return 1
 
     try:
-        while True:
-            try:
-                reply = input(f"  ch{channel} = {value:3d}  > ").strip().lower()
-            except EOFError:
-                break
-            if reply in ("q", "quit", "exit"):
-                break
-            if reply == "-":
-                value = dmx.clamp(value - args.step, high=ceiling)
-            elif reply == "":
-                value = dmx.clamp(value + args.step, high=ceiling)
-            else:
+        with dmx.safe_output(args.universe):
+            while True:
                 try:
-                    value = dmx.clamp(int(reply), high=ceiling)
-                except ValueError:
-                    print("     ENTER, '-', a number, or 'q'")
-                    continue
-            ok = dmx.send(dmx.frame_with(channel, value), args.universe)
-            if not ok:
-                print("     SEND FAILED - going to zero", file=sys.stderr)
-                break
-    finally:
-        stop("exit")
+                    reply = input(f"  ch{channel} = {value:3d}  > ").strip().lower()
+                except EOFError:
+                    break
+                if reply in ("q", "quit", "exit"):
+                    break
+                if reply == "-":
+                    value = dmx.clamp(value - args.step, high=ceiling)
+                elif reply == "":
+                    value = dmx.clamp(value + args.step, high=ceiling)
+                else:
+                    try:
+                        value = dmx.clamp(int(reply), high=ceiling)
+                    except ValueError:
+                        print("     ENTER, '-', a number, or 'q'")
+                        continue
+                ok = dmx.send(dmx.frame_with(channel, value), args.universe)
+                if not ok:
+                    print("     SEND FAILED - going to zero", file=sys.stderr)
+                    break
+    except RuntimeError as exc:
+        print(f"jog: {exc}", file=sys.stderr)
+        return 1
     return 0
+
+
+def _show_loop(source, cfg, baseline, label, args, send_frame):
+    """Track, build the wave, hand each frame to `send_frame`. The whole show.
+
+    `send_frame` is passed in rather than chosen here so that --dry-run, --lights-only
+    and the real thing are the same loop. The only difference between watching this on
+    a screen and putting it in the water is which function gets called.
+    """
+    from tracker.wave import Wave
+
+    state = viewer.State()
+    server = viewer.serve(state, cfg)
+    tracker = Tracker(cfg)
+    wave = Wave(cfg)
+
+    scans = 0
+    started = None
+    last_print = time.time()
+    last_sent = 0.0
+    peak_height = 0
+    try:
+        for timestamp, points in source:
+            if started is None:
+                started = time.time()
+            foreground, background = geometry.to_world(points, cfg, baseline)
+            frame = tracker.update(timestamp, foreground)
+            scans += 1
+
+            heights, colours = wave.heights_and_colours(frame, timestamp)
+            peak_height = max(peak_height, max(heights) if heights else 0)
+            now = time.time()
+            # Re-send on a change or on the heartbeat, whichever comes first.
+            if now - last_sent >= cfg.resend_seconds or any(heights):
+                send_frame(wave.frame(frame, timestamp,
+                                      lights_only=args.lights_only))
+                last_sent = now
+
+            elapsed = max(1e-6, time.time() - started)
+            frame["fg"] = [[round(x, 4), round(y, 4)] for x, y in foreground]
+            frame["bg"] = [[round(x, 4), round(y, 4)] for x, y in background]
+            frame["hz"] = scans / elapsed
+            frame["source"] = label
+            frame["heights"] = heights
+            state.set(frame)
+
+            if time.time() - last_print >= 1.0:
+                last_print = time.time()
+                confirmed = [t for t in frame["tracks"] if t["confirmed"]]
+                # s, not t['jet']: the tracker clamps 'jet' into range, so a person
+                # standing well past the end of the strip reports jet 19 and looks
+                # like they are stood on it. s tells the truth about where they are.
+                summary = "  ".join(
+                    f"#{t['id']} s={t['s']:.2f} v={t['speed']:.2f}" for t in confirmed)
+                print(f"\r{scans / elapsed:5.2f} Hz  tracks={len(confirmed)}  "
+                      f"peak={max(heights) if heights else 0:3d}/{cfg.height_max}  "
+                      f"{summary}      ", end="", flush=True)
+    except KeyboardInterrupt:
+        print("\nstopping")
+    finally:
+        server.shutdown()
+    print(f"\n{scans} scans, tallest jet commanded {peak_height} "
+          f"(cap {cfg.height_max}, about {peak_height * 0.762:.1f} cm)")
+    return 0
+
+
+def cmd_show(args):
+    """The installation: LiDAR in, wave out, DMX to the water.
+
+    Three ways to run it, in the order they should be used:
+      --dry-run       no DMX at all. Watch it in the viewer against a recording.
+      --lights-only   real DMX, but every fountain channel forced to zero. The
+                      pixels chase a walker and nothing gets wet.
+      neither         the real thing.
+    """
+    from tracker import dmx
+
+    cfg = _load_config(args)
+    if args.height_max is not None:
+        cfg.height_max = args.height_max
+    if args.attract:
+        cfg.attract_enabled = True
+
+    baseline = scanfile.load_baseline(args.baseline) if args.baseline else None
+    if baseline is None:
+        print("show: no baseline, so the walls will look like people "
+              "(run 'record' then 'baseline' first)", file=sys.stderr)
+
+    if args.replay:
+        source = scanfile.replay(args.replay, speed=args.speed, loop=args.loop)
+        label = os.path.basename(args.replay)
+        lidar = None
+    else:
+        lidar, source = _lidar_source(cfg)
+        label = "lidar"
+
+    mode = ("DRY RUN, no DMX" if args.dry_run
+            else "LIGHTS ONLY, fountains forced to 0" if args.lights_only
+            else "LIVE, water will move")
+    print(f"show: {mode}. height cap {cfg.height_max} "
+          f"(about {cfg.height_max * 0.762:.1f} cm), "
+          f"attract {'on' if cfg.attract_enabled else 'off'}")
+
+    try:
+        if args.dry_run:
+            return _show_loop(source, cfg, baseline, label, args,
+                              send_frame=lambda frame: None)
+        with dmx.safe_output(args.universe):
+            return _show_loop(
+                source, cfg, baseline, label, args,
+                send_frame=lambda frame: dmx.send(frame, args.universe))
+    except RuntimeError as exc:
+        print(f"show: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        if lidar is not None:
+            lidar.close()
 
 
 def cmd_offline(args):
@@ -313,6 +405,27 @@ def build_parser():
     jog.add_argument("--step", type=int, default=5)
     jog.add_argument("--universe", type=int, default=1)
     jog.set_defaults(func=cmd_jog)
+
+    show = subparsers.add_parser(
+        "show", help="the installation: track people and drive the water")
+    show.add_argument("--baseline")
+    show.add_argument("--replay", help="run against a recorded clip instead of "
+                                       "the LiDAR")
+    show.add_argument("--speed", type=float, default=1.0)
+    show.add_argument("--loop", action="store_true")
+    show.add_argument("--dry-run", action="store_true", dest="dry_run",
+                      help="no DMX at all; just the viewer and the numbers")
+    show.add_argument("--lights-only", action="store_true", dest="lights_only",
+                      help="real DMX, but every fountain channel forced to 0 - "
+                           "watch the pixels chase somebody with nothing wet")
+    show.add_argument("--height-max", type=int, dest="height_max",
+                      help="override the safety cap. 1 DMX unit is 7.62 mm, so "
+                           "the default 40 is about 30 cm")
+    show.add_argument("--attract", action="store_true",
+                      help="roll a hill when nobody is there. OFF by default and "
+                           "should stay off until a watchdog can drop the 24 V")
+    show.add_argument("--universe", type=int, default=1)
+    show.set_defaults(func=cmd_show)
 
     offline = subparsers.add_parser("offline", help="replay fast, no viewer, summary only")
     offline.add_argument("scan")

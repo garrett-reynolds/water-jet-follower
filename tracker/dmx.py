@@ -20,6 +20,8 @@ without it.
 """
 
 import array
+import contextlib
+import sys
 
 UNIVERSE_SIZE = 512
 CHANNELS_PER_NOZZLE = 5
@@ -145,3 +147,79 @@ def zero(universe=1, verbose=True):
             print(f"zero: sent={ok} slots_held={len(held)} "
                   f"{'ALL ZERO' if clean else f'STILL SET {nonzero[:10]}'}")
     return clean
+
+
+def height_channels(jet_count, nozzles_per_module=NOZZLES_PER_HD_MODULE):
+    """1-based DMX channels carrying fountain height, for a strip of `jet_count`.
+
+    Jets run across modules: jet 0 is module 1 nozzle 1, jet 10 is module 2
+    nozzle 1. Returns them in jet order.
+    """
+    channels = []
+    for jet in range(jet_count):
+        module = jet // nozzles_per_module + 1
+        nozzle = jet % nozzles_per_module + 1
+        channels.append(channel_for(nozzle, HEIGHT, nozzles_per_module, module))
+    return channels
+
+
+def clamp_heights(frame, cap, jet_count):
+    """Force every fountain-height slot down to `cap`. Colour slots are untouched.
+
+    This is the last thing that runs before a frame goes out, and it is the only
+    guard that does not depend on the wave logic being correct. The modules latch
+    their last value, so one wrong height written once stays up until somebody cuts
+    the 24 V. See the latch entry in DECISIONS.md.
+    """
+    cap = clamp(cap)
+    for channel in height_channels(jet_count):
+        if frame[channel - 1] > cap:
+            frame[channel - 1] = cap
+    return frame
+
+
+@contextlib.contextmanager
+def safe_output(universe=1, verbose=True):
+    """Hold the DMX line, and put it back to zero whatever happens.
+
+    This is the stop path that was proven on hardware with nozzle 1's red LED:
+    the LED went out when the process was killed. Both `jog` and `show` run inside
+    it so there is only ever one such path, and it is the tested one.
+
+    It does NOT save you if olad dies, the interface is unplugged, or the process
+    is SIGKILLed. The modules hold their last value forever in all three cases.
+    The only stop that covers those is the switch on the 24 V supply.
+    """
+    import atexit
+    import signal
+
+    def stop(reason):
+        try:
+            zero(universe, verbose=verbose)
+        except Exception as exc:                # never let the stop path throw
+            print(f"\nZERO FAILED ({reason}): {exc}\n"
+                  f"PULL THE 24 V POWER.", file=sys.stderr)
+
+    atexit.register(stop, "atexit")
+
+    def on_signal(signum, _frame):
+        print(f"\ncaught {signal.Signals(signum).name}")
+        raise SystemExit(0)                     # lets the finally below run
+
+    previous = {}
+    for name in ("SIGINT", "SIGTERM", "SIGHUP"):
+        if hasattr(signal, name):
+            number = getattr(signal, name)
+            previous[number] = signal.signal(number, on_signal)
+
+    if not zero(universe, verbose=verbose):
+        raise RuntimeError(
+            "olad is not holding 512 zeros - refusing to start. "
+            "Check ola_dev_info, and use the 24 V switch if anything is up.")
+    try:
+        yield
+    finally:
+        stop("exit")
+        atexit.unregister(stop)
+        for number, handler in previous.items():
+            signal.signal(number, handler)
