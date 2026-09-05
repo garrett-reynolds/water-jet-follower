@@ -236,6 +236,22 @@ Once the calibration lands, the show is real and #10 unblocks.
   It only blocks reading the stored fountain-height calibration, which is why the jog ceiling
   stays a DMX number rather than a height in cm.
 
+## Check this first, next time you are at the bench
+
+The Pi went unreachable at the end of the last session — `water-jets.local` stopped resolving —
+before its final DMX state could be confirmed. The last thing run against it was
+`show --lights-only`, which forces every fountain channel to zero, so **no jet can have been
+left up**. The pixels may be holding a colour, because the modules latch. Powering the Pi back
+on does not clear them by itself; `olad` starts with an empty universe and sends nothing, and
+the modules keep whatever they last received. Run this once the Pi answers again:
+
+```
+ssh pi@water-jets.local "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
+```
+
+Expect `slots_held=512 ALL ZERO`. If the interface is not plugged in it will say so plainly
+rather than reporting success.
+
 ## Traps that already cost time
 
 - **`pyrplidar` does not drain its serial buffer on `stop()`.** It throws
