@@ -1,0 +1,324 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "water-jet-follower signal chain",
+    "output": "docs/water-jet-follower.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "legend": {
+      "entries": {
+        "external": {
+          "label": "hardware"
+        },
+        "backend": {
+          "label": "Python on the Pi"
+        },
+        "frontend": {
+          "label": "web page"
+        },
+        "security": {
+          "label": "power and stop"
+        }
+      }
+    },
+    "views": [
+      {
+        "id": "sensing",
+        "label": "Finding the walker",
+        "focus": [
+          "walker",
+          "lidar",
+          "tracker",
+          "viewer"
+        ],
+        "note": "A level scan at shin height becomes one track per person."
+      },
+      {
+        "id": "water",
+        "label": "Driving the water",
+        "focus": [
+          "wave",
+          "dmxout",
+          "olad",
+          "enttec",
+          "modules"
+        ],
+        "note": "One hill per walker becomes a full 512-slot DMX frame."
+      },
+      {
+        "id": "stopping",
+        "label": "Stopping it",
+        "focus": [
+          "olad",
+          "enttec",
+          "modules",
+          "power"
+        ],
+        "note": "The modules hold their last value. Only the 24 V switch is a real stop."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "walker",
+      "type": "external",
+      "label": "Walker",
+      "sublabel": "in the hallway",
+      "pos": [
+        60,
+        140
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "lidar",
+      "type": "external",
+      "label": "RPLIDAR A2M8",
+      "sublabel": "Boost, 16 Hz",
+      "pos": [
+        260,
+        140
+      ],
+      "size": [
+        150,
+        62
+      ],
+      "tag": "USB"
+    },
+    {
+      "id": "enttec",
+      "type": "external",
+      "label": "Enttec Pro Mk2",
+      "sublabel": "USB to XLR",
+      "pos": [
+        660,
+        140
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "modules",
+      "type": "external",
+      "label": "HydroMatrix",
+      "sublabel": "20 jets",
+      "pos": [
+        860,
+        140
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "tracker",
+      "type": "backend",
+      "label": "tracker",
+      "sublabel": "legs and Kalman",
+      "pos": [
+        160,
+        380
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "wave",
+      "type": "backend",
+      "label": "wave",
+      "sublabel": "one hill each",
+      "pos": [
+        360,
+        380
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "dmxout",
+      "type": "backend",
+      "label": "dmx",
+      "sublabel": "512 slots, capped",
+      "pos": [
+        560,
+        380
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "olad",
+      "type": "backend",
+      "label": "olad",
+      "sublabel": "universe 1",
+      "pos": [
+        760,
+        380
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "viewer",
+      "type": "frontend",
+      "label": "Scan viewer",
+      "sublabel": "port 8080",
+      "pos": [
+        160,
+        600
+      ],
+      "size": [
+        150,
+        62
+      ]
+    },
+    {
+      "id": "power",
+      "type": "security",
+      "label": "24 V supply",
+      "sublabel": "the only stop",
+      "pos": [
+        1060,
+        600
+      ],
+      "size": [
+        150,
+        62
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Raspberry Pi 5, headless",
+      "wraps": [
+        "tracker",
+        "wave",
+        "dmxout",
+        "olad",
+        "viewer"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "security-group",
+      "label": "the basin",
+      "wraps": [
+        "modules"
+      ],
+      "pad": 14
+    }
+  ],
+  "connections": [
+    {
+      "from": "walker",
+      "to": "lidar",
+      "label": "legs",
+      "variant": "emphasis"
+    },
+    {
+      "from": "lidar",
+      "to": "tracker",
+      "label": "scan",
+      "variant": "emphasis",
+      "route": "orthogonal-v"
+    },
+    {
+      "from": "tracker",
+      "to": "wave",
+      "label": "tracks",
+      "variant": "emphasis"
+    },
+    {
+      "from": "wave",
+      "to": "dmxout",
+      "label": "heights",
+      "variant": "emphasis"
+    },
+    {
+      "from": "dmxout",
+      "to": "olad",
+      "label": "frame",
+      "variant": "emphasis"
+    },
+    {
+      "from": "olad",
+      "to": "enttec",
+      "label": "USB",
+      "variant": "emphasis",
+      "route": "orthogonal-v"
+    },
+    {
+      "from": "enttec",
+      "to": "modules",
+      "label": "DMX",
+      "variant": "emphasis"
+    },
+    {
+      "from": "tracker",
+      "to": "viewer",
+      "label": "live",
+      "variant": "dashed",
+      "labelAt": [
+        235,
+        521
+      ]
+    },
+    {
+      "from": "power",
+      "to": "modules",
+      "label": "cut to stop",
+      "variant": "security",
+      "route": "orthogonal-v",
+      "labelAt": [
+        1180,
+        521
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "What it does",
+      "items": [
+        "One LiDAR finds walkers by their legs",
+        "A hill of water follows each walker",
+        "Hill colour runs slow blue to fast white"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Stopping it",
+      "items": [
+        "Software zero works while the chain is alive",
+        "The modules hold their last value forever",
+        "Only the 24 V switch stops a running jet"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Measured on the bench",
+      "items": [
+        "7.62 mm of jet height per DMX unit",
+        "Height capped at DMX 40, about 30 cm",
+        "Position jitter 7-13 mm against 50 mm pitch"
+      ]
+    }
+  ]
+}

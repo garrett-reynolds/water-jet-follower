@@ -253,6 +253,14 @@ Once the calibration lands, the show is real and #10 unblocks.
 
 ## Missing from this repo
 
-There is no `README.md`. Global CLAUDE.md requires it be produced with the `create-readme`
-skill rather than hand-written. Worth doing once the tracker exists and there is something to
-describe running.
+~~There is no `README.md`.~~ **Written with the `create-readme` skill.** It carries the setup
+from zero, the wiring, the quickstart and the troubleshooting table. Regenerate it with the same
+skill rather than hand-editing, and never overwrite a newer `create-readme` stamp than your own.
+
+There is still no `hardware/` directory and no BOM. Every part is owned and nothing needs buying,
+so a BOM would be a list of things already on the bench. Worth adding if this is ever rebuilt.
+
+**One README claim is reconstructed rather than re-run:** the `apt install ola ola-python` line
+in Setup step 1. OLA is installed and working on the Pi, and `ola-python` is the package that
+puts `ola` in `/usr/lib/python3/dist-packages`, but the original install command was not run
+again to confirm it. Everything else in Setup comes from `DECISIONS.md` or was checked live.
