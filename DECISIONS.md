@@ -646,3 +646,47 @@ now justifies: 40 is 12 inches, a sane ceiling for a test basin.
 
 Useful working numbers, if linear: DMX 10 is 7.6 cm, 20 is 15.2 cm, 30 is 22.9 cm, 60 is
 45.7 cm, 80 is 61 cm.
+
+## [2026-09-04] Wave design: max not sum, two clamps, attract off, and metres not jet index
+
+Logged at session end rather than when decided. Four choices inside `tracker/wave.py` that are
+not obvious from reading it, and that a later change could quietly undo.
+
+**Overlapping hills combine with `max`, never `sum`.** Two walkers close together would
+otherwise stack into a jet taller than either hill asked for, and past the cap. `max` cannot
+exceed its inputs, so the property holds without a second guard.
+
+**Two separate height numbers, and they are not the same kind of thing.** `hill_peak` is what
+the wave *wants* — a design knob. `height_max` is what the code will *ever send* — a safety cap,
+applied by `dmx.clamp_heights` as the last step before a frame goes out, after all wave logic.
+The cap therefore holds even if the wave is wrong. This split exists because these modules latch
+their last value forever when DMX stops, so a bad height is not a transient. Tests assert no
+frame ever exceeds the cap.
+
+**Attract is written but off by default.** It is the one behaviour that runs with nobody
+watching, and combined with the latch, a crash mid-roll leaves jets up in an empty room. It
+stays off until there is a contactor on the 24 V that a watchdog can drop.
+
+**The wave reads `track["s"]` in metres, not `track["jet"]`.** The tracker clamps `jet` into
+`0..jet_count-1`, so somebody standing three metres past the end of the strip reports jet 19.
+Reading it would have looked correct in every test with a walker on the strip, and pinned the
+last jet up whenever anyone stood beyond it. Verified both ways: a walker at s=1.2 m and beyond
+raises no water, and both ends of the strip still work.
+
+## [2026-09-04] RDM parked, not solved. It was only ever wanted for one number.
+
+The modules answer RDM — ESTA manufacturer 0x2421 is HB-Laserkomponenten, their own maker — but
+OLA cannot resolve a UID from their discovery replies, and every run ends `Discovery tree is
+corrupted`. Two readings remain unseparated: two responders sharing a factory UID, or a
+non-standard DUB encoding. The test that would separate them needs one module powered alone, and
+the modules are hardwired together, so it cannot be run.
+
+Two software routes were tried and both are dead ends. `ola_rdm_get` refuses a UID that
+discovery never resolved, and `/etc/ola/ola-usbserial.conf` exposes no RDM or timing knobs for
+this widget.
+
+**Parked deliberately.** RDM was only ever wanted to read the stored fountain-height
+calibration, and that number has since been measured directly on the bench instead — 7.62 mm per
+DMX unit. Nothing else in the build needs RDM: plain DMX is one-way and does not use it. What is
+left to try, if it is ever wanted, is a 120 ohm terminator on the last module's DMX out, and
+OLA's Python `RDMGet` / `SendRawRDMDiscovery`, which may address a UID the CLI refuses.

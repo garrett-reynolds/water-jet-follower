@@ -1,6 +1,6 @@
 # Next steps
 
-Last updated 2026-09-04.
+Last updated 2026-09-04, end of the session that first put water in the air.
 
 ## Where the plan actually lives
 
@@ -11,14 +11,19 @@ pointer and a cold-start summary, not a second source of truth. Decisions live i
 ## State
 
 Every decision that can be made in a conversation has been made. **10 of 13 tickets closed.**
-The design is settled and every part is owned.
+The design is settled, every part is owned, and **the whole chain has now run end to end with
+water in the air.** What remains is aim, not build: the software does not know where the strip
+physically is. See step 1.
 
 | | |
 |---|---|
 | Sensor | Slamtec RPLIDAR A2M8, one unit, Boost mode, motor PWM 800 (**see the correction below**) |
 | Controller | Raspberry Pi 5, Raspberry Pi OS Lite 64-bit (Debian 13 Trixie), headless |
 | DMX out | Enttec DMX USB Pro Mk2 via OLA's `usbserial` plugin, universe 1 |
-| Software | Plain Python in `~/wj-venv`, not ROS. Tracker and viewer written, see `tracker/README.md` |
+| Software | Plain Python in `~/wj-venv`, not ROS. Tracker, viewer, DMX and wave all written, see `tracker/README.md` |
+| The show | `tracker.run show` — hills follow walkers, colour by speed. `--dry-run`, `--lights-only`, or real |
+| Height | **7.62 mm per DMX unit**, measured. Cap is DMX 40 = 30 cm. DMX 255 would be 1.94 m |
+| Stopping | Software zero works **only while the chain is alive**. The modules latch. The 24 V switch is the only real stop |
 | Power | Pi's own supply plus a **powered USB hub** for the LiDAR — not optional, see `DECISIONS.md` |
 | Cost to finish | CAD $0 |
 
@@ -28,10 +33,11 @@ Reach the Pi with `ssh pi@water-jets.local` (key-based, no password). OLA's web 
 
 ## Open tickets
 
-- **#12 — Prototype: does one RPLIDAR A2 survive two walkers crossing?** **Items 1-6 done;
-  7 half done.** One unit is enough, a standing person is held 99% of the time, and position
+- **#12 — Prototype: does one RPLIDAR A2 survive two walkers crossing?** **Items 1-6 done, 7
+  half done.** One unit is enough, a standing person is held 99% of the time, and position
   jitter is 7-13 mm against a 50 mm jet pitch. **Item 3 closed 2026-09-04**: DMX value 5 on
-  channel 5 made jet 1 spray. Ready to close once item 7's absolute accuracy is measured.
+  channel 5 made jet 1 spray. Only item 7's absolute accuracy is left, and step 1 below takes
+  the same measurements.
 - **#10 — Write the build-ready spec.** Blocked by #12.
 
 ## Done since the last update
@@ -57,7 +63,34 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
 
 ## Do next, in order
 
-1. **Record the remaining clips, alone.** Garrett has no second person, and does not need
+1. **Calibrate where the strip actually is. This blocks everything else.**
+
+   The software works. It is pointed at the wrong place. `config.py` says jet 0 sits at
+   **(0.10, 0.00)** and jet 19 at **(1.05, 0.00)** — a line straight out in front of the LiDAR,
+   starting 10 cm away. Standing at jet 0 on the real bench reads about **(0.3, 0.8)**. So the
+   strip is roughly 30 cm out and **80 cm off to one side** of where the software thinks it is.
+   Every hill lands in the wrong place until this is fixed, and the tracker is not at fault.
+
+   **The jet 19 reading was never taken.** One number is not enough — two points are needed to
+   place a line, and the angle matters as much as the offset.
+
+   To finish it: run `show --lights-only`, open `http://water-jets.local:8080/`, stand at jet 0
+   and then at jet 19, and read the x/y off the viewer at each. Then write both into a config
+   file and pass it with `--config`:
+
+   ```
+   ~/wj-venv/bin/python -m tracker.run --config ~/strip.json show --baseline ~/data/baseline.json --lights-only
+   ```
+
+   `Config.save()` writes the whole dataclass as JSON, so the quickest route is to dump a
+   default, edit `strip_start` and `strip_end`, and keep it on the Pi.
+
+   **Layout as it now stands:** the two modules are in **two separate bins, one module each,
+   end to end** — a single 1 x 20 line of jets, which is what `config.py` has always assumed.
+   Each bin needs its own water above the 8 cm minimum; only the original single 24 x 16 inch
+   basin at 9 cm was ever checked.
+
+2. ~~**Record the remaining clips, alone.**~~ **Done.** Garrett has no second person, and does not need
    one. All the commands are in `tracker/README.md`.
    1. ~~The room, 60 s, with him walking about in it.~~ **Done 2026-09-04.**
       `~/data/room.jsonl`, 924 scans, baseline at `~/data/baseline.json` and
@@ -75,13 +108,13 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    Clips 2 and 3 then merge into a two-person crossing with `tracker.run merge`, and
    `--shift-b` slides where they cross. One pair of recordings gives the whole occlusion
    sweep. See the merge entry in `DECISIONS.md` for why this is faithful and not a fudge.
-2. **Measure absolute accuracy.** Tape the real distance between the three standing spots and
+3. **Measure absolute accuracy.** Tape the real distance between the three standing spots and
    from the sensor to one of them, and compare against `DECISIONS.md`. Precision is already
    measured at 7-13 mm; only the absolute offset is open, and the A2's mirror is not at the
    centre of its case.
-3. **Decide the motor PWM.** PWM 800 measures 16.25 Hz, which is outside the A2M8's rated
+4. **Decide the motor PWM.** PWM 800 measures 16.25 Hz, which is outside the A2M8's rated
    5-15 Hz band; PWM 760 gives 15.09 Hz. See the correction entry in `DECISIONS.md`.
-4. **Connect the water modules** and complete #12 item 3: set module 1 channel 5 and watch jet 1
+5. ~~**Connect the water modules**~~ **Done.** #12 item 3: set module 1 channel 5 and watch jet 1
    move. ~~This is the only untested link in the whole chain.~~
 
    **The DMX path is proven end to end, 2026-09-04.** `tracker.run jog --channel 1 --max 40`
@@ -127,7 +160,7 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    roughly 2 L of splash margin before the pumps are below their rated level. The module
    drawing shows a "Water level sensor M3" on board; whether it cuts the pumps when dry is
    **unverified** and worth checking, because it would settle the margin question.
-5. ~~**Write the wave and the DMX output.**~~ **Written 2026-09-04.** `tracker/wave.py` and
+6. ~~**Write the wave and the DMX output.**~~ **Written 2026-09-04.** `tracker/wave.py` and
    `tracker.run show`. Hills that follow each walker, one per person, combined with **max and
    never sum** so two overlapping hills cannot climb past the cap. Hold falls out for free - a
    stopped walker still has a track. Colour runs slow blue to fast white over a dim base, with
@@ -141,7 +174,15 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    The venv trap is fixed too: `include-system-site-packages` is `true`, the old file is at
    `~/wj-venv/pyvenv.cfg.bak`, and the venv imports `ola` and `pyrplidar`.
 
-Once step 4 lands, #12 closes and #10 unblocks.
+7. **A contactor on the 24 V, dropped by a watchdog.** New, and it is a build-spec item rather
+   than a bench one. The modules latch their last value forever when DMX stops, so a software
+   crash with jets up is a flood and no software stop can prevent it. An unattended hallway
+   needs the 24 V switched by something that drops when the control software stops
+   heartbeating. `cfg.resend_seconds` already re-sends a frame twice a second so that a
+   watchdog has a heartbeat to watch. Nothing else exists yet. **Attract mode must stay off
+   until this is built.** Raise as its own ticket against #10.
+
+Once the calibration lands, the show is real and #10 unblocks.
 
 ## Known unknowns
 

@@ -368,3 +368,32 @@ That path was tested on hardware with a real LED.
 **It does not save you if `olad` dies, the interface is unplugged, or the process is
 SIGKILLed.** All three were tested and the modules held their value. The only stop that
 covers those is the switch on the 24 V supply. Keep a hand on it.
+
+### Aiming it at the real strip
+
+`config.py` holds `strip_start` and `strip_end` — where jet 0 and jet 19 sit in the LiDAR's
+world frame, in metres, with the sensor at (0, 0). **These are assumptions, not measurements**,
+and until they match the bench every hill lands in the wrong place. The tracking is fine; the
+aim is not.
+
+The defaults say jet 0 is 10 cm straight in front of the sensor. On the bench 2026-09-04, jet 0
+read about **(0.3, 0.8)** — 80 cm off to the side of where the software thinks it is. The jet 19
+reading was never taken, and two points are needed, because the angle matters as much as the
+offset.
+
+To fix it: run `show --lights-only`, open the viewer, stand at jet 0 and then at jet 19, and
+read the x/y off the page at each. Then:
+
+```
+ssh pi@water-jets.local
+cd ~ && ~/wj-venv/bin/python -c "from tracker.config import Config; Config().save('/home/pi/strip.json')"
+```
+
+Edit `strip_start` and `strip_end` in `~/strip.json`, then run with it:
+
+```
+cd ~ && ~/wj-venv/bin/python -m tracker.run --config ~/strip.json show --baseline ~/data/baseline.json --lights-only
+```
+
+The viewer draws the strip as a green line and the LiDAR as a yellow dot. When the green line
+sits where the bins really are, the aim is right.
