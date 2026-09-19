@@ -374,4 +374,6 @@ covers those is the switch on the 24 V supply. Keep a hand on it.
 `config.py` holds `strip_points`, one measured LiDAR x/y target for each of jets 0 through 9.
 The tracker draws a joined path through those points and interpolates between adjacent jets.
 The large viewer panel shows x, y, and the mapped jet number. Garrett verified the live viewer
-map on 2026-09-19. Light and water aim still need a bench check.
+map, light aim, and water aim for jets 0 through 9 on 2026-09-19. The live water test peaked at
+DMX 30 and stopped with all 512 DMX slots at zero. The final build uses all 20 jets. Jets 10
+through 19 still need measured points and the same bench check.

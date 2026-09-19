@@ -3,8 +3,8 @@
 A strip of water jets that follows people along a hallway. One LiDAR finds walkers by their
 legs, and a hill of water rises under each one. It runs on a Raspberry Pi 5 in plain Python.
 
-**Prototype. The whole chain runs and water has moved. Jets 0 through 9 use a measured
-person-to-jet path. The viewer mapping is verified. Light and water aim are not yet verified.**
+**Prototype. The final build uses all 20 jets. Jets 0 through 9 use a measured person-to-jet
+path and are verified with light and water. Jets 10 through 19 are not calibrated yet.**
 
 [Decisions](DECISIONS.md) · [Next steps](NEXT_STEPS.md) · [Glossary](CONTEXT.md) · [Tracker notes](tracker/README.md)
 
@@ -43,7 +43,7 @@ walker who stops keeps their hill, because their track is still there.
 | Sensor | Slamtec RPLIDAR A2M8, one unit, Boost mode |
 | Controller | Raspberry Pi 5, Raspberry Pi OS Lite 64-bit, headless |
 | DMX interface | Enttec DMX USB Pro Mk2 |
-| Water | 1 active HB-Laser 3D HydroMatrix HD module, jets 0 through 9; second module unused |
+| Water | 2 x HB-Laser 3D HydroMatrix HD modules, 10 jets each; first module verified |
 | USB hub | Powered hub, Genesys Logic USB2.1/3.1 |
 | Module supply | 24 V DC, 3.2 A per module |
 
@@ -62,7 +62,7 @@ walker who stops keeps their hill, because their track is still there.
 | Enttec Pro Mk2 | Powered USB hub | USB | Appears as `/dev/ttyENTTEC`. Serial `EN329670`. |
 | Powered USB hub | Raspberry Pi 5 | USB | The hub carries its own supply. |
 | Enttec breakout | Module 1 input | 5-pin XLR | Enttec output is female. The module input is male. |
-| Module 1 | Module 2 | HB-Laser link | Present, but module 2 is not used by the current 10-jet configuration. |
+| Module 1 | Module 2 | HB-Laser link | Final build uses both modules. Current bench config drives module 1 only. |
 | 24 V supply | Module 1 | HB-Laser feed | Put a switch on the mains lead. Keep it in reach. |
 
 ## 🧰 Setup
@@ -186,6 +186,7 @@ forced to zero, so nothing gets wet. The third moves water. The last is the stop
 - [DECISIONS.md](DECISIONS.md) — every choice made, and why.
 - [NEXT_STEPS.md](NEXT_STEPS.md) — the true state of play, and what to do next.
 - [CONTEXT.md](CONTEXT.md) — the glossary. Read this before the code.
+- [docs/BUILD_SPEC.md](docs/BUILD_SPEC.md) — the final 20-jet build specification.
 - [tracker/README.md](tracker/README.md) — running the tracker, the show, and the first power-up.
 - [docs/water-jet-follower.html](docs/water-jet-follower.html) — the signal chain, interactive.
 

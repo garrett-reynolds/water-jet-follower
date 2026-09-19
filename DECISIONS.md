@@ -1,10 +1,10 @@
 # Decisions
 
-## [2026-09-19] Use only the first 10 jets
+## [2026-09-19] Test with the first 10 jets
 
-The installation now uses jets 0 through 9 on the first HB-Laser module. The second module
-stays unused. The default tracker configuration changes from 20 jets to 10 jets, so normal
-show output uses only DMX channels 1 through 50. Calibration now measures jet 0 and jet 9.
+The current bench test uses jets 0 through 9 on the first HB-Laser module. The default tracker
+configuration changes from 20 jets to 10 jets for this test, so show output uses only DMX
+channels 1 through 50. The final build still uses both modules and all 20 jets.
 
 ## [2026-09-19] Map jets 0 through 9 to ten measured person positions
 
@@ -15,6 +15,9 @@ jet order: `(1.80, -1.64)`, `(1.80, -1.32)`, `(1.75, -1.00)`, `(1.72, -0.73)`,
 exactly to its jet. Positions between two points interpolate between those two jets. This is a
 person-to-jet control map, not the physical nozzle spacing. Garrett walked the live path and
 confirmed on 2026-09-19 that the large viewer jet label maps it correctly.
+He then ran the real show at a peak of DMX 30 and confirmed that the light hill and water hill
+followed the correct first ten jets. The show stopped cleanly and read back all 512 DMX slots
+at zero. Jets 10 through 19 are not calibrated or verified yet.
 
 General mode: `## [YYYY-MM-DD] <title>` — what was decided or tried, the outcome, and why.
 
