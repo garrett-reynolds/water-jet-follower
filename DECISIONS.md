@@ -12,6 +12,12 @@ control path; they do not require ten more measured points.
 Idle water and colour animations are configurable. Idle water stays off until the watchdog
 contactor passes. A tracked person always takes control from an idle animation.
 
+The browser holds a draft until Apply. The server validates the full versioned profile and
+updates the live config dictionary in one operation, so the tracker cannot read a half-applied
+profile. Changing the hard maximum needs a separate unlock. A one-jet test holds until ALL OFF;
+lights-only still forces its water channel to zero. Save and load use a local JSON download and
+upload, so the Pi does not need a second profile file path.
+
 ## [2026-09-19] Test with the first 10 jets
 
 The current bench test uses jets 0 through 9 on the first HB-Laser module. The default tracker

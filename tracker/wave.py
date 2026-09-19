@@ -83,6 +83,7 @@ class Wave:
     def __init__(self, cfg):
         self.cfg = cfg
         self._smoothed_speed = {}       # track id -> EMA of speed
+        self._smoothed_position = {}    # track id -> followed jet position
         self._last_time = None
 
     def _smooth(self, track, dt):
@@ -118,6 +119,8 @@ class Wave:
         live_ids = {t["id"] for t in tracks}
         for stale in set(self._smoothed_speed) - live_ids:
             del self._smoothed_speed[stale]
+        for stale in set(self._smoothed_position) - live_ids:
+            del self._smoothed_position[stale]
 
         for track in tracks:
             if "jet_position" in track:
@@ -126,8 +129,15 @@ class Wave:
             else:
                 centre_s = track["s"] + strip_velocity(track, cfg) * cfg.lead_seconds
                 centre_jet = centre_s / pitch if pitch else 0.0
+            previous_position = self._smoothed_position.get(track["id"])
+            if previous_position is not None and cfg.follow_response > 0 and dt > 0:
+                follow_alpha = 1.0 - math.exp(-dt / cfg.follow_response)
+                centre_jet = previous_position + follow_alpha * (centre_jet - previous_position)
+            self._smoothed_position[track["id"]] = centre_jet
             speed = self._smooth(track, dt)
-            amount = speed / cfg.fast_speed if cfg.fast_speed > 0 else 0.0
+            speed_range = cfg.fast_speed - cfg.slow_speed
+            amount = ((speed - cfg.slow_speed) / speed_range
+                      if speed_range > 0 else 0.0)
             colour = lerp_colour(cfg.slow_colour, cfg.fast_colour, amount)
 
             for jet in range(cfg.jet_count):
@@ -143,7 +153,9 @@ class Wave:
         if not tracks and cfg.attract_enabled:
             self._attract(heights, colours, now)
 
-        capped = [min(int(round(h)), cfg.height_max) for h in heights]
+        capped = [0 if h <= 0 else min(max(int(round(h)), cfg.height_min),
+                                      cfg.height_max)
+                  for h in heights]
         return capped, colours
 
     def _attract(self, heights, colours, now):
@@ -175,11 +187,17 @@ class Wave:
         heights, colours = self.heights_and_colours(tracker_frame, now)
         frame = dmx.blank_frame()
 
+        enabled = tuple(cfg.jet_enabled)
+        if len(enabled) != cfg.jet_count:
+            enabled = (True,) * cfg.jet_count
         for jet in range(cfg.jet_count):
-            module = jet // dmx.NOZZLES_PER_HD_MODULE + 1
-            nozzle = jet % dmx.NOZZLES_PER_HD_MODULE + 1
+            output = cfg.jet_count - 1 - jet if cfg.reverse_jets else jet
+            module = output // dmx.NOZZLES_PER_HD_MODULE + 1
+            nozzle = output % dmx.NOZZLES_PER_HD_MODULE + 1
             base = dmx.channel_for(nozzle, dmx.RED, dmx.NOZZLES_PER_HD_MODULE,
                                    module)
+            if not enabled[jet]:
+                continue
             red, green, blue, white = colours[jet]
             frame[base - 1] = dmx.clamp(red)
             frame[base + 0] = dmx.clamp(green)

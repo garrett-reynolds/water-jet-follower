@@ -18,6 +18,7 @@ tool for a first power-up, and `zero` is the stop.
 | `dmx.py` | DMX out through olad; always full 512-slot frames, and the zero path |
 | `wave.py` | tracks in, one DMX frame out: hills, colour by speed, attract |
 | `viewer.py` | web page served from the Pi, because Pi OS Lite has no window |
+| `settings.py` | versioned profiles, validation, undo, and safe operator actions |
 | `run.py` | the command line |
 | `tests/` | synthetic walkers, so the maths can be checked with nobody in the room |
 
@@ -340,6 +341,14 @@ cd ~ && ~/wj-venv/bin/python -m tracker.run show --baseline ~/data/baseline.json
 Add `--attract` to roll a hill when nobody is there. **It is off by default and should
 stay off** until there is a contactor on the 24 V that a watchdog can drop — attract
 runs with nobody watching, and the modules latch.
+
+### Browser settings
+
+While `show` is running, open `http://water-jets:8080/settings`. Edits are a preview until
+**Apply profile** sends one complete versioned profile. Unlock the hard maximum before changing
+it. **Test** holds one jet at the configured minimum until **ALL OFF**. Lights-only always forces
+the water channel to zero. **Save JSON** downloads the profile to the browser computer; **Load
+JSON** previews a saved profile before apply.
 
 ### The height cap
 

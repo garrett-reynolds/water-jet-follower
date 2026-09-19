@@ -108,12 +108,18 @@ class Config:
     # once stays up until somebody cuts the 24 V. 40 is 12 inches, which is what
     # has actually been run in the test basin.
     height_max: int = 40                 # 30.5 cm - the hard cap, tested
+    height_min: int = 5                  # smallest active jet; zero still means off
     hill_peak: int = 30                  # 22.9 cm - what the hill aims for
     hill_jets: int = 5                   # jets across one hill, from the wave decision
     # Where the hill sits relative to the walker. Positive leads them, which is
     # what the wave decision asks for. Lag is not modelled: the hill is symmetric
     # about a lead-shifted centre, which is close enough for v1.
     lead_seconds: float = 0.15
+    follow_response: float = 0.0         # seconds; 0 follows the tracker immediately
+
+    # Output routing. An empty enabled list means every configured jet is enabled.
+    jet_enabled: tuple = ()
+    reverse_jets: bool = False
 
     # Attract: the empty-hallway roll. **Off by default and it must stay off**
     # until there is a contactor on the 24 V that a watchdog can drop. Attract is
@@ -128,6 +134,7 @@ class Config:
     base_colour: tuple = (0, 0, 40, 0)
     slow_colour: tuple = (0, 0, 255, 0)
     fast_colour: tuple = (255, 255, 255, 255)
+    slow_speed: float = 0.0              # m/s that counts as "slow"
     fast_speed: float = 1.6              # m/s that counts as "fast"
     colour_tau: float = 0.5              # EMA seconds; raw speed is too jumpy
 

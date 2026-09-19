@@ -195,17 +195,20 @@ def cmd_jog(args):
     return 0
 
 
-def _show_loop(source, cfg, baseline, label, args, send_frame):
+def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output):
     """Track, build the wave, hand each frame to `send_frame`. The whole show.
 
     `send_frame` is passed in rather than chosen here so that --dry-run, --lights-only
     and the real thing are the same loop. The only difference between watching this on
     a screen and putting it in the water is which function gets called.
     """
+    from tracker.settings import SettingsControl
     from tracker.wave import Wave
 
     state = viewer.State()
-    server = viewer.serve(state, cfg)
+    control = SettingsControl(cfg, send_frame=send_frame, zero_output=zero_output)
+    control.set_lights_only(args.lights_only)
+    server = viewer.serve(state, cfg, control)
     tracker = Tracker(cfg)
     wave = Wave(cfg)
 
@@ -227,8 +230,9 @@ def _show_loop(source, cfg, baseline, label, args, send_frame):
             now = time.time()
             # Re-send on a change or on the heartbeat, whichever comes first.
             if now - last_sent >= cfg.resend_seconds or any(heights):
-                send_frame(wave.frame(frame, timestamp,
-                                      lights_only=args.lights_only))
+                live_frame = wave.frame(frame, timestamp,
+                                        lights_only=control.lights_only)
+                send_frame(control.output_frame(live_frame))
                 last_sent = now
 
             elapsed = max(1e-6, time.time() - started)
@@ -299,11 +303,13 @@ def cmd_show(args):
     try:
         if args.dry_run:
             return _show_loop(source, cfg, baseline, label, args,
-                              send_frame=lambda frame: None)
+                              send_frame=lambda frame: None,
+                              zero_output=lambda: True)
         with dmx.safe_output(args.universe):
             return _show_loop(
                 source, cfg, baseline, label, args,
-                send_frame=lambda frame: dmx.send(frame, args.universe))
+                send_frame=lambda frame: dmx.send(frame, args.universe),
+                zero_output=lambda: dmx.zero(args.universe))
     except RuntimeError as exc:
         print(f"show: {exc}", file=sys.stderr)
         return 1

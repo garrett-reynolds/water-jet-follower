@@ -205,6 +205,14 @@ class TestCap(unittest.TestCase):
             else:
                 self.assertEqual(frame[channel - 1], 200)
 
+    def test_positive_water_is_raised_to_the_active_minimum(self):
+        cfg = config_20()
+        cfg.height_min = 12
+        cfg.hill_peak = 20
+        heights, _ = wave.Wave(cfg).heights_and_colours(
+            frame_of(track(s=10 * wave.jet_pitch(cfg))), 0.0)
+        self.assertTrue(all(height == 0 or height >= 12 for height in heights))
+
 
 class TestFrameLayout(unittest.TestCase):
     def setUp(self):
@@ -241,6 +249,23 @@ class TestFrameLayout(unittest.TestCase):
         pitch = wave.jet_pitch(cfg)
         frame = wave.Wave(cfg).frame(frame_of(track(s=10 * pitch)), 0.0)
         self.assertEqual(sum(frame[100:]), 0)   # nothing past channel 100
+
+    def test_disabled_jet_is_all_off(self):
+        cfg = self.cfg
+        cfg.base_colour = (20, 20, 20, 20)
+        cfg.jet_enabled = (False,) + (True,) * 19
+        frame = wave.Wave(cfg).frame(frame_of(), 0.0)
+        self.assertEqual(list(frame[:5]), [0, 0, 0, 0, 0])
+
+    def test_reverse_order_swaps_the_output_ends(self):
+        cfg = self.cfg
+        cfg.base_colour = (0, 0, 0, 0)
+        pitch = wave.jet_pitch(cfg)
+        normal = wave.Wave(cfg).frame(frame_of(track(s=0.0)), 0.0)
+        cfg.reverse_jets = True
+        reversed_frame = wave.Wave(cfg).frame(frame_of(track(s=0.0)), 0.0)
+        self.assertEqual(normal[4], reversed_frame[99])
+        self.assertEqual(reversed_frame[4], 0)
 
 
 class TestColour(unittest.TestCase):
