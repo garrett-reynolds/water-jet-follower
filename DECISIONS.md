@@ -1,5 +1,17 @@
 # Decisions
 
+## [2026-09-19] Configure the show in the browser
+
+The viewer will also be the settings screen. The operator can drag the control-path points and
+set jet count, water height limits, hill shape, follow feel, speed thresholds, and RGBW colours.
+The same screen will save and load one versioned JSON profile, preview a full change, and apply
+it as one validated update. It will also provide per-jet enable and test controls, jet-order
+reverse, lights-only mode, and an ALL OFF control. The final 20 jets use the existing measured
+control path; they do not require ten more measured points.
+
+Idle water and colour animations are configurable. Idle water stays off until the watchdog
+contactor passes. A tracked person always takes control from an idle animation.
+
 ## [2026-09-19] Test with the first 10 jets
 
 The current bench test uses jets 0 through 9 on the first HB-Laser module. The default tracker

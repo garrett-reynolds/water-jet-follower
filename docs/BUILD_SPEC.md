@@ -185,31 +185,103 @@ PWM 800 is above the A2M8 rated 15 Hz limit.
 
 The final PWM choice is still open.
 
-## 9. Position map
+## 9. Control-path map
 
-The first ten measured person positions are:
+The ten measured points define the full walking path.
 
-| Jet | LiDAR x | LiDAR y | State |
+They are control points.
+
+They are not one required measurement for each final jet.
+
+| Point | LiDAR x | LiDAR y | State |
 |---:|---:|---:|---|
-| 0 | 1.80 | -1.64 | Light and water verified |
-| 1 | 1.80 | -1.32 | Light and water verified |
-| 2 | 1.75 | -1.00 | Light and water verified |
-| 3 | 1.72 | -0.73 | Light and water verified |
-| 4 | 1.65 | -0.48 | Light and water verified |
-| 5 | 1.62 | -0.19 | Light and water verified |
-| 6 | 1.60 | 0.07 | Light and water verified |
-| 7 | 1.51 | 0.47 | Light and water verified |
-| 8 | 1.55 | 0.65 | Light and water verified |
-| 9 | 1.54 | 1.20 | Light and water verified |
-| 10-19 | Not measured | Not measured | Open |
+| 0 | 1.80 | -1.64 | Verified |
+| 1 | 1.80 | -1.32 | Verified |
+| 2 | 1.75 | -1.00 | Verified |
+| 3 | 1.72 | -0.73 | Verified |
+| 4 | 1.65 | -0.48 | Verified |
+| 5 | 1.62 | -0.19 | Verified |
+| 6 | 1.60 | 0.07 | Verified |
+| 7 | 1.51 | 0.47 | Verified |
+| 8 | 1.55 | 0.65 | Verified |
+| 9 | 1.54 | 1.20 | Verified |
 
-Add one measured LiDAR x/y person position for each of jets 10 through 19.
+Spread the configured jet count across this path.
 
-Set `jet_count` to `20` after all 20 points exist.
+The final profile uses 20 jets.
 
-Do not guess the last ten points.
+The current bench profile uses 10 jets.
 
-## 10. Software and start commands
+## 10. Configuration screen
+
+The existing browser viewer will also hold the settings screen.
+
+The settings module has one small interface.
+
+It loads, validates, previews, applies, and saves one full profile.
+
+It must not write a partial profile into a running show.
+
+### Path and hardware settings
+
+- Drag, add, remove, undo, and reset control-path points on the scan view.
+- Set the jet count from 1 to 20.
+- Enable or disable one jet.
+- Test one jet at a safe value.
+- Reverse the jet order.
+
+### Water settings
+
+- Set the minimum active water height.
+- Set the normal hill height.
+- Set the hard maximum water height.
+- Set the hill width.
+- Set the lead time.
+- Set the follow response.
+
+The hard maximum needs a clear warning and a lock.
+
+Zero always means off and stays outside the minimum active height.
+
+### Colour settings
+
+- Set the base RGBW colour.
+- Set the slow RGBW colour.
+- Set the fast RGBW colour.
+- Set the slow speed threshold.
+- Set the fast speed threshold.
+- Set the maximum idle brightness.
+
+### Screen actions
+
+- Save one versioned JSON profile.
+- Load a saved profile.
+- Preview all changes before apply.
+- Apply the full validated profile as one change.
+- Enter lights-only mode.
+- Send ALL OFF and read back all 512 DMX slots at zero.
+
+## 11. Idle animations
+
+The operator can select an idle water animation and an idle colour animation in the profile.
+
+Idle water starts off by default.
+
+It stays disabled until the watchdog contactor passes.
+
+Idle water includes an end-to-end hill, a soft ripple, and a slow low-height pulse.
+
+Idle colour includes an end-to-end chase, a slow colour fade, and a breathing effect.
+
+All idle water stays inside the idle minimum and the hard maximum.
+
+All idle colour stays inside the idle brightness limit.
+
+A confirmed person stops the idle animation and takes control.
+
+ALL OFF clears both water and colour channels.
+
+## 12. Software and start commands
 
 The Pi uses Raspberry Pi OS Lite 64-bit.
 
@@ -241,7 +313,7 @@ Run zero after the test:
 ssh pi@water-jets "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
 ```
 
-## 11. Stop rules
+## 13. Stop rules
 
 The software stop sends 512 zero slots.
 
@@ -257,7 +329,7 @@ Do not enable attract mode for the current bench build.
 
 Do not use the system unattended until the watchdog contactor passes a real fault test.
 
-## 12. Acceptance checks
+## 14. Acceptance checks
 
 The final build passes only when all checks pass.
 
@@ -266,26 +338,38 @@ The final build passes only when all checks pass.
 | LiDAR Boost mode | About 8,000 samples/s | Passed |
 | First module address | Module 1 starts at channel 1 | Passed |
 | Second module address | Module 2 starts at channel 51 | Not verified |
-| Position map | 20 measured points | 10 of 20 complete |
+| Control-path map | Ten draggable points can drive 20 jets | Not built |
 | Light aim | Correct pixel hill on all 20 jets | First 10 passed |
 | Water aim | Correct water hill on all 20 jets | First 10 passed |
+| Settings profile | Save, load, validate, preview, and apply one full profile | Not built |
+| Per-jet controls | Disable, test, and reverse safely | Not built |
+| Idle water | Three capped animations and person takeover | Not built; blocked by watchdog |
+| Idle colour | Three limited animations and person takeover | Not built |
 | Height cap | No height channel above DMX 40 | Passed in code and first module test |
 | Normal stop | Read back 512 zero slots | Passed |
 | Hardware fault stop | 24 V drops when the heartbeat stops | Not built |
 | Attract mode | Stays off until the hardware fault stop passes | Passed in current config |
 | Motor speed | Final PWM is inside the chosen operating limit | Open |
 
-## 13. Release blocks
+## 15. Release blocks
 
-1. Measure and enter the positions for jets 10 through 19.
+1. Build the configuration screen and settings profiles in issue #14.
 
-2. Verify that module 2 uses channels 51 through 100.
+2. Map all 20 jets across the existing control path in issue #15.
 
-3. Run the light and water aim checks on jets 10 through 19.
+3. Commission and verify the second module in issue #16.
 
-4. Select, build, and test the watchdog contactor.
+4. Build and test the watchdog contactor in issue #17.
 
-5. Choose PWM 760 or accept PWM 800 above the rated scan band.
+5. Measure jet response and choose the motor PWM in issue #18.
+
+6. Keep the background baseline fresh in issue #19.
+
+7. Check whether water changes LiDAR tracking in issue #20.
+
+8. Build idle water animations in issue #21.
+
+9. Build idle colour animations in issue #22.
 
 Garrett accepted this specification on 2026-09-19.
 

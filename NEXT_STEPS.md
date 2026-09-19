@@ -10,10 +10,11 @@ pointer and a cold-start summary, not a second source of truth. Decisions live i
 
 ## State
 
-Every decision that can be made in a conversation has been made. **11 of 13 tickets closed.**
+Every decision that can be made in a conversation has been made. **12 of 22 issues are closed.**
 The design is settled, every part is owned, and **the whole chain has now run end to end with
-water in the air.** The first ten jets are calibrated and verified with both lights and water.
-The final build uses all 20 jets. Jets 10 through 19 still need calibration and verification.
+water in the air.** The ten measured control points are verified with the first module. The
+final build spreads all 20 jets across that same path. The second module still needs a bench
+check.
 
 | | |
 |---|---|
@@ -33,9 +34,10 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 
 ## Open tickets
 
-- **#10 — Write the build-ready spec.** Garrett approved `docs/BUILD_SPEC.md` on 2026-09-19.
-  The final build uses all 20 jets. The first ten are verified. The last ten still need
-  calibration.
+- **#14 — Configuration screen and settings profiles.**
+- **#15 — Map all 20 jets across the existing control path.**
+- **#16 — Commission and verify the second module.**
+- **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
 
 **#12 was closed on 2026-09-05, with no closing comment.** Items 1-6 were done and item 7 half
 done: one unit is enough, a standing person is held 99% of the time, and position jitter is
@@ -73,8 +75,8 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    a joined path through all ten points and interpolates between adjacent jets. The mapping is
    in `Config.strip_points` and is covered by unit tests. Garrett verified the live viewer map,
    light aim, and water aim for jets 0 through 9 on 2026-09-19. The live show used a peak of
-   DMX 30. It stopped cleanly and read back all 512 DMX slots at zero. The final build uses all
-   20 jets. Jets 10 through 19 still need measured points and the same bench check.
+   DMX 30. It stopped cleanly and read back all 512 DMX slots at zero. The ten points define
+   the full path. Issue #15 spreads all 20 output jets across it without more measurements.
 
    <details><summary>Old straight-line calibration notes</summary>
 
