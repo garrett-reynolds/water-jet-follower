@@ -18,6 +18,10 @@ profile. Changing the hard maximum needs a separate unlock. A one-jet test holds
 lights-only still forces its water channel to zero. Save and load use a local JSON download and
 upload, so the Pi does not need a second profile file path.
 
+The layout view draws the live LiDAR scan behind the editable path. Zoom centres on the selected
+path point, so an operator can line each control point up with a real person return without
+switching back to the separate viewer.
+
 ## [2026-09-19] Test with the first 10 jets
 
 The current bench test uses jets 0 through 9 on the first HB-Laser module. The default tracker

@@ -348,7 +348,9 @@ While `show` is running, open `http://water-jets:8080/settings`. Edits are a pre
 **Apply profile** sends one complete versioned profile. Unlock the hard maximum before changing
 it. **Test** holds one jet at the configured minimum until **ALL OFF**. Lights-only always forces
 the water channel to zero. **Save JSON** downloads the profile to the browser computer; **Load
-JSON** previews a saved profile before apply.
+JSON** previews a saved profile before apply. The layout map draws the live LiDAR scan behind
+the editable path. Use the mouse wheel or the `−`, **Fit**, and `+` buttons to zoom around the
+selected path point.
 
 ### The height cap
 

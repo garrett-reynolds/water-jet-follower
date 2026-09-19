@@ -205,6 +205,10 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 .map { position:sticky; top:0; height:calc(100vh - 62px); background:#092f35; }
 #path { width:100%; height:100%; display:block; touch-action:none; }
 .map-tools { position:absolute; left:16px; bottom:16px; display:flex; gap:8px; flex-wrap:wrap; }
+.map-view { position:absolute; right:16px; top:16px; display:flex; gap:6px; align-items:center;
+  padding:6px; border:1px solid #3e686c; border-radius:5px; background:#08272ccc; color:#d7efeb; }
+.map-view button { min-width:38px; background:#123f45; border-color:#47777b; color:white; }
+#live-state { padding:0 5px; font-size:13px; }
 .controls { padding:18px; overflow:auto; }
 section { background:var(--panel); border:1px solid var(--line); margin:0 0 14px;
   padding:16px; border-radius:6px; }
@@ -231,7 +235,10 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
 </style></head><body>
 <header><h1>Water and light control</h1><a href="/">Live viewer</a></header>
 <main>
-  <div class="map"><canvas id="path"></canvas><div class="map-tools">
+  <div class="map"><canvas id="path"></canvas><div class="map-view">
+    <span id="live-state">LiDAR waiting</span><button id="zoom-out" aria-label="Zoom out">−</button>
+    <button id="zoom-fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button>
+  </div><div class="map-tools">
     <button id="add-point">Add point</button><button id="remove-point">Remove point</button>
     <button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
   </div></div>
@@ -265,7 +272,8 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
   </div>
 </main>
 <script>
-let profile, original, defaultProfile, roi, selected=0, dragging=false, lightsOnly=false;
+let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging=false, lightsOnly=false;
+let zoom=1, viewCentre=null;
 const $=id=>document.getElementById(id);
 const fields=['jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed'];
 const colourNames=['base_colour','slow_colour','fast_colour'];
@@ -278,14 +286,18 @@ function readForm(){const s=copy(profile.settings);for(const n of fields)s[n]=Nu
 function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;for(const n of colourNames)for(let i=0;i<4;i++)$(n+'_'+i).value=s[n][i];buildJets();draw();status('Preview only. Apply the complete profile when it looks right.');}
 function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><span>Jet '+(i+1)+'</span><input type="checkbox" '+(on?'checked':'')+'></label><button data-test="'+i+'">Test</button></div>'));box.querySelectorAll('button').forEach(b=>b.onclick=()=>testJet(Number(b.dataset.test)));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
-function xy(p){const c=$('path'),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [pad+(p[0]-roi.xmin)/(roi.xmax-roi.xmin)*w,pad+h-(p[1]-roi.ymin)/(roi.ymax-roi.ymin)*h];}
-function world(x,y){const c=$('path'),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [roi.xmin+(x-pad)/w*(roi.xmax-roi.xmin),roi.ymin+(pad+h-y)/h*(roi.ymax-roi.ymin)];}
-function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);const pts=profile.settings.strip_points;ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();pts.forEach((p,i)=>{const q=xy(p);ctx.fillStyle=i===selected?'#f3b61f':'#e9fffa';ctx.beginPath();ctx.arc(...q,i===selected?9:6,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(String(i+1),q[0]+10,q[1]-8)});}
+function bounds(){const cx=viewCentre?viewCentre[0]:(roi.xmin+roi.xmax)/2,cy=viewCentre?viewCentre[1]:(roi.ymin+roi.ymax)/2,hw=(roi.xmax-roi.xmin)/zoom/2,hh=(roi.ymax-roi.ymin)/zoom/2;return {xmin:cx-hw,xmax:cx+hw,ymin:cy-hh,ymax:cy+hh};}
+function xy(p){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [pad+(p[0]-v.xmin)/(v.xmax-v.xmin)*w,pad+h-(p[1]-v.ymin)/(v.ymax-v.ymin)*h];}
+function world(x,y){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [v.xmin+(x-pad)/w*(v.xmax-v.xmin),v.ymin+(pad+h-y)/h*(v.ymax-v.ymin)];}
+function scanDot(ctx,p,r,colour){const q=xy(p);ctx.fillStyle=colour;ctx.beginPath();ctx.arc(q[0],q[1],r,0,Math.PI*2);ctx.fill();}
+function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);const v=bounds();ctx.strokeStyle='#17474d';ctx.lineWidth=1;for(let x=Math.ceil(v.xmin*2)/2;x<=v.xmax;x+=.5){const a=xy([x,v.ymin]),b=xy([x,v.ymax]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}for(let y=Math.ceil(v.ymin*2)/2;y<=v.ymax;y+=.5){const a=xy([v.xmin,y]),b=xy([v.xmax,y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}if(liveFrame){for(const p of liveFrame.bg||[])scanDot(ctx,p,1.3,'#527277');for(const p of liveFrame.fg||[])scanDot(ctx,p,2.2,'#45dce7');for(const t of liveFrame.tracks||[])scanDot(ctx,[t.x,t.y],t.confirmed?7:5,t.confirmed?'#f3b61f':'#92aaa8')}scanDot(ctx,[0,0],6,'#fff06a');const pts=profile.settings.strip_points;ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();pts.forEach((p,i)=>{const q=xy(p);ctx.fillStyle=i===selected?'#f3b61f':'#e9fffa';ctx.beginPath();ctx.arc(...q,i===selected?9:6,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(String(i+1),q[0]+10,q[1]-8)});}
 function nearest(x,y){let best=0,dist=Infinity;profile.settings.strip_points.forEach((p,i)=>{const q=xy(p),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<900?best:null;}
 function dirty(){readForm();draw();status('Preview only. Nothing is live yet.');}
 async function apply(){try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
 async function testJet(i){try{await api('/actions/test-jet',{jet:i});status('Jet '+(i+1)+' test sent. Use ALL OFF when finished.');}catch(e){status(e.message,true)}}
 async function init(){buildColours();try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');size();}catch(e){status(e.message,true)}}
+async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';draw()}catch(e){$('live-state').textContent='LiDAR not available'}setTimeout(pollState,100)}
+function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
 $('unlock').onchange=()=>{$('height_max').disabled=!$('unlock').checked};
 $('jet_count').onchange=()=>{readForm();buildJets();dirty()};
 $('colours').onchange=dirty;
@@ -297,11 +309,12 @@ $('undo').onclick=async()=>{try{profile=await api('/settings/undo',{});fill();st
 $('reset').onclick=()=>{profile=copy(defaultProfile);fill();status('Default profile previewed. Press Apply profile to make it live.');};
 $('lights').onclick=async()=>{try{const d=await api('/actions/lights-only',{enabled:!lightsOnly});lightsOnly=d.enabled;$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');}catch(e){status(e.message,true)}};
 $('all-off').onclick=async()=>{try{const d=await api('/actions/all-off',{});status(d.all_zero?'ALL OFF verified. All 512 slots are zero.':'ALL OFF could not be verified.',!d.all_zero)}catch(e){status(e.message,true)}};
+$('zoom-in').onclick=()=>setZoom(zoom*1.5);$('zoom-out').onclick=()=>setZoom(zoom/1.5);$('zoom-fit').onclick=()=>setZoom(1);
 $('add-point').onclick=()=>{readForm();const p=profile.settings.strip_points, a=p[Math.max(0,p.length-2)], b=p[p.length-1];p.splice(p.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);selected=p.length-2;dirty()};
 $('remove-point').onclick=()=>{readForm();if(profile.settings.strip_points.length<=2)return status('The path needs at least two points.',true);profile.settings.strip_points.splice(selected,1);selected=Math.max(0,selected-1);dirty()};
-const canvas=$('path');canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();const n=nearest(e.clientX-r.left,e.clientY-r.top);if(n!==null){selected=n;dragging=true;canvas.setPointerCapture(e.pointerId);draw()}};
+const canvas=$('path');canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY<0?zoom*1.2:zoom/1.2)};canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();const n=nearest(e.clientX-r.left,e.clientY-r.top);if(n!==null){selected=n;if(zoom>1)viewCentre=profile.settings.strip_points[selected];dragging=true;canvas.setPointerCapture(e.pointerId);draw()}};
 canvas.onpointermove=e=>{if(!dragging)return;const r=canvas.getBoundingClientRect();profile.settings.strip_points[selected]=world(e.clientX-r.left,e.clientY-r.top);dirty()};
-canvas.onpointerup=()=>dragging=false;window.onresize=size;init();
+canvas.onpointerup=()=>dragging=false;window.onresize=size;init();pollState();
 </script></body></html>"""
 
 
