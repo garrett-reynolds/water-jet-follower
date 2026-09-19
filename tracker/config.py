@@ -128,6 +128,12 @@ class Config:
     attract_enabled: bool = False
     attract_height: int = 15             # 11.4 cm, about half the hill
     attract_seconds: float = 8.0         # one pass along the strip
+    idle_water_animation: str = "off"   # off, roll, ripple, or pulse
+    idle_colour_animation: str = "off"  # off, chase, fade, or breathe
+    idle_brightness: int = 64            # limit for every idle RGBW channel
+    idle_seconds: float = 8.0            # seconds for one complete idle cycle
+    idle_height: int = 15                # peak DMX height for idle water
+    idle_colour: tuple = (0, 0, 255, 0) # RGBW used by idle colour animations
 
     # Colour. Slow is blue, fast is white, on a dim base - the wave decision.
     # RGBW, 0-255 each.

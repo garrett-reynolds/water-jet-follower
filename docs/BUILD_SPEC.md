@@ -52,11 +52,20 @@ Prices are in CAD.
 | 2 | HB-Laser 3D HydroMatrix HD Single Module | Owned; first module tested | $0 |
 | 1 | HB-Laser 24 V supply | Owned and tested | $0 |
 | 1 | 5-pin DMX cable and module link | Owned and tested | $0 |
-| 1 | 24 V contactor and watchdog stop | Not selected | Unverified |
+| 1 | Siemens `3UG5651-1CW30` pulse watchdog | Selected; not ordered or tested | CAD $785.51 |
+| 1 | Siemens `3RT2026-1BB40` 24 VDC contactor | Selected; not ordered or tested | CAD $523.91 |
+| 1 | BDMICRO `OPTO-4` heartbeat isolator | Selected; not ordered or tested | CAD $124.62 |
+| 1 | Eaton Bussmann `LP-CC-10` 10 A time-delay fuse | Selected; not ordered or tested | CAD $152.68 |
+| 1 | Eaton Bussmann `CHCC1DU` DIN rail fuse holder | Selected; not ordered or tested | CAD $148.58 |
+| 10 ft | LAPP `601402` two-conductor 14 AWG cable | Selected; not ordered or tested | CAD $45.37 |
 
 The listed owned parts add CAD $0.
 
-The final cost is not known until the contactor and watchdog are selected.
+The selected hardware stop adds CAD $1,780.67 before tax, duty, and shipping.
+
+The watchdog price and isolator price were converted from USD on 2026-09-19.
+
+See [watchdog-contactor.md](../hardware/watchdog-contactor.md) for the circuit and test gate.
 
 ## 4. Physical layout
 
@@ -100,7 +109,11 @@ The LiDAR must use the powered hub.
 
 The Pi USB ports did not supply enough current for LiDAR motor start.
 
-The 24 V contactor must default to off.
+The 24 V contactor defaults to off.
+
+Use 14 AWG copper for the 10 ft module feed.
+
+Protect the feed with the selected 10 A time-delay fuse before the contactor.
 
 The contactor must open when the Pi, tracker, OLA, Enttec, or DMX path fails.
 
@@ -265,6 +278,8 @@ Zero always means off and stays outside the minimum active height.
 
 The operator can select an idle water animation and an idle colour animation in the profile.
 
+The operator can set the idle RGBW colour, brightness limit, cycle time, and water height.
+
 Idle water starts off by default.
 
 It stays disabled until the watchdog contactor passes.
@@ -343,8 +358,8 @@ The final build passes only when all checks pass.
 | Water aim | Correct water hill on all 20 jets | First 10 passed |
 | Settings profile | Save, load, validate, preview, and apply one full profile | Not built |
 | Per-jet controls | Disable, test, and reverse safely | Not built |
-| Idle water | Three capped animations and person takeover | Not built; blocked by watchdog |
-| Idle colour | Three limited animations and person takeover | Not built |
+| Idle water | Three capped animations and person takeover | Software built; bench check open |
+| Idle colour | Three limited animations and person takeover | Passed; Chase verified on real lights |
 | Height cap | No height channel above DMX 40 | Passed in code and first module test |
 | Normal stop | Read back 512 zero slots | Passed |
 | Hardware fault stop | 24 V drops when the heartbeat stops | Not built |

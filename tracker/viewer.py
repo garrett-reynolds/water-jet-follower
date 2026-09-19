@@ -224,7 +224,9 @@ button.danger { border-color:var(--danger); color:var(--danger); font-weight:650
 button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; }
 .actions { display:flex; flex-wrap:wrap; gap:8px; }
 .lock { border-left:4px solid var(--danger); padding-left:10px; }
-.colours { display:grid; grid-template-columns:70px repeat(4,1fr); gap:6px; align-items:end; }
+.colour-control { display:grid; grid-template-columns:190px 1fr; gap:12px 16px; align-items:center; }
+#colour_wheel { width:180px; height:180px; display:block; touch-action:none; cursor:crosshair; }
+.colour-sliders { display:grid; gap:12px; }
 .jets { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
 .jet { border:1px solid var(--line); padding:7px; display:grid; gap:5px; border-radius:4px; }
 .water-tester { border:2px solid var(--water); background:#f4fffc; }
@@ -256,11 +258,25 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
       <label>Follow response in seconds<input id="follow_response" type="number" min="0" max="5" step="0.01"></label>
       <label><span><input id="reverse_jets" type="checkbox"> Reverse jet order</span></label>
     </div></section>
-    <section><h2>Speed colours</h2><div class="colours" id="colours"></div>
+    <section><h2>Colours</h2>
+      <label>Set colour for<select id="colour_mode"><option value="base_colour">Base</option><option value="slow_colour">Slow person</option><option value="fast_colour">Fast person</option><option value="idle_colour">Idle animation</option></select></label>
+      <div class="colour-control"><canvas id="colour_wheel" width="180" height="180" aria-label="Colour wheel"></canvas>
+        <div class="colour-sliders">
+          <label>Colour level<input id="colour_value" type="range" min="0" max="255" value="255"></label>
+          <label>White level<input id="white_level" type="range" min="0" max="255" value="0"></label>
+        </div>
+      </div>
       <div class="grid" style="margin-top:10px">
         <label>Slow speed<input id="slow_speed" type="number" min="0" max="10" step="0.1"></label>
         <label>Fast speed<input id="fast_speed" type="number" min="0" max="10" step="0.1"></label>
       </div></section>
+    <section><h2>Idle animations</h2><div class="grid">
+      <label>Water<select id="idle_water_animation"><option value="off">Off</option><option value="roll">Roll</option><option value="ripple">Ripple</option><option value="pulse">Pulse</option></select></label>
+      <label>Colour<select id="idle_colour_animation"><option value="off">Off</option><option value="chase">Chase</option><option value="fade">Fade</option><option value="breathe">Breathe</option></select></label>
+      <label>Idle brightness<input id="idle_brightness" type="number" min="0" max="255"></label>
+      <label>Cycle time in seconds<input id="idle_seconds" type="number" min="0.5" max="120" step="0.5"></label>
+      <label>Idle water height<input id="idle_height" type="number" min="1" max="255"></label>
+    </div></section>
     <section><h2>Jet enable</h2><div class="jets" id="jets"></div></section>
     <section class="water-tester"><h2>Water jet tester</h2>
       <p class="note warning">Holds one jet until you stop the test. Keep your hand on the 24 V switch.</p>
@@ -284,18 +300,22 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
   </div>
 </main>
 <script>
-let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging=false, lightsOnly=false;
+let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging=false, lightsOnly=false, colourMode='base_colour';
 let zoom=1, viewCentre=null;
 const $=id=>document.getElementById(id);
-const fields=['jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed'];
-const colourNames=['base_colour','slow_colour','fast_colour'];
-const labels={base_colour:'Base',slow_colour:'Slow',fast_colour:'Fast'};
+const fields=['jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed','idle_brightness','idle_seconds','idle_height'];
 function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'bad':'';}
 function copy(v){return JSON.parse(JSON.stringify(v));}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
-function buildColours(){const box=$('colours');box.innerHTML='<span></span><span>R</span><span>G</span><span>B</span><span>W</span>';for(const name of colourNames){box.insertAdjacentHTML('beforeend','<strong>'+labels[name]+'</strong>'+[0,1,2,3].map(i=>'<input type="number" min="0" max="255" id="'+name+'_'+i+'">').join(''));}}
-function readForm(){const s=copy(profile.settings);for(const n of fields)s[n]=Number($(n).value);s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);for(const n of colourNames)s[n]=[0,1,2,3].map(i=>Number($(n+'_'+i).value));profile.settings=s;return profile;}
-function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('water-test-jet').max=s.jet_count;$('water-test-height').min=s.height_min;$('water-test-height').max=s.height_max;if(Number($('water-test-height').value)<s.height_min)$('water-test-height').value=s.height_min;if(Number($('water-test-height').value)>s.height_max)$('water-test-height').value=s.height_max;for(const n of colourNames)for(let i=0;i<4;i++)$(n+'_'+i).value=s[n][i];buildJets();draw();status('Preview only. Apply the complete profile when it looks right.');}
+let wheelHue=0,wheelSat=0,wheelDrag=false;
+function hsvToRgb(h,s,v){const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);const a=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i%6];return a.map(x=>Math.round(x*255));}
+function rgbToHsv(c){const r=c[0]/255,g=c[1]/255,b=c[2]/255,m=Math.max(r,g,b),n=Math.min(r,g,b),d=m-n;let h=0;if(d){if(m===r)h=((g-b)/d)%6;else if(m===g)h=(b-r)/d+2;else h=(r-g)/d+4;h=(h/6+1)%1}return [h,m?d/m:0,m];}
+function drawColourWheel(){const c=$('colour_wheel'),x=c.getContext('2d'),r=c.width/2,img=x.createImageData(c.width,c.height);for(let py=0;py<c.height;py++)for(let px=0;px<c.width;px++){const dx=px-r,dy=py-r,d=Math.hypot(dx,dy),i=(py*c.width+px)*4;if(d<=r){const rgb=hsvToRgb((Math.atan2(dy,dx)/(2*Math.PI)+1)%1,d/r,1);img.data.set([...rgb,255],i)}}x.putImageData(img,0,0);const a=wheelHue*2*Math.PI,rr=wheelSat*r;x.strokeStyle='white';x.lineWidth=3;x.beginPath();x.arc(r+Math.cos(a)*rr,r+Math.sin(a)*rr,6,0,2*Math.PI);x.stroke();x.strokeStyle='#092f35';x.lineWidth=1;x.stroke();}
+function setWheel(e){const c=$('colour_wheel'),b=c.getBoundingClientRect(),r=c.width/2,dx=(e.clientX-b.left)*c.width/b.width-r,dy=(e.clientY-b.top)*c.height/b.height-r;wheelHue=(Math.atan2(dy,dx)/(2*Math.PI)+1)%1;wheelSat=Math.min(1,Math.hypot(dx,dy)/r);drawColourWheel();dirty();}
+function saveColour(){const rgb=hsvToRgb(wheelHue,wheelSat,Number($('colour_value').value)/255);profile.settings[colourMode]=[...rgb,Number($('white_level').value)];}
+function fillColour(){const c=profile.settings[colourMode],hsv=rgbToHsv(c);wheelHue=hsv[0];wheelSat=hsv[1];$('colour_mode').value=colourMode;$('colour_value').value=Math.round(hsv[2]*255);$('white_level').value=c[3];drawColourWheel();}
+function readForm(){const s=copy(profile.settings);saveColour();for(const n of fields)s[n]=Number($(n).value);s[colourMode]=profile.settings[colourMode];s.idle_water_animation=$('idle_water_animation').value;s.idle_colour_animation=$('idle_colour_animation').value;s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);profile.settings=s;return profile;}
+function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('water-test-jet').max=s.jet_count;$('water-test-height').min=s.height_min;$('water-test-height').max=s.height_max;if(Number($('water-test-height').value)<s.height_min)$('water-test-height').value=s.height_min;if(Number($('water-test-height').value)>s.height_max)$('water-test-height').value=s.height_max;fillColour();buildJets();draw();status('Preview only. Apply the complete profile when it looks right.');}
 function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><span>Jet '+(i+1)+'</span><input type="checkbox" '+(on?'checked':'')+'></label></div>'));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
 function bounds(){const cx=viewCentre?viewCentre[0]:(roi.xmin+roi.xmax)/2,cy=viewCentre?viewCentre[1]:(roi.ymin+roi.ymax)/2,hw=(roi.xmax-roi.xmin)/zoom/2,hh=(roi.ymax-roi.ymin)/zoom/2;return {xmin:cx-hw,xmax:cx+hw,ymin:cy-hh,ymax:cy+hh};}
@@ -309,12 +329,14 @@ function dirty(){readForm();draw();status('Preview only. Nothing is live yet.');
 async function apply(){try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
 async function startWaterTest(){const jet=Number($('water-test-jet').value)-1,height=Number($('water-test-height').value);try{await api('/actions/test-jet',{jet,height});status('Water test is holding jet '+(jet+1)+' at height '+height+'. Press Stop water test.');}catch(e){status(e.message,true)}}
 async function stopWaterTest(){try{const d=await api('/actions/all-off',{});status(d.all_zero?'Water test stopped. All 512 slots are zero.':'Water test could not be stopped.',!d.all_zero)}catch(e){status(e.message,true)}}
-async function init(){buildColours();try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');size();}catch(e){status(e.message,true)}}
+async function init(){try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');size();}catch(e){status(e.message,true)}}
 async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';draw()}catch(e){$('live-state').textContent='LiDAR not available'}setTimeout(pollState,100)}
 function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
 $('unlock').onchange=()=>{$('height_max').disabled=!$('unlock').checked};
 $('jet_count').onchange=()=>{const count=Number($('jet_count').value);profile.settings.strip_points=jetPoints(profile.settings.strip_points,count);selected=Math.min(selected,count-1);readForm();buildJets();dirty()};
-$('colours').onchange=dirty;
+$('colour_mode').onchange=()=>{saveColour();colourMode=$('colour_mode').value;fillColour();dirty()};
+$('colour_value').oninput=dirty;$('white_level').oninput=dirty;
+const wheel=$('colour_wheel');wheel.onpointerdown=e=>{wheelDrag=true;wheel.setPointerCapture(e.pointerId);setWheel(e)};wheel.onpointermove=e=>{if(wheelDrag)setWheel(e)};wheel.onpointerup=()=>wheelDrag=false;
 document.querySelector('.controls').addEventListener('change',e=>{if(e.target.matches('input')&&!['load','jet_count','unlock'].includes(e.target.id))dirty()});
 $('apply').onclick=apply;
 $('save').onclick=()=>{readForm();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(profile,null,2)],{type:'application/json'}));a.download='water-jet-profile.json';a.click();URL.revokeObjectURL(a.href)};

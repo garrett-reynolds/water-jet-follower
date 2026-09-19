@@ -8,6 +8,7 @@
 """
 
 import argparse
+from contextlib import nullcontext
 import os
 import sys
 import time
@@ -33,6 +34,16 @@ def _lidar_source(cfg):
 
 
 # --- subcommands --------------------------------------------------------
+
+def _send_with_heartbeat(send_frame, frame, heartbeat=None):
+    """Pulse the watchdog only after the DMX path accepts a frame."""
+    sent = send_frame(frame)
+    if sent is False:
+        raise RuntimeError("DMX send failed; watchdog heartbeat stopped")
+    if heartbeat is not None:
+        heartbeat.beat()
+    return sent
+
 
 def cmd_check(args):
     from tracker.lidar import health_check
@@ -195,7 +206,8 @@ def cmd_jog(args):
     return 0
 
 
-def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output):
+def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
+               heartbeat=None):
     """Track, build the wave, hand each frame to `send_frame`. The whole show.
 
     `send_frame` is passed in rather than chosen here so that --dry-run, --lights-only
@@ -232,7 +244,9 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output):
             if now - last_sent >= cfg.resend_seconds or any(heights):
                 live_frame = wave.frame(frame, timestamp,
                                         lights_only=control.lights_only)
-                send_frame(control.output_frame(live_frame))
+                _send_with_heartbeat(send_frame,
+                                     control.output_frame(live_frame),
+                                     heartbeat)
                 last_sent = now
 
             elapsed = max(1e-6, time.time() - started)
@@ -305,11 +319,15 @@ def cmd_show(args):
             return _show_loop(source, cfg, baseline, label, args,
                               send_frame=lambda frame: None,
                               zero_output=lambda: True)
-        with dmx.safe_output(args.universe):
+        from tracker import heartbeat
+        heartbeat_context = (heartbeat.open_gpio(args.watchdog_gpio)
+                             if args.watchdog_gpio is not None else nullcontext())
+        with dmx.safe_output(args.universe), heartbeat_context as watchdog:
             return _show_loop(
                 source, cfg, baseline, label, args,
                 send_frame=lambda frame: dmx.send(frame, args.universe),
-                zero_output=lambda: dmx.zero(args.universe))
+                zero_output=lambda: dmx.zero(args.universe),
+                heartbeat=watchdog)
     except RuntimeError as exc:
         print(f"show: {exc}", file=sys.stderr)
         return 1
@@ -431,6 +449,9 @@ def build_parser():
                       help="roll a hill when nobody is there. OFF by default and "
                            "should stay off until a watchdog can drop the 24 V")
     show.add_argument("--universe", type=int, default=1)
+    show.add_argument("--watchdog-gpio", type=int, dest="watchdog_gpio",
+                      help="BCM GPIO line for the external pulse watchdog. "
+                           "Disabled unless set; the DIN rail design uses 17")
     show.set_defaults(func=cmd_show)
 
     offline = subparsers.add_parser("offline", help="replay fast, no viewer, summary only")

@@ -53,6 +53,22 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn('id="stop-water-test"', page)
         self.assertIn('Holds one jet until you stop the test.', page)
 
+    def test_settings_page_uses_an_inline_colour_wheel_and_mode_selector(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn('id="colour_mode"', page)
+        self.assertIn('id="colour_wheel"', page)
+        self.assertIn('id="colour_value" type="range"', page)
+        self.assertIn('id="white_level" type="range"', page)
+        self.assertNotIn('type="color"', page)
+        self.assertNotIn('id="base_colour_0"', page)
+
+    def test_idle_height_follows_the_editable_hard_maximum(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("$('idle_height').max=s.height_max", page)
+        self.assertNotIn('id="idle_height" type="number" min="1" max="40"', page)
+
     def test_state_endpoint_supplies_scan_points(self):
         with urlopen(self.base + "/state") as response:
             frame = json.load(response)

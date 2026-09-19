@@ -26,7 +26,7 @@ movable point. Do not propose connecting the second module unless Garrett change
 | Height | **7.62 mm per DMX unit**, measured. Cap is DMX 40 = 30 cm. DMX 255 would be 1.94 m |
 | Stopping | Software zero works **only while the chain is alive**. The modules latch. The 24 V switch is the only real stop |
 | Power | Pi's own supply plus a **powered USB hub** for the LiDAR — not optional, see `DECISIONS.md` |
-| Cost to finish | CAD $0 |
+| Cost to finish | CAD $1,780.67 before tax, duty, and shipping |
 
 Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is at
 `http://water-jets:9090`. The scan viewer is at `http://water-jets:8080/` while
@@ -35,6 +35,9 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 ## Open tickets
 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
+
+Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
+software tests. Issue #21 still needs its low-water bench check. Idle water defaults to off.
 
 Issue #16 was closed on 2026-09-19 because Garrett ruled out connecting the second module.
 
@@ -198,8 +201,12 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    crash with jets up is a flood and no software stop can prevent it. An unattended hallway
    needs the 24 V switched by something that drops when the control software stops
    heartbeating. `cfg.resend_seconds` already re-sends a frame twice a second so that a
-   watchdog has a heartbeat to watch. Nothing else exists yet. **Attract mode must stay off
-   until this is built.** Raise as its own ticket against #10.
+   watchdog has a heartbeat to watch. The DIN rail design now selects a Siemens
+   `3UG5651-1CW30` pulse watchdog, a Siemens `3RT2026-1BB40` 24 VDC contactor, and a BDMICRO
+   `OPTO-4` isolator. The selected parts cost CAD $1,434.04 before tax, duty, and shipping.
+   Nothing is ordered or built. The GPIO17 heartbeat code is on the Pi, and all 97 tests pass
+   there. The 10 A fuse and 14 AWG wire are selected. The five live fault results remain open in issue #17. **Attract
+   mode must stay off until this is built.**
 
 Once the calibration lands, the show is real and #10 unblocks.
 

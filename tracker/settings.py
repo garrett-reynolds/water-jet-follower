@@ -6,12 +6,14 @@ from tracker import dmx
 from tracker.config import Config
 
 
-PROFILE_VERSION = 1
+PROFILE_VERSION = 3
 EDITABLE = (
     "strip_points", "jet_count", "height_min", "hill_peak", "height_max",
     "hill_jets", "lead_seconds", "follow_response", "base_colour",
     "slow_colour", "fast_colour", "slow_speed", "fast_speed",
-    "jet_enabled", "reverse_jets",
+    "jet_enabled", "reverse_jets", "idle_water_animation",
+    "idle_colour_animation", "idle_brightness",
+    "idle_seconds", "idle_height", "idle_colour",
 )
 
 
@@ -56,6 +58,12 @@ def validate_profile(profile):
                                                "follow_response", 0, 5))
     clean["slow_speed"] = float(_number(values["slow_speed"], "slow_speed", 0, 10))
     clean["fast_speed"] = float(_number(values["fast_speed"], "fast_speed", 0, 10))
+    clean["idle_brightness"] = int(_number(values["idle_brightness"],
+                                             "idle_brightness", 0, 255))
+    clean["idle_seconds"] = float(_number(values["idle_seconds"],
+                                           "idle_seconds", 0.5, 120))
+    clean["idle_height"] = int(_number(values["idle_height"], "idle_height",
+                                         clean["height_min"], clean["height_max"]))
     if clean["fast_speed"] <= clean["slow_speed"]:
         raise ValueError("fast_speed must be greater than slow_speed")
 
@@ -71,7 +79,7 @@ def validate_profile(profile):
     if len(clean["strip_points"]) != len(points):
         raise ValueError("each strip point must contain x and y")
 
-    for name in ("base_colour", "slow_colour", "fast_colour"):
+    for name in ("base_colour", "slow_colour", "fast_colour", "idle_colour"):
         colour = values[name]
         if not isinstance(colour, (list, tuple)) or len(colour) != 4:
             raise ValueError(f"{name} must contain RGBW")
@@ -86,6 +94,12 @@ def validate_profile(profile):
     if not isinstance(values["reverse_jets"], bool):
         raise ValueError("reverse_jets must be true or false")
     clean["reverse_jets"] = values["reverse_jets"]
+    for name, allowed in (
+            ("idle_water_animation", {"off", "roll", "ripple", "pulse"}),
+            ("idle_colour_animation", {"off", "chase", "fade", "breathe"})):
+        if values[name] not in allowed:
+            raise ValueError(f"{name} is not valid")
+        clean[name] = values[name]
     return clean
 
 

@@ -1,5 +1,61 @@
 # Decisions
 
+## [2026-09-19] Use three selectable idle water and colour animations
+
+The settings profile now selects roll, ripple, or pulse water and chase, fade, or
+breathe colour. Both selectors default to off. Idle colour has a final brightness
+limit. A confirmed person always takes control. The software passed all 101 laptop
+tests. Real water and light bench checks are still open in issues #21 and #22.
+
+The first real light-only check found that a blue chase from DMX 40 to 64 was too
+small to see. The chase background now goes to zero. Garrett then confirmed that
+the blue chase moved on the real first module. Fade and Breathe remain unverified.
+
+Idle animations now have their own RGBW colour and cycle time. Cycle time is the
+number of seconds for one full animation cycle, so a smaller value is faster. The
+idle brightness limit remains the final limit after the selected colour is applied.
+Idle water also has its own height control. Validation keeps it between the active
+minimum and the hard water maximum.
+
+The settings page uses one inline colour wheel instead of sixteen RGBW number boxes
+or a system pop-up picker. A
+mode selector chooses Base, Slow person, Fast person, or Idle animation. One White
+slider keeps control of the fourth LED channel that an RGB colour wheel cannot set.
+One Colour level slider sets light or dark RGB values.
+
+## [2026-09-19] Use a DIN rail pulse watchdog and a 35 A DC contactor
+
+The hardware stop uses a Siemens `3UG5651-1CW30` speed monitoring relay as a missing-pulse
+watchdog and a Siemens `3RT2026-1BB40` contactor. The supply label is 24 VDC, 21 A. Siemens
+rates one `3RT2026` main path for 35 A at 24 VDC under DC-1, so it has 14 A of rated margin
+over the supply limit. The contactor has a 24 VDC coil and normally open main contacts. Loss
+of coil power therefore opens the module feed.
+
+The Pi heartbeat crosses an optically isolated BDMICRO `OPTO-4`. The watchdog uses its
+closed-circuit mode. A stopped tracker, stopped Pi, failed OLA send, disconnected Enttec, or
+broken heartbeat wire must stop the pulse train. The watchdog then opens its output and drops
+the contactor without asking the DMX path to send zero.
+
+GPIO17, header pin 11, is the heartbeat output. The live Pi reported it free and has Python
+`gpiod` 2.2.0 installed. The show only drives it when `--watchdog-gpio 17` is present. Each
+successful DMX send toggles the line. A failed send stops the show without another heartbeat.
+The line starts low and returns low when the show exits.
+
+The heartbeat code was copied to `/home/pi/tracker` on 2026-09-19. The prior Pi `run.py` is at
+`/home/pi/tracker/run.py.bak-20260919-watchdog`. All 97 tests passed on the Pi. The six focused
+heartbeat tests include the failed-DMX rule. GPIO17 remained an unused input because the test
+did not open the GPIO line.
+
+This selection is a design only. No part has been ordered. No circuit has been built. The five
+fault cases in issue #17 still need real low-water bench results before idle water can be used.
+
+The final module feed uses 10 ft of two-conductor 14 AWG copper cable. An Eaton Bussmann
+`LP-CC-10` 10 A time-delay fuse sits in a `CHCC1DU` DIN rail holder before the contactor.
+The two modules can draw 6.4 A in total. The proposed 18 AWG cable was rejected. The checked
+18 AWG resistance gives about 0.85 V of loss over the 20 ft power loop at 6.4 A and 25 C.
+That is about 3.6 percent of 24 V. A panel electrician must still confirm the cable method
+and local code.
+
 ## [2026-09-19] First-module live follow works with 0.50 s lead
 
 Garrett verified the real first module with a live walker. The water jets rose in the correct

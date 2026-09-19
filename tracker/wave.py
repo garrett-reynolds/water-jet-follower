@@ -150,8 +150,12 @@ class Wave:
                     owner_strength[jet] = strength
                     colours[jet] = colour
 
-        if not tracks and cfg.attract_enabled:
-            self._attract(heights, colours, now)
+        if not tracks:
+            water_mode = cfg.idle_water_animation
+            if cfg.attract_enabled and water_mode == "off":
+                water_mode = "roll"
+            self._idle_water(heights, now, water_mode)
+            self._idle_colour(colours, now, cfg.idle_colour_animation)
 
         capped = [0 if h <= 0 else min(max(int(round(h)), cfg.height_min),
                                       cfg.height_max)
@@ -175,6 +179,39 @@ class Wave:
                 heights[jet] = max(heights[jet], strength * cfg.attract_height)
                 colours[jet] = lerp_colour(cfg.base_colour, cfg.slow_colour,
                                            strength)
+
+    def _idle_water(self, heights, now, mode):
+        cfg = self.cfg
+        if mode == "off" or cfg.idle_seconds <= 0:
+            return
+        phase = (now % cfg.idle_seconds) / cfg.idle_seconds
+        if mode == "pulse":
+            level = (0.5 - 0.5 * math.cos(2 * math.pi * phase)) * cfg.idle_height
+            heights[:] = [level] * cfg.jet_count
+            return
+        width = cfg.hill_jets if mode == "roll" else max(2, cfg.hill_jets / 2)
+        centre = phase * (cfg.jet_count - 1)
+        for jet in range(cfg.jet_count):
+            heights[jet] = hill_profile(jet - centre, width) * cfg.idle_height
+
+    def _idle_colour(self, colours, now, mode):
+        cfg = self.cfg
+        if mode == "off" or cfg.idle_seconds <= 0:
+            return
+        phase = (now % cfg.idle_seconds) / cfg.idle_seconds
+        amount = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
+        if mode == "fade":
+            colours[:] = [lerp_colour(cfg.idle_colour, cfg.fast_colour, amount)] * cfg.jet_count
+        elif mode == "breathe":
+            colours[:] = [lerp_colour((0, 0, 0, 0), cfg.idle_colour,
+                                      0.2 + 0.8 * amount)] * cfg.jet_count
+        elif mode == "chase":
+            centre = phase * (cfg.jet_count - 1)
+            colours[:] = [lerp_colour((0, 0, 0, 0), cfg.idle_colour,
+                                      hill_profile(jet - centre, cfg.hill_jets))
+                          for jet in range(cfg.jet_count)]
+        colours[:] = [tuple(min(cfg.idle_brightness, value) for value in colour)
+                      for colour in colours]
 
     def frame(self, tracker_frame, now, lights_only=False):
         """The full 512-slot DMX frame for one scan.

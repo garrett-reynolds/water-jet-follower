@@ -343,5 +343,66 @@ class TestAttract(unittest.TestCase):
         self.assertEqual(heights.index(max(heights)), 10)
 
 
+class TestIdleAnimations(unittest.TestCase):
+    def test_water_modes_are_off_by_default(self):
+        cfg = config_20()
+        self.assertEqual(cfg.idle_water_animation, "off")
+        self.assertEqual(max(wave.Wave(cfg).heights_and_colours(frame_of(), 2)[0]), 0)
+
+    def test_each_water_mode_is_capped(self):
+        for mode in ("roll", "ripple", "pulse"):
+            cfg = config_20()
+            cfg.idle_water_animation = mode
+            heights, _ = wave.Wave(cfg).heights_and_colours(frame_of(), 2)
+            self.assertGreater(max(heights), 0)
+            self.assertLessEqual(max(heights), cfg.height_max)
+
+    def test_idle_height_sets_the_water_peak(self):
+        cfg = config_20()
+        cfg.idle_water_animation = "roll"
+        cfg.idle_height = 9
+        heights, _ = wave.Wave(cfg).heights_and_colours(frame_of(), 0)
+        self.assertEqual(max(heights), 9)
+
+    def test_each_colour_mode_obeys_brightness_limit(self):
+        for mode in ("chase", "fade", "breathe"):
+            cfg = config_20()
+            cfg.idle_colour_animation = mode
+            cfg.idle_brightness = 25
+            _, colours = wave.Wave(cfg).heights_and_colours(frame_of(), 2)
+            self.assertLessEqual(max(max(colour) for colour in colours), 25)
+
+    def test_chase_has_a_dark_background_and_a_visible_peak(self):
+        cfg = config_20()
+        cfg.idle_colour_animation = "chase"
+        cfg.idle_brightness = 64
+        _, colours = wave.Wave(cfg).heights_and_colours(frame_of(), 0)
+        self.assertEqual(colours[0], (0, 0, 64, 0))
+        self.assertEqual(colours[-1], (0, 0, 0, 0))
+
+    def test_idle_colour_sets_the_chase_colour(self):
+        cfg = config_20()
+        cfg.idle_colour_animation = "chase"
+        cfg.idle_colour = (50, 10, 0, 0)
+        _, colours = wave.Wave(cfg).heights_and_colours(frame_of(), 0)
+        self.assertEqual(colours[0], (50, 10, 0, 0))
+
+    def test_idle_seconds_sets_cycle_speed(self):
+        cfg = config_20()
+        cfg.idle_colour_animation = "chase"
+        cfg.idle_seconds = 4
+        _, start = wave.Wave(cfg).heights_and_colours(frame_of(), 0)
+        _, end = wave.Wave(cfg).heights_and_colours(frame_of(), 4)
+        self.assertEqual(start, end)
+
+    def test_a_person_takes_control(self):
+        cfg = config_20()
+        cfg.idle_water_animation = "pulse"
+        cfg.idle_colour_animation = "fade"
+        heights, _ = wave.Wave(cfg).heights_and_colours(
+            frame_of(track(s=10 * wave.jet_pitch(cfg))), 2)
+        self.assertEqual(max(heights), cfg.hill_peak)
+
+
 if __name__ == "__main__":
     unittest.main()

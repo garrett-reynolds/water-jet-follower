@@ -48,6 +48,20 @@ class TestProfiles(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.control.apply(profile)
 
+    def test_idle_speed_and_colour_are_validated(self):
+        profile = profile_for(self.cfg)
+        profile["settings"]["idle_seconds"] = 3.5
+        profile["settings"]["idle_colour"] = [12, 34, 56, 7]
+        self.control.apply(profile)
+        self.assertEqual(self.cfg.idle_seconds, 3.5)
+        self.assertEqual(self.cfg.idle_colour, (12, 34, 56, 7))
+
+    def test_idle_height_must_stay_inside_the_water_limits(self):
+        profile = profile_for(self.cfg)
+        profile["settings"]["idle_height"] = 41
+        with self.assertRaises(ValueError):
+            self.control.apply(profile)
+
 
 class TestActions(unittest.TestCase):
     def test_all_off_uses_the_verified_zero_callback(self):
