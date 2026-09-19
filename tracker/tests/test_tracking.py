@@ -249,12 +249,28 @@ class TestMerge(unittest.TestCase):
 class TestStripMapping(unittest.TestCase):
     def test_position_maps_to_a_jet(self):
         cfg = Config()
-        s, jet = geometry.strip_position(cfg.strip_start[0], 0.0, cfg)
+        s, jet = geometry.strip_position(*cfg.strip_start, cfg)
         self.assertEqual(jet, 0)
-        s, jet = geometry.strip_position(cfg.strip_end[0], 0.0, cfg)
+        s, jet = geometry.strip_position(*cfg.strip_end, cfg)
         self.assertEqual(jet, cfg.jet_count - 1)
-        s, jet = geometry.strip_position(9.0, 0.0, cfg)
+        last, previous = cfg.strip_points[-1], cfg.strip_points[-2]
+        beyond = (last[0] + last[0] - previous[0],
+                  last[1] + last[1] - previous[1])
+        s, jet = geometry.strip_position(*beyond, cfg)
         self.assertEqual(jet, cfg.jet_count - 1, "off the end clamps to the last jet")
+
+    def test_each_calibrated_point_maps_to_its_jet(self):
+        cfg = Config()
+        for expected, (x, y) in enumerate(cfg.strip_points):
+            _, jet = geometry.strip_position(x, y, cfg)
+            self.assertEqual(jet, expected)
+
+    def test_midpoint_interpolates_between_two_jets(self):
+        cfg = Config()
+        a, b = cfg.strip_points[4:6]
+        x, y = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        projection = geometry.strip_projection(x, y, cfg)
+        self.assertAlmostEqual(projection["jet_position"], 4.5)
 
 
 if __name__ == "__main__":

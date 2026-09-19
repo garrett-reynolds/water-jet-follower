@@ -28,8 +28,8 @@ physically is. See step 1.
 | Power | Pi's own supply plus a **powered USB hub** for the LiDAR — not optional, see `DECISIONS.md` |
 | Cost to finish | CAD $0 |
 
-Reach the Pi with `ssh pi@water-jets.local` (key-based, no password). OLA's web UI is at
-`http://water-jets.local:9090`. The scan viewer is at `http://water-jets.local:8080/` while
+Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is at
+`http://water-jets:9090`. The scan viewer is at `http://water-jets:8080/` while
 `tracker.run live` is running.
 
 ## Open tickets
@@ -67,7 +67,14 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
 
 ## Do next, in order
 
-1. **Calibrate where the strip actually is. This blocks everything else.**
+1. ~~**Calibrate where the strip actually is.**~~ **Done 2026-09-19.**
+
+   Garrett measured one LiDAR x/y target point for each of jets 0 through 9. The tracker uses
+   a joined path through all ten points and interpolates between adjacent jets. The mapping is
+   in `Config.strip_points` and is covered by unit tests. Garrett verified the live viewer map
+   on 2026-09-19. Real light and water aim are not yet verified.
+
+   <details><summary>Old straight-line calibration notes</summary>
 
    The software works. It is pointed at the wrong place. `config.py` says jet 0 sits at
    **(0.10, 0.00)** and jet 19 at **(1.05, 0.00)** — a line straight out in front of the LiDAR,
@@ -75,11 +82,11 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    strip is roughly 30 cm out and **80 cm off to one side** of where the software thinks it is.
    Every hill lands in the wrong place until this is fixed, and the tracker is not at fault.
 
-   **The jet 19 reading was never taken.** One number is not enough — two points are needed to
+   **The jet 9 reading was never taken.** One number is not enough — two points are needed to
    place a line, and the angle matters as much as the offset.
 
    To finish it: run `show --lights-only`, open `http://water-jets.local:8080/`, stand at jet 0
-   and then at jet 19, and read the x/y off the viewer at each. Then write both into a config
+   and then at jet 9, and read the x/y off the viewer at each. Then write both into a config
    file and pass it with `--config`:
 
    ```
@@ -89,10 +96,10 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    `Config.save()` writes the whole dataclass as JSON, so the quickest route is to dump a
    default, edit `strip_start` and `strip_end`, and keep it on the Pi.
 
-   **Layout as it now stands:** the two modules are in **two separate bins, one module each,
-   end to end** — a single 1 x 20 line of jets, which is what `config.py` has always assumed.
-   Each bin needs its own water above the 8 cm minimum; only the original single 24 x 16 inch
-   basin at 9 cm was ever checked.
+   **Current scope:** use only the first module and jets 0 through 9. The second module stays
+   unused. `config.py` defaults to a 1 x 10 line with 50 mm pitch.
+
+   </details>
 
 2. ~~**Record the remaining clips, alone.**~~ **Done.** Garrett has no second person, and does not need
    one. All the commands are in `tracker/README.md`.
@@ -170,7 +177,8 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    stopped walker still has a track. Colour runs slow blue to fast white over a dim base, with
    the speed smoothed so it does not strobe. Attract is written but **off by default**.
 
-   **65 tests pass** on laptop and Pi, and it has been run against the recorded two-walker
+   **69 tests pass** on the laptop. The earlier 65-test suite passed on the Pi, and the show has
+   been run against the recorded two-walker
    crossing clip. **No water has been through it yet** - `--lights-only` is the next step, and
    it forces every fountain channel to zero so the pixels can be watched chasing a walker with
    nothing wet.
@@ -250,7 +258,7 @@ on does not clear them by itself; `olad` starts with an empty universe and sends
 the modules keep whatever they last received. Run this once the Pi answers again:
 
 ```
-ssh pi@water-jets.local "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
+ssh pi@water-jets "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
 ```
 
 Expect `slots_held=512 ALL ZERO`. If the interface is not plugged in it will say so plainly

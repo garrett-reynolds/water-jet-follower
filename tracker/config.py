@@ -39,9 +39,16 @@ class Config:
     roi_y_max: float = 2.00
 
     # --- the strip -------------------------------------------------------
-    strip_start: tuple = (0.10, 0.0)     # centre of jet 0
-    strip_end: tuple = (1.05, 0.0)       # centre of jet 19
-    jet_count: int = 20                  # two HB-Laser modules, 50 mm pitch
+    strip_start: tuple = (1.80, -1.64)   # measured person position for jet 0
+    strip_end: tuple = (1.54, 1.20)      # measured person position for jet 9
+    jet_count: int = 10                  # first HB-Laser module only, 50 mm pitch
+    # Measured person positions for jets 0..9, in order. The tracker projects a
+    # person onto the joined path and interpolates between each adjacent pair.
+    strip_points: tuple = (
+        (1.80, -1.64), (1.80, -1.32), (1.75, -1.00), (1.72, -0.73),
+        (1.65, -0.48), (1.62, -0.19), (1.60, 0.07), (1.51, 0.47),
+        (1.55, 0.65), (1.54, 1.20),
+    )
 
     # --- background subtraction (local) ----------------------------------
     background_bin_deg: float = 1.0

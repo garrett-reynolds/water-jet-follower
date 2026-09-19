@@ -7,7 +7,7 @@ itself - it is a jet stuck up until somebody cuts the 24 V.
 
 import unittest
 
-from tracker import dmx, wave
+from tracker import dmx, geometry, wave
 from tracker.config import Config
 
 
@@ -18,6 +18,29 @@ def track(id=1, s=0.5, speed=0.0, vx=0.0, vy=0.0, confirmed=True):
 
 def frame_of(*tracks):
     return {"tracks": list(tracks)}
+
+
+def config_20():
+    """The original two-module geometry used by the broad wave tests."""
+    return Config(strip_start=(0.10, 0.0), strip_end=(1.05, 0.0),
+                  jet_count=20, strip_points=())
+
+
+class TestDefaultScope(unittest.TestCase):
+    def test_default_uses_only_the_first_module(self):
+        cfg = Config()
+        self.assertEqual(cfg.jet_count, 10)
+        self.assertEqual(dmx.height_channels(cfg.jet_count),
+                         [5, 10, 15, 20, 25, 30, 35, 40, 45, 50])
+
+    def test_calibrated_position_aims_at_its_jet(self):
+        cfg = Config()
+        x, y = cfg.strip_points[7]
+        jet_position = geometry.strip_projection(x, y, cfg)["jet_position"]
+        heights, _ = wave.Wave(cfg).heights_and_colours(
+            frame_of({**track(), "s": 0.0, "jet_position": jet_position,
+                      "x": x, "y": y}), 0.0)
+        self.assertEqual(heights.index(max(heights)), 7)
 
 
 class TestHillProfile(unittest.TestCase):
@@ -40,7 +63,7 @@ class TestHillProfile(unittest.TestCase):
 
 class TestHill(unittest.TestCase):
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = config_20()
         self.wave = wave.Wave(self.cfg)
 
     def test_no_tracks_means_no_water(self):
@@ -105,7 +128,7 @@ class TestOffStrip(unittest.TestCase):
     """
 
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = config_20()
         self.strip_end_s = (self.cfg.jet_count - 1) * wave.jet_pitch(self.cfg)
 
     def test_a_walker_past_the_end_of_the_strip_gets_no_water(self):
@@ -129,7 +152,7 @@ class TestOffStrip(unittest.TestCase):
 
 class TestTwoWalkers(unittest.TestCase):
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = config_20()
 
     def test_two_walkers_get_two_hills(self):
         pitch = wave.jet_pitch(self.cfg)
@@ -152,7 +175,7 @@ class TestCap(unittest.TestCase):
     """No frame may ever carry a height above cfg.height_max. The modules latch."""
 
     def test_hill_peak_above_the_cap_is_still_capped(self):
-        cfg = Config()
+        cfg = config_20()
         cfg.hill_peak = 250                     # someone edits this badly
         pitch = wave.jet_pitch(cfg)
         heights, _ = wave.Wave(cfg).heights_and_colours(
@@ -160,7 +183,7 @@ class TestCap(unittest.TestCase):
         self.assertEqual(max(heights), cfg.height_max)
 
     def test_no_height_slot_in_a_real_frame_exceeds_the_cap(self):
-        cfg = Config()
+        cfg = config_20()
         cfg.hill_peak = 255
         pitch = wave.jet_pitch(cfg)
         w = wave.Wave(cfg)
@@ -170,7 +193,7 @@ class TestCap(unittest.TestCase):
             self.assertLessEqual(frame[channel - 1], cfg.height_max)
 
     def test_clamp_heights_leaves_colour_alone(self):
-        cfg = Config()
+        cfg = config_20()
         frame = dmx.blank_frame()
         for i in range(100):
             frame[i] = 200
@@ -185,7 +208,7 @@ class TestCap(unittest.TestCase):
 
 class TestFrameLayout(unittest.TestCase):
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = config_20()
 
     def test_frame_is_512_slots(self):
         frame = wave.Wave(self.cfg).frame(frame_of(), 0.0)
@@ -222,7 +245,7 @@ class TestFrameLayout(unittest.TestCase):
 
 class TestColour(unittest.TestCase):
     def setUp(self):
-        self.cfg = Config()
+        self.cfg = config_20()
 
     def test_base_colour_where_there_is_no_hill(self):
         _, colours = wave.Wave(self.cfg).heights_and_colours(frame_of(), 0.0)
@@ -264,12 +287,12 @@ class TestAttract(unittest.TestCase):
     def test_attract_is_off_by_default(self):
         """It runs unattended and the modules latch. It stays off until there is
         a watchdog that can drop the 24 V."""
-        self.assertFalse(Config().attract_enabled)
-        heights, _ = wave.Wave(Config()).heights_and_colours(frame_of(), 3.0)
+        self.assertFalse(config_20().attract_enabled)
+        heights, _ = wave.Wave(config_20()).heights_and_colours(frame_of(), 3.0)
         self.assertEqual(max(heights), 0)
 
     def test_attract_rolls_along_the_strip_when_enabled(self):
-        cfg = Config()
+        cfg = config_20()
         cfg.attract_enabled = True
         seen = []
         for t in (0.0, 2.0, 4.0, 6.0):
@@ -279,14 +302,14 @@ class TestAttract(unittest.TestCase):
         self.assertGreater(seen[-1], seen[0])
 
     def test_attract_never_exceeds_its_own_height(self):
-        cfg = Config()
+        cfg = config_20()
         cfg.attract_enabled = True
         for t in (0.0, 1.0, 2.5, 4.0, 7.9):
             heights, _ = wave.Wave(cfg).heights_and_colours(frame_of(), t)
             self.assertLessEqual(max(heights), cfg.attract_height)
 
     def test_a_walker_beats_attract(self):
-        cfg = Config()
+        cfg = config_20()
         cfg.attract_enabled = True
         pitch = wave.jet_pitch(cfg)
         heights, _ = wave.Wave(cfg).heights_and_colours(

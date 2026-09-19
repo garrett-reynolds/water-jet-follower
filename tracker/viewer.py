@@ -12,6 +12,8 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from tracker import geometry
+
 
 class State:
     """The one frame the viewer is allowed to see. Written by the tracker thread."""
@@ -36,9 +38,13 @@ PAGE = """<!doctype html>
   body { margin:0; background:#111; color:#ddd; font:13px/1.4 monospace; }
   #hud { position:fixed; top:8px; left:8px; background:#000a; padding:8px 10px;
          border:1px solid #333; white-space:pre; }
+  #position { position:fixed; top:8px; right:8px; background:#000e; color:#fff;
+              padding:10px 16px; border:2px solid #0f6; font:bold 48px/1.15 monospace;
+              white-space:pre; text-align:right; }
   canvas { display:block; }
 </style></head><body>
 <div id="hud">connecting...</div>
+<div id="position">x=--\ny=--\njet=--</div>
 <canvas id="c"></canvas>
 <script>
 let CFG = null, FRAME = null;
@@ -84,17 +90,19 @@ function draw() {
   }
 
   // the strip and its jets
-  const a = CFG.strip_start, b = CFG.strip_end;
+  const path = CFG.strip_points || [CFG.strip_start, CFG.strip_end];
   ctx.strokeStyle = '#2a6'; ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(t.sx(a[0]), t.sy(a[1]));
-  ctx.lineTo(t.sx(b[0]), t.sy(b[1])); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(t.sx(path[0][0]), t.sy(path[0][1]));
+  for (let j = 1; j < path.length; j++) {
+    ctx.lineTo(t.sx(path[j][0]), t.sy(path[j][1]));
+  }
+  ctx.stroke();
   // Each jet is drawn at the size of the height it has actually been commanded,
   // so the hill is visible. Without this every jet is the same dot and the only
   // thing the page can tell you is that something is happening.
   const H = FRAME.heights || [];
   for (let j = 0; j < CFG.jet_count; j++) {
-    const f = j / (CFG.jet_count - 1);
-    const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f;
+    const x = path[j][0], y = path[j][1];
     const h = H[j] || 0;
     const up = CFG.height_max > 0 ? Math.min(1, h / CFG.height_max) : 0;
     dot(ctx, t, x, y, 2.5 + 9 * up, up > 0 ? '#4cf' : '#2a6');
@@ -153,6 +161,11 @@ function draw() {
       (k.seen ? '' : ' OCCLUDED'));
   }
   document.getElementById('hud').textContent = lines.join('\\n');
+  const person = FRAME.tracks.find(k => k.seen) || FRAME.tracks[0];
+  document.getElementById('position').textContent = person
+    ? 'x=' + person.x.toFixed(2) + '\\ny=' + person.y.toFixed(2)
+      + '\\njet=' + person.jet
+    : 'x=--\\ny=--\\njet=--';
 }
 
 async function poll() {
@@ -190,6 +203,7 @@ def make_handler(state, cfg):
                     "roi_y_min": cfg.roi_y_min, "roi_y_max": cfg.roi_y_max,
                     "strip_start": list(cfg.strip_start),
                     "strip_end": list(cfg.strip_end),
+                    "strip_points": [list(point) for point in geometry.strip_points(cfg)],
                     "jet_count": cfg.jet_count,
                     "height_max": cfg.height_max,
                 }), "application/json")

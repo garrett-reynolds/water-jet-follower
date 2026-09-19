@@ -3,7 +3,8 @@
 A strip of water jets that follows people along a hallway. One LiDAR finds walkers by their
 legs, and a hill of water rises under each one. It runs on a Raspberry Pi 5 in plain Python.
 
-**Prototype. The whole chain runs and water has moved. The strip is not yet calibrated, so the hills land in the wrong place.**
+**Prototype. The whole chain runs and water has moved. Jets 0 through 9 use a measured
+person-to-jet path. The viewer mapping is verified. Light and water aim are not yet verified.**
 
 [Decisions](DECISIONS.md) · [Next steps](NEXT_STEPS.md) · [Glossary](CONTEXT.md) · [Tracker notes](tracker/README.md)
 
@@ -42,7 +43,7 @@ walker who stops keeps their hill, because their track is still there.
 | Sensor | Slamtec RPLIDAR A2M8, one unit, Boost mode |
 | Controller | Raspberry Pi 5, Raspberry Pi OS Lite 64-bit, headless |
 | DMX interface | Enttec DMX USB Pro Mk2 |
-| Water | 2 x HB-Laser 3D HydroMatrix HD module, 10 jets each |
+| Water | 1 active HB-Laser 3D HydroMatrix HD module, jets 0 through 9; second module unused |
 | USB hub | Powered hub, Genesys Logic USB2.1/3.1 |
 | Module supply | 24 V DC, 3.2 A per module |
 
@@ -61,7 +62,7 @@ walker who stops keeps their hill, because their track is still there.
 | Enttec Pro Mk2 | Powered USB hub | USB | Appears as `/dev/ttyENTTEC`. Serial `EN329670`. |
 | Powered USB hub | Raspberry Pi 5 | USB | The hub carries its own supply. |
 | Enttec breakout | Module 1 input | 5-pin XLR | Enttec output is female. The module input is male. |
-| Module 1 | Module 2 | HB-Laser link | Carries DMX and 24 V. Module 2 starts at DMX channel 51. |
+| Module 1 | Module 2 | HB-Laser link | Present, but module 2 is not used by the current 10-jet configuration. |
 | 24 V supply | Module 1 | HB-Laser feed | Put a switch on the mains lead. Keep it in reach. |
 
 ## 🧰 Setup
@@ -108,13 +109,13 @@ Run steps 1 to 5 on the Pi, over SSH.
 5. **Copy the code from the laptop.** Run this in Git Bash on the laptop.
 
    ```
-   scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets.local:~/
+   scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets:~/
    ```
 
 ### Verifying it worked
 
 ```
-ssh pi@water-jets.local
+ssh pi@water-jets
 cd ~ && ~/wj-venv/bin/python -m tracker.run check
 ```
 
@@ -132,16 +133,15 @@ not in Boost mode. Then run `~/wj-venv/bin/python -m tracker.run zero` and expec
 - **`pyrplidar` does not drain its serial buffer on stop.** It throws
   `PyRPlidarProtocolError: sync bytes are mismatched` on reconnect. The driver retries and
   flushes for this reason.
-- **The strip position in `config.py` is an assumption.** `strip_start` and `strip_end` say where
-  jet 0 and jet 19 sit relative to the sensor. They have not been measured. Every hill lands
-  wrong until they are.
+- **The control path uses ten measured points.** `strip_points` maps real person positions to
+  jets 0 through 9. The tracker interpolates between adjacent points.
 - **One DMX unit is 7.62 mm of jet height.** DMX 255 is about 1.94 m. Raise the cap in small
   steps and never as a guess.
 
 ## ⚡ Quickstart
 
 ```
-ssh pi@water-jets.local
+ssh pi@water-jets
 cd ~ && ~/wj-venv/bin/python -m tracker.run show --replay ~/data/crossing.jsonl --baseline ~/data/baseline.json --dry-run
 cd ~ && ~/wj-venv/bin/python -m tracker.run show --baseline ~/data/baseline.json --lights-only
 cd ~ && ~/wj-venv/bin/python -m tracker.run show --baseline ~/data/baseline.json
@@ -176,7 +176,7 @@ forced to zero, so nothing gets wet. The third moves water. The last is the stop
 | `tracker/wave.py` | Tracks in, one DMX frame out. |
 | `tracker/dmx.py` | DMX out through `olad`, and the stop path. |
 | `tracker/viewer.py` | The web page, served from the Pi. |
-| `tracker/tests/` | 65 tests. Synthetic walkers, so no hardware is needed. |
+| `tracker/tests/` | 69 tests. Synthetic walkers, so no hardware is needed. |
 | `bench/` | Throwaway LiDAR probe scripts from the sensor bring-up. |
 | `data/` | Recorded scans and baselines. |
 | `docs/` | The signal chain diagram and the agent docs. |

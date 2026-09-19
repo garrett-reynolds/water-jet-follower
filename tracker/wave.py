@@ -19,7 +19,7 @@ tested against recorded walks with no water and no hardware.
 
 import math
 
-from tracker import dmx
+from tracker import dmx, geometry
 
 
 def hill_profile(distance_jets, hill_jets):
@@ -36,10 +36,10 @@ def hill_profile(distance_jets, hill_jets):
 
 
 def jet_pitch(cfg):
-    """Metres between two jets, from the strip's own end points."""
-    x0, y0 = cfg.strip_start
-    x1, y1 = cfg.strip_end
-    length = math.hypot(x1 - x0, y1 - y0)
+    """Average path distance between two mapped jets."""
+    points = geometry.strip_points(cfg)
+    length = sum(math.hypot(b[0] - a[0], b[1] - a[1])
+                 for a, b in zip(points, points[1:]))
     return length / max(1, cfg.jet_count - 1)
 
 
@@ -52,6 +52,21 @@ def strip_velocity(track, cfg):
     if length == 0:
         return 0.0
     return (track.get("vx", 0.0) * dx + track.get("vy", 0.0) * dy) / length
+
+
+def strip_velocity_jets(track, cfg):
+    """Walk speed along the calibrated path, in jet gaps per second."""
+    if "jet_position" not in track or "x" not in track or "y" not in track:
+        pitch = jet_pitch(cfg)
+        return strip_velocity(track, cfg) / pitch if pitch else 0.0
+    projection = geometry.strip_projection(track["x"], track["y"], cfg)
+    length = projection["segment_length"]
+    if length == 0:
+        return 0.0
+    tx, ty = projection["tangent"]
+    metres_per_second = (track.get("vx", 0.0) * tx
+                         + track.get("vy", 0.0) * ty)
+    return metres_per_second / length
 
 
 def lerp_colour(a, b, amount):
@@ -105,8 +120,12 @@ class Wave:
             del self._smoothed_speed[stale]
 
         for track in tracks:
-            centre_s = track["s"] + strip_velocity(track, cfg) * cfg.lead_seconds
-            centre_jet = centre_s / pitch if pitch else 0.0
+            if "jet_position" in track:
+                centre_jet = (track["jet_position"]
+                              + strip_velocity_jets(track, cfg) * cfg.lead_seconds)
+            else:
+                centre_s = track["s"] + strip_velocity(track, cfg) * cfg.lead_seconds
+                centre_jet = centre_s / pitch if pitch else 0.0
             speed = self._smooth(track, dt)
             amount = speed / cfg.fast_speed if cfg.fast_speed > 0 else 0.0
             colour = lerp_colour(cfg.slow_colour, cfg.fast_colour, amount)

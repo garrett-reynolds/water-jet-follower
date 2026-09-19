@@ -1,5 +1,21 @@
 # Decisions
 
+## [2026-09-19] Use only the first 10 jets
+
+The installation now uses jets 0 through 9 on the first HB-Laser module. The second module
+stays unused. The default tracker configuration changes from 20 jets to 10 jets, so normal
+show output uses only DMX channels 1 through 50. Calibration now measures jet 0 and jet 9.
+
+## [2026-09-19] Map jets 0 through 9 to ten measured person positions
+
+Garrett stood at the real target position for each jet and measured these LiDAR x/y points in
+jet order: `(1.80, -1.64)`, `(1.80, -1.32)`, `(1.75, -1.00)`, `(1.72, -0.73)`,
+`(1.65, -0.48)`, `(1.62, -0.19)`, `(1.60, 0.07)`, `(1.51, 0.47)`, `(1.55, 0.65)`, and
+`(1.54, 1.20)`. The tracker now uses a joined path through all ten points. Each point maps
+exactly to its jet. Positions between two points interpolate between those two jets. This is a
+person-to-jet control map, not the physical nozzle spacing. Garrett walked the live path and
+confirmed on 2026-09-19 that the large viewer jet label maps it correctly.
+
 General mode: `## [YYYY-MM-DD] <title>` — what was decided or tried, the outcome, and why.
 
 ## [2026-09-04] Issue tracking on GitHub, default triage labels

@@ -30,7 +30,7 @@ which is end of life.
 On the laptop, in Git Bash:
 
 ```
-scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets.local:~/
+scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets:~/
 ```
 
 ## Use it on the Pi
@@ -38,7 +38,7 @@ scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follow
 Everything runs from the home directory, in the venv:
 
 ```
-ssh pi@water-jets.local
+ssh pi@water-jets
 cd ~
 ```
 
@@ -117,7 +117,7 @@ walked, not on top of it. Count the seconds out loud so the clip can be read lat
 ~/wj-venv/bin/python -m tracker.run live --baseline data/baseline.json
 ```
 
-Open `http://water-jets.local:8080/` on a laptop. Green dot = a confirmed
+Open `http://water-jets:8080/` on a laptop. Green dot = a confirmed
 person. Grey = a new track that is not confirmed yet. Red = a track coasting
 through an occlusion. Orange rings = leg clusters. Blue dots = moving points, dark
 grey = the room.
@@ -239,7 +239,7 @@ only stop that does not depend on software. Everything below is layers on top of
 **1. Find the modules and their DMX addresses.**
 
 ```
-ssh pi@water-jets.local
+ssh pi@water-jets
 ola_rdm_discover -u 1
 ```
 
@@ -263,7 +263,7 @@ not the same test.
 **2a. The client dies.** Bring the LED to 40. From a second terminal:
 
 ```
-ssh pi@water-jets.local "pkill -HUP -f 'tracker.run jog'"
+ssh pi@water-jets "pkill -HUP -f 'tracker.run jog'"
 ```
 
 The LED should go out. This is the path already proven at the olad level on channel
@@ -303,7 +303,7 @@ Watch the water level as well as the jet. A 24 in x 16 in basin at 9 cm has only
 **Layer (b), the stop you keep in a second terminal:**
 
 ```
-ssh pi@water-jets.local "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
+ssh pi@water-jets "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
 ```
 
 It drives all 512 slots to zero and then reads the universe back to prove it, rather
@@ -319,7 +319,7 @@ in this order.
 **1. Dry run.** No DMX at all. Watch it in the browser against a recorded walk.
 
 ```
-ssh pi@water-jets.local
+ssh pi@water-jets
 cd ~ && ~/wj-venv/bin/python -m tracker.run show --replay ~/data/crossing.jsonl --baseline ~/data/baseline.json --dry-run
 ```
 
@@ -371,29 +371,7 @@ covers those is the switch on the 24 V supply. Keep a hand on it.
 
 ### Aiming it at the real strip
 
-`config.py` holds `strip_start` and `strip_end` — where jet 0 and jet 19 sit in the LiDAR's
-world frame, in metres, with the sensor at (0, 0). **These are assumptions, not measurements**,
-and until they match the bench every hill lands in the wrong place. The tracking is fine; the
-aim is not.
-
-The defaults say jet 0 is 10 cm straight in front of the sensor. On the bench 2026-09-04, jet 0
-read about **(0.3, 0.8)** — 80 cm off to the side of where the software thinks it is. The jet 19
-reading was never taken, and two points are needed, because the angle matters as much as the
-offset.
-
-To fix it: run `show --lights-only`, open the viewer, stand at jet 0 and then at jet 19, and
-read the x/y off the page at each. Then:
-
-```
-ssh pi@water-jets.local
-cd ~ && ~/wj-venv/bin/python -c "from tracker.config import Config; Config().save('/home/pi/strip.json')"
-```
-
-Edit `strip_start` and `strip_end` in `~/strip.json`, then run with it:
-
-```
-cd ~ && ~/wj-venv/bin/python -m tracker.run --config ~/strip.json show --baseline ~/data/baseline.json --lights-only
-```
-
-The viewer draws the strip as a green line and the LiDAR as a yellow dot. When the green line
-sits where the bins really are, the aim is right.
+`config.py` holds `strip_points`, one measured LiDAR x/y target for each of jets 0 through 9.
+The tracker draws a joined path through those points and interpolates between adjacent jets.
+The large viewer panel shows x, y, and the mapped jet number. Garrett verified the live viewer
+map on 2026-09-19. Light and water aim still need a bench check.

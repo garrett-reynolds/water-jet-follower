@@ -279,7 +279,7 @@ class Tracker:
                 self.tracks.append(Track(detection, timestamp, cfg))
 
     def _report(self, track):
-        s, jet = geometry.strip_position(track.x, track.y, self.cfg)
+        projection = geometry.strip_projection(track.x, track.y, self.cfg)
         return {
             "id": track.id,
             "x": round(track.x, 4),
@@ -287,8 +287,9 @@ class Tracker:
             "vx": round(track.vx, 4),
             "vy": round(track.vy, 4),
             "speed": round(track.speed, 4),
-            "s": round(s, 4),
-            "jet": jet,
+            "s": round(projection["s"], 4),
+            "jet_position": round(projection["jet_position"], 4),
+            "jet": projection["jet"],
             "confirmed": track.confirmed,
             "seen": track.seen_this_scan,
             "times_seen": track.times_seen,
