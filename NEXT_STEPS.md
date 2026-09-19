@@ -10,11 +10,11 @@ pointer and a cold-start summary, not a second source of truth. Decisions live i
 
 ## State
 
-Every decision that can be made in a conversation has been made. **12 of 22 issues are closed.**
+Every decision that can be made in a conversation has been made. **14 of 22 issues are closed.**
 The design is settled, every part is owned, and **the whole chain has now run end to end with
 water in the air.** The ten measured control points are verified with the first module. The
-final build spreads all 20 jets across that same path. The second module still needs a bench
-check.
+final build starts all 20 jets across that same path. The settings layout now gives every jet
+its own movable point. The second module still needs a bench check.
 
 | | |
 |---|---|
@@ -34,8 +34,6 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 
 ## Open tickets
 
-- **#14 — Configuration screen and settings profiles.**
-- **#15 — Map all 20 jets across the existing control path.**
 - **#16 — Commission and verify the second module.**
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
 
@@ -76,7 +74,8 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    in `Config.strip_points` and is covered by unit tests. Garrett verified the live viewer map,
    light aim, and water aim for jets 0 through 9 on 2026-09-19. The live show used a peak of
    DMX 30. It stopped cleanly and read back all 512 DMX slots at zero. The ten points define
-   the full path. Issue #15 spreads all 20 output jets across it without more measurements.
+   the full path. Issue #15 now starts all 20 output jets across it without more measurements,
+   then lets the operator move every jet point on the layout.
 
    <details><summary>Old straight-line calibration notes</summary>
 
@@ -254,26 +253,10 @@ Once the calibration lands, the show is real and #10 unblocks.
 
 ## Check this first, next time you are at the bench
 
-The Pi went unreachable at the end of the last session — `water-jets.local` stopped resolving —
-before its final DMX state could be confirmed. The last thing run against it was
-`show --lights-only`, which forces every fountain channel to zero, so **no jet can have been
-left up**. The pixels may be holding a colour, because the modules latch. Powering the Pi back
-on does not clear them by itself; `olad` starts with an empty universe and sends nothing, and
-the modules keep whatever they last received. Run this once the Pi answers again:
-
-```
-ssh pi@water-jets "cd ~ && ~/wj-venv/bin/python -m tracker.run zero"
-```
-
-Expect `slots_held=512 ALL ZERO`. If the interface is not plugged in it will say so plainly
-rather than reporting success.
-
-**Still unreachable on 2026-09-05.** `ping water-jets.local` from the laptop returns
-`Ping request could not find host water-jets.local`. That is a name-resolution failure on
-Windows, so it does **not** prove the Pi is off — but **no IP address for the Pi is recorded
-anywhere in this repo**, so there is no second way in. Get it from `arp -a` on the laptop or from
-the router, and **write it into this file**, so the next session is not stopped by the same
-thing.
+The Pi is reachable as `pi@water-jets`. The settings page is at
+`http://water-jets.local:8080/settings` while the show runs. The 20-point layout was confirmed
+in the browser on 2026-09-19. Profiles still live in the browser as JSON files; a Pi restart
+loads the default 10-jet profile until the operator loads and applies a saved profile.
 
 ## Traps that already cost time
 
