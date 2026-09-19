@@ -300,7 +300,7 @@ async function init(){buildColours();try{const data=await api('/settings-data');
 async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';draw()}catch(e){$('live-state').textContent='LiDAR not available'}setTimeout(pollState,100)}
 function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
 $('unlock').onchange=()=>{$('height_max').disabled=!$('unlock').checked};
-$('jet_count').onchange=()=>{readForm();buildJets();dirty()};
+$('jet_count').onchange=()=>{const count=Number($('jet_count').value);profile.settings.strip_points=jetPoints(profile.settings.strip_points,count);selected=Math.min(selected,count-1);readForm();buildJets();dirty()};
 $('colours').onchange=dirty;
 document.querySelector('.controls').addEventListener('change',e=>{if(e.target.matches('input')&&!['load','jet_count','unlock'].includes(e.target.id))dirty()});
 $('apply').onclick=apply;

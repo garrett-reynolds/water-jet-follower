@@ -382,8 +382,9 @@ covers those is the switch on the 24 V supply. Keep a hand on it.
 
 ### Aiming it at the real strip
 
-`config.py` holds ten measured LiDAR x/y control-path points. The 10-jet bench map keeps one
-point per jet. A larger jet count spreads all jets across the same measured path.
+`config.py` holds ten measured LiDAR x/y control-path points for the bench profile. The settings
+screen makes one movable control point per jet. Raising the jet count fills the new points across
+the current path, so the operator can then move every jet point.
 The tracker draws a joined path through those points and interpolates between adjacent jets.
 The large viewer panel shows x, y, and the mapped jet number. Garrett verified the live viewer
 map, light aim, and water aim for jets 0 through 9 on 2026-09-19. The live water test peaked at

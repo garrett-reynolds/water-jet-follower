@@ -37,6 +37,13 @@ class TestSettingsMap(unittest.TestCase):
             page = response.read().decode("utf-8")
         self.assertIn("jetPoints(profile.settings.strip_points", page)
 
+    def test_jet_count_change_makes_one_movable_point_per_jet(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn(
+            "profile.settings.strip_points=jetPoints("
+            "profile.settings.strip_points,count)", page)
+
     def test_state_endpoint_supplies_scan_points(self):
         with urlopen(self.base + "/state") as response:
             frame = json.load(response)

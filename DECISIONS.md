@@ -1,5 +1,11 @@
 # Decisions
 
+## [2026-09-19] Make every jet point movable
+
+The layout uses one movable control point per jet. When the operator raises the jet count, the
+screen fills the new points across the current path. This gives the 20-jet layout 20 movable
+points without asking the operator to measure ten new points before the first preview.
+
 ## [2026-09-19] Configure the show in the browser
 
 The viewer will also be the settings screen. The operator can drag the control-path points and
