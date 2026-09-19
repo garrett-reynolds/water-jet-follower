@@ -247,6 +247,14 @@ class TestMerge(unittest.TestCase):
 
 
 class TestStripMapping(unittest.TestCase):
+    def test_twenty_jets_use_the_ten_point_control_path(self):
+        cfg = Config(jet_count=20)
+        points = geometry.strip_points(cfg)
+
+        self.assertEqual(len(points), 20)
+        self.assertEqual(points[0], cfg.strip_points[0])
+        self.assertEqual(points[-1], cfg.strip_points[-1])
+
     def test_position_maps_to_a_jet(self):
         cfg = Config()
         s, jet = geometry.strip_position(*cfg.strip_start, cfg)

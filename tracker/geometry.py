@@ -50,12 +50,46 @@ def to_world(points, cfg, baseline=None):
     return foreground, background
 
 
-def strip_points(cfg):
-    """Return calibrated points, or the old straight-line end points."""
+def control_points(cfg):
+    """Return the measured path points, or the old straight-line end points."""
     points = tuple(getattr(cfg, "strip_points", ()))
-    if len(points) == cfg.jet_count and len(points) >= 2:
+    if len(points) >= 2:
         return points
     return (cfg.strip_start, cfg.strip_end)
+
+
+def strip_points(cfg):
+    """Place every jet at an equal distance along the measured control path."""
+    points = control_points(cfg)
+    if len(points) == cfg.jet_count:
+        return points
+    lengths = [math.hypot(b[0] - a[0], b[1] - a[1])
+               for a, b in zip(points, points[1:])]
+    total_length = sum(lengths)
+    if cfg.jet_count <= 1 or total_length == 0:
+        return (points[0],)
+
+    result = []
+    segment = 0
+    distance_before = 0.0
+    for index in range(cfg.jet_count):
+        if index == 0:
+            result.append(points[0])
+            continue
+        if index == cfg.jet_count - 1:
+            result.append(points[-1])
+            continue
+        target = total_length * index / (cfg.jet_count - 1)
+        while (segment < len(lengths) - 1
+               and distance_before + lengths[segment] < target):
+            distance_before += lengths[segment]
+            segment += 1
+        a, b = points[segment], points[segment + 1]
+        length = lengths[segment]
+        amount = 0.0 if length == 0 else (target - distance_before) / length
+        result.append((a[0] + amount * (b[0] - a[0]),
+                       a[1] + amount * (b[1] - a[1])))
+    return tuple(result)
 
 
 def strip_projection(x, y, cfg):
@@ -64,7 +98,7 @@ def strip_projection(x, y, cfg):
     `jet_position` is continuous. A value of 4.5 is halfway from jet 4 to jet 5.
     `s` is physical distance in metres along the joined path from jet 0.
     """
-    points = strip_points(cfg)
+    points = control_points(cfg)
     best = None
     distance_before = 0.0
     total_length = sum(math.hypot(b[0] - a[0], b[1] - a[1])
@@ -84,7 +118,7 @@ def strip_projection(x, y, cfg):
             position_t = raw_t if ((index == 0 and raw_t < 0.0)
                                    or (index == len(points) - 2 and raw_t > 1.0)) else t
             best = (distance_squared, distance_before + position_t * length,
-                    index + position_t, dx / length, dy / length, length)
+                    index, position_t, dx / length, dy / length, length)
         distance_before += length
 
     if best is None:
@@ -92,10 +126,17 @@ def strip_projection(x, y, cfg):
                 "tangent": (0.0, 0.0), "segment_length": 0.0,
                 "path_length": total_length}
 
-    _, s, jet_position, tx, ty, segment_length = best
+    _, s, index, position_t, tx, ty, segment_length = best
+    if len(points) == cfg.jet_count:
+        jet_position = index + position_t
+        jet_pitch = segment_length
+    else:
+        jet_position = (s / total_length * (cfg.jet_count - 1)
+                        if total_length else 0.0)
+        jet_pitch = total_length / max(1, cfg.jet_count - 1)
     jet = max(0, min(cfg.jet_count - 1, int(round(jet_position))))
     return {"s": s, "jet_position": jet_position, "jet": jet,
-            "tangent": (tx, ty), "segment_length": segment_length,
+            "tangent": (tx, ty), "segment_length": jet_pitch,
             "path_length": total_length}
 
 

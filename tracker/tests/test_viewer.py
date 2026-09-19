@@ -32,6 +32,11 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn('id="zoom-fit"', page)
         self.assertIn("pollState()", page)
 
+    def test_settings_page_draws_each_jet_on_the_control_path(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("jetPoints(profile.settings.strip_points", page)
+
     def test_state_endpoint_supplies_scan_points(self):
         with urlopen(self.base + "/state") as response:
             frame = json.load(response)
