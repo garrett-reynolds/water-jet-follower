@@ -10,11 +10,11 @@ pointer and a cold-start summary, not a second source of truth. Decisions live i
 
 ## State
 
-Every decision that can be made in a conversation has been made. **14 of 22 issues are closed.**
+Every decision that can be made in a conversation has been made. **15 of 22 issues are closed.**
 The design is settled, every part is owned, and **the whole chain has now run end to end with
 water in the air.** The ten measured control points are verified with the first module. The
-final build starts all 20 jets across that same path. The settings layout now gives every jet
-its own movable point. The second module still needs a bench check.
+current live build uses those ten jets. The settings layout gives every configured jet its own
+movable point. Do not propose connecting the second module unless Garrett changes that decision.
 
 | | |
 |---|---|
@@ -34,8 +34,9 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 
 ## Open tickets
 
-- **#16 — Commission and verify the second module.**
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
+
+Issue #16 was closed on 2026-09-19 because Garrett ruled out connecting the second module.
 
 **#12 was closed on 2026-09-05, with no closing comment.** Items 1-6 were done and item 7 half
 done: one unit is enough, a standing person is held 99% of the time, and position jitter is
@@ -128,6 +129,9 @@ over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 
    centre of its case.
 4. **Decide the motor PWM.** PWM 800 measures 16.25 Hz, which is outside the A2M8's rated
    5-15 Hz band; PWM 760 gives 15.09 Hz. See the correction entry in `DECISIONS.md`.
+   The first-module live follow passed on 2026-09-19 with `lead_seconds=0.50`,
+   `follow_response=0.0`, `hill_peak=30`, and `height_max=40`. The jet rise time itself was not
+   measured, so issue #18 stays open.
 5. ~~**Connect the water modules**~~ **Done.** #12 item 3: set module 1 channel 5 and watch jet 1
    move. ~~This is the only untested link in the whole chain.~~
 
@@ -257,6 +261,8 @@ The Pi is reachable as `pi@water-jets`. The settings page is at
 `http://water-jets.local:8080/settings` while the show runs. The 20-point layout was confirmed
 in the browser on 2026-09-19. Profiles still live in the browser as JSON files; a Pi restart
 loads the default 10-jet profile until the operator loads and applies a saved profile.
+The Water jet tester selects one jet and height, holds that test, and uses **Stop water test** to
+send and verify all zero. Live first-module follow passed with a 0.50 s lead and the DMX 40 cap.
 
 ## Traps that already cost time
 

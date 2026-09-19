@@ -44,6 +44,15 @@ class TestSettingsMap(unittest.TestCase):
             "profile.settings.strip_points=jetPoints("
             "profile.settings.strip_points,count)", page)
 
+    def test_settings_page_has_a_water_jet_tester(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn('id="water-test-jet"', page)
+        self.assertIn('id="water-test-height"', page)
+        self.assertIn('id="start-water-test"', page)
+        self.assertIn('id="stop-water-test"', page)
+        self.assertIn('Holds one jet until you stop the test.', page)
+
     def test_state_endpoint_supplies_scan_points(self):
         with urlopen(self.base + "/state") as response:
             frame = json.load(response)

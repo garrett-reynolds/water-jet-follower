@@ -352,6 +352,11 @@ JSON** previews a saved profile before apply. The layout map draws the live LiDA
 the editable path. Use the mouse wheel or the `−`, **Fit**, and `+` buttons to zoom around the
 selected path point.
 
+The **Water jet tester** holds one selected jet at one selected height. Turn lights-only mode off,
+keep a hand on the 24 V switch, and press **Start water test**. Press **Stop water test** when the
+check is complete; it sends zero and verifies that all 512 DMX slots are zero. A water test is
+rejected while lights-only mode is on.
+
 ### The height cap
 
 `--height-max` is a hard ceiling applied to every fountain channel as the last step

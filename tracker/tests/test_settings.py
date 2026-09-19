@@ -65,6 +65,26 @@ class TestActions(unittest.TestCase):
         self.assertEqual(frames[0][4], 7)
         self.assertFalse(any(frames[0][5:]))
 
+    def test_water_test_uses_the_requested_safe_height(self):
+        frames = []
+        cfg = Config(height_max=40)
+        control = SettingsControl(cfg, send_frame=frames.append)
+        control.test_jet(2, height=20)
+        self.assertEqual(frames[0][14], 20)
+
+    def test_water_test_rejects_height_above_the_hard_maximum(self):
+        control = SettingsControl(Config(height_max=40), send_frame=lambda frame: None)
+        with self.assertRaises(ValueError):
+            control.test_jet(0, height=41)
+
+    def test_water_test_is_blocked_in_lights_only_mode(self):
+        frames = []
+        control = SettingsControl(Config(), send_frame=frames.append)
+        control.set_lights_only(True)
+        with self.assertRaises(ValueError):
+            control.test_jet(0, height=5)
+        self.assertEqual(frames, [])
+
     def test_disabled_jet_cannot_be_tested(self):
         cfg = Config(jet_enabled=(False,) + (True,) * 9)
         control = SettingsControl(cfg, send_frame=lambda frame: None)
@@ -83,7 +103,7 @@ class TestActions(unittest.TestCase):
     def test_lights_only_forces_a_held_test_jet_dry(self):
         control = SettingsControl(Config(), send_frame=lambda frame: None)
         control.test_jet(0)
-        control.set_lights_only(True)
+        control.lights_only = True
         self.assertEqual(control.output_frame([0] * 512)[4], 0)
 
 

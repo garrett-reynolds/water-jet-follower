@@ -227,7 +227,8 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
 .colours { display:grid; grid-template-columns:70px repeat(4,1fr); gap:6px; align-items:end; }
 .jets { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
 .jet { border:1px solid var(--line); padding:7px; display:grid; gap:5px; border-radius:4px; }
-.jet button { padding:4px; }
+.water-tester { border:2px solid var(--water); background:#f4fffc; }
+.water-tester .warning { border-left:4px solid var(--danger); padding-left:10px; }
 #status { min-height:42px; padding:10px; background:#dce9e6; border-radius:4px; }
 #status.bad { background:#ffe4df; color:#7d211b; }
 .note { color:var(--muted); font-size:13px; }
@@ -260,7 +261,18 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
         <label>Slow speed<input id="slow_speed" type="number" min="0" max="10" step="0.1"></label>
         <label>Fast speed<input id="fast_speed" type="number" min="0" max="10" step="0.1"></label>
       </div></section>
-    <section><h2>Jet controls</h2><div class="jets" id="jets"></div></section>
+    <section><h2>Jet enable</h2><div class="jets" id="jets"></div></section>
+    <section class="water-tester"><h2>Water jet tester</h2>
+      <p class="note warning">Holds one jet until you stop the test. Keep your hand on the 24 V switch.</p>
+      <div class="grid">
+        <label>Jet number<input id="water-test-jet" type="number" min="1" max="20" value="1"></label>
+        <label>Test height<input id="water-test-height" type="number" min="1" max="40" value="5"></label>
+      </div>
+      <div class="actions" style="margin-top:12px">
+        <button id="start-water-test" class="primary">Start water test</button>
+        <button id="stop-water-test" class="danger">Stop water test</button>
+      </div>
+    </section>
     <section><h2>Run controls</h2><div class="actions">
       <button id="lights">Lights only: off</button>
       <button id="all-off" class="danger">ALL OFF</button>
@@ -283,8 +295,8 @@ function copy(v){return JSON.parse(JSON.stringify(v));}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
 function buildColours(){const box=$('colours');box.innerHTML='<span></span><span>R</span><span>G</span><span>B</span><span>W</span>';for(const name of colourNames){box.insertAdjacentHTML('beforeend','<strong>'+labels[name]+'</strong>'+[0,1,2,3].map(i=>'<input type="number" min="0" max="255" id="'+name+'_'+i+'">').join(''));}}
 function readForm(){const s=copy(profile.settings);for(const n of fields)s[n]=Number($(n).value);s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);for(const n of colourNames)s[n]=[0,1,2,3].map(i=>Number($(n+'_'+i).value));profile.settings=s;return profile;}
-function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;for(const n of colourNames)for(let i=0;i<4;i++)$(n+'_'+i).value=s[n][i];buildJets();draw();status('Preview only. Apply the complete profile when it looks right.');}
-function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><span>Jet '+(i+1)+'</span><input type="checkbox" '+(on?'checked':'')+'></label><button data-test="'+i+'">Test</button></div>'));box.querySelectorAll('button').forEach(b=>b.onclick=()=>testJet(Number(b.dataset.test)));}
+function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('water-test-jet').max=s.jet_count;$('water-test-height').min=s.height_min;$('water-test-height').max=s.height_max;if(Number($('water-test-height').value)<s.height_min)$('water-test-height').value=s.height_min;if(Number($('water-test-height').value)>s.height_max)$('water-test-height').value=s.height_max;for(const n of colourNames)for(let i=0;i<4;i++)$(n+'_'+i).value=s[n][i];buildJets();draw();status('Preview only. Apply the complete profile when it looks right.');}
+function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><span>Jet '+(i+1)+'</span><input type="checkbox" '+(on?'checked':'')+'></label></div>'));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
 function bounds(){const cx=viewCentre?viewCentre[0]:(roi.xmin+roi.xmax)/2,cy=viewCentre?viewCentre[1]:(roi.ymin+roi.ymax)/2,hw=(roi.xmax-roi.xmin)/zoom/2,hh=(roi.ymax-roi.ymin)/zoom/2;return {xmin:cx-hw,xmax:cx+hw,ymin:cy-hh,ymax:cy+hh};}
 function xy(p){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [pad+(p[0]-v.xmin)/(v.xmax-v.xmin)*w,pad+h-(p[1]-v.ymin)/(v.ymax-v.ymin)*h];}
@@ -295,7 +307,8 @@ function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d'
 function nearest(x,y){let best=0,dist=Infinity;profile.settings.strip_points.forEach((p,i)=>{const q=xy(p),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<900?best:null;}
 function dirty(){readForm();draw();status('Preview only. Nothing is live yet.');}
 async function apply(){try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
-async function testJet(i){try{await api('/actions/test-jet',{jet:i});status('Jet '+(i+1)+' test sent. Use ALL OFF when finished.');}catch(e){status(e.message,true)}}
+async function startWaterTest(){const jet=Number($('water-test-jet').value)-1,height=Number($('water-test-height').value);try{await api('/actions/test-jet',{jet,height});status('Water test is holding jet '+(jet+1)+' at height '+height+'. Press Stop water test.');}catch(e){status(e.message,true)}}
+async function stopWaterTest(){try{const d=await api('/actions/all-off',{});status(d.all_zero?'Water test stopped. All 512 slots are zero.':'Water test could not be stopped.',!d.all_zero)}catch(e){status(e.message,true)}}
 async function init(){buildColours();try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');size();}catch(e){status(e.message,true)}}
 async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';draw()}catch(e){$('live-state').textContent='LiDAR not available'}setTimeout(pollState,100)}
 function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
@@ -310,6 +323,7 @@ $('undo').onclick=async()=>{try{profile=await api('/settings/undo',{});fill();st
 $('reset').onclick=()=>{profile=copy(defaultProfile);fill();status('Default profile previewed. Press Apply profile to make it live.');};
 $('lights').onclick=async()=>{try{const d=await api('/actions/lights-only',{enabled:!lightsOnly});lightsOnly=d.enabled;$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');}catch(e){status(e.message,true)}};
 $('all-off').onclick=async()=>{try{const d=await api('/actions/all-off',{});status(d.all_zero?'ALL OFF verified. All 512 slots are zero.':'ALL OFF could not be verified.',!d.all_zero)}catch(e){status(e.message,true)}};
+$('start-water-test').onclick=startWaterTest;$('stop-water-test').onclick=stopWaterTest;
 $('zoom-in').onclick=()=>setZoom(zoom*1.5);$('zoom-out').onclick=()=>setZoom(zoom/1.5);$('zoom-fit').onclick=()=>setZoom(1);
 $('add-point').onclick=()=>{readForm();const p=profile.settings.strip_points, a=p[Math.max(0,p.length-2)], b=p[p.length-1];p.splice(p.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);selected=p.length-2;dirty()};
 $('remove-point').onclick=()=>{readForm();if(profile.settings.strip_points.length<=2)return status('The path needs at least two points.',true);profile.settings.strip_points.splice(selected,1);selected=Math.max(0,selected-1);dirty()};
@@ -381,7 +395,7 @@ def make_handler(state, cfg, control=None):
                 elif self.path == "/actions/lights-only":
                     self._json({"enabled": control.set_lights_only(body.get("enabled"))})
                 elif self.path == "/actions/test-jet":
-                    control.test_jet(body.get("jet"))
+                    control.test_jet(body.get("jet"), body.get("height"))
                     self._json({"sent": True})
                 elif self.path == "/actions/all-off":
                     self._json({"all_zero": control.all_off()})

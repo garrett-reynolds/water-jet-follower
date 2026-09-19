@@ -1,5 +1,25 @@
 # Decisions
 
+## [2026-09-19] First-module live follow works with 0.50 s lead
+
+Garrett verified the real first module with a live walker. The water jets rose in the correct
+place and the light followed correctly. The working live settings were `reverse_jets=true`,
+`lead_seconds=0.50`, `follow_response=0.0`, `hill_peak=30`, and `height_max=40`. All ten jets had
+already passed the individual Water jet tester check. The manual test hold was cleared before
+the live run.
+
+## [2026-09-19] Make water testing an explicit held mode
+
+The settings screen uses one Water jet tester area instead of small Test buttons beside each
+jet. The operator chooses one jet and one height, then starts a held test. A separate Stop water
+test button sends and verifies all 512 slots at zero. Water tests are blocked while lights-only
+mode is on, so a control labelled as dry cannot send even one wet frame.
+
+## [2026-09-19] Do not suggest connecting the second module
+
+Do not propose or schedule work that connects the second water module. Keep real-setup tests on
+the first module and jets 0 through 9 unless Garrett explicitly changes this decision.
+
 ## [2026-09-19] Make every jet point movable
 
 The layout uses one movable control point per jet. When the operator raises the jet count, the

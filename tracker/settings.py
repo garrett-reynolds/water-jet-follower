@@ -145,13 +145,21 @@ class SettingsControl:
             self._manual_frame = None
         return result
 
-    def test_jet(self, jet):
+    def test_jet(self, jet, height=None):
         if self.send_frame is None:
             raise RuntimeError("jet test is not available in this run mode")
+        if self.lights_only:
+            raise ValueError("turn lights-only off before starting a water test")
         if not isinstance(jet, int) or not 0 <= jet < self.cfg.jet_count:
             raise ValueError("jet is outside the configured range")
         if not _enabled(self.cfg)[jet]:
             raise ValueError("jet is disabled")
+        height = self.cfg.height_min if height is None else height
+        if isinstance(height, bool) or not isinstance(height, (int, float)):
+            raise ValueError("test height must be a number")
+        if not self.cfg.height_min <= height <= self.cfg.height_max:
+            raise ValueError(
+                f"test height must be from {self.cfg.height_min} to {self.cfg.height_max}")
         output = self.cfg.jet_count - 1 - jet if self.cfg.reverse_jets else jet
         module = output // dmx.NOZZLES_PER_HD_MODULE + 1
         nozzle = output % dmx.NOZZLES_PER_HD_MODULE + 1
@@ -159,7 +167,7 @@ class SettingsControl:
         frame = dmx.blank_frame()
         for offset, value in enumerate(self.cfg.slow_colour):
             frame[base - 1 + offset] = dmx.clamp(value)
-        frame[base + 3] = dmx.clamp(self.cfg.height_min, high=self.cfg.height_max)
+        frame[base + 3] = dmx.clamp(height, high=self.cfg.height_max)
         self._manual_frame = frame
         self.send_frame(frame)
         return True
