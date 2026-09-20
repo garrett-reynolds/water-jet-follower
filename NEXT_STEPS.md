@@ -127,8 +127,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   #31 fix, PID 38048, started 16:50. Test mode is off, the cap is 40, lights-only is on. Nothing
   on the pages saves to disk, so any restart puts the profile back to the config defaults.
   Garrett's own `/test` opens are what put it in test mode earlier in the day.
-- **Two eyeball checks still open on the iPad:** the bottom bar stays put while scrolling, and
-  a ticked jet tile turns green (chips render checked on load; toggling was not exercised).
+- **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while
+  scrolling, and a tapped jet tile turns green. Garrett checked both on the real iPad.
 - **Loose files in the tree, not committed:** `bom/` holds ROM Raptors estimate spreadsheets
   that look like they belong to another project; `AGENTS.md` is the Codex copy; `.claude/` is
   local tooling. Decide whether `bom/` moves out or gets a `.gitignore` rule.
@@ -160,16 +160,15 @@ the laptop at about 11:55 with the standard `setsid nohup` line below. The previ
 stopped by SIGTERM at 11:52:40 with the hard maximum at **156** (about 119 cm); on restart the
 cap read 40 again, so the unlocked value did not survive the restart.
 
-Still unverified: the pages in headless Chrome are not the iPad. Two things to eyeball on the
-real device: the bottom bar stays put while scrolling, and a ticked jet tile turns green.
+Checked on the real iPad 2026-09-20: the bottom bar stays put while scrolling, and a tapped
+jet tile turns green.
 
 **Do first, next session:**
 
 1. **Prove test mode with a real walker.** Every check so far ran on a replay or an empty
    hallway. Walk, get a hill up, open `/test` on the iPad: the water must drop and stay down
-   while walking, and the `show.log` line must read `TEST`. Also confirm `/settings` loads on
-   the iPad and the bottom bar with ALL OFF stays on screen while scrolling (the pages were
-   only run in headless Chrome, not iPad Safari).
+   while walking, and the `show.log` line must read `TEST`. (`/settings` loads on the iPad
+   and the bottom bar with ALL OFF stays on screen while scrolling: checked 2026-09-20.)
 2. **The first two jets did not react in the show** (issue #23). `show.log` proves height 29
    went to jet 0 and about 18 to jet 1 while Garrett stood at `s=-0.04`; manual tests at height
    5 worked. On `/test`: hold jet 1 at 30 and jet 2 at 18 (page numbering, from 1), then stand
@@ -177,9 +176,9 @@ real device: the bottom bar stays put while scrolling, and a ticked jet tile tur
    else means the map.
 3. **iPad as the only control surface.** Garrett asked for the app to be functional on the
    iPad. The pages are now touch-sized and reachable at `http://water-jets.local:8080/`. Still
-   open: starting and stopping `show` needs SSH from the laptop, and the pages have not been
-   tried in iPad Safari yet. Decide whether a start/stop control belongs on the Pi (a service
-   plus a button) before charting anything.
+   open: starting and stopping `show` needs SSH from the laptop. The pages work in iPad
+   Safari (checked 2026-09-20). Decide whether a start/stop control belongs on the Pi (a
+   service plus a button) before charting anything.
 
 Restart the show from the laptop, in PowerShell:
 
