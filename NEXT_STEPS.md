@@ -35,12 +35,12 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 ## Open tickets
 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
-- **#23 — Bug: the first two jets do not react in the show but pass a manual test.**
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
   `PRODUCT.md` are committed. #24 is done: the settings map now uses the viewer's track colours
-  (green seen, red occluded, grey tentative), deployed to the Pi. Remaining: a scored review of
-  each page, the shared CSS moved to one served file, and a re-run of the document pass at the
-  end. Refinement only, no redesign.
+  (green seen, red occluded, grey tentative), deployed to the Pi. `/settings` reviewed
+  2026-09-20 at 29/40; fixes filed as #26 to #30 (unlock target, amber on Apply, dead map on
+  link drop, phone room for sliders, bar on one row). Remaining: fix #26 to #30, review `/test`
+  and `/`, move the shared CSS to one served file, re-run the document pass. Refinement only.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
 software tests. Issue #21 still needs its low-water bench check. Idle water defaults to off.
@@ -95,7 +95,38 @@ the two entries and `tracker/README.md` for the pages.
 `DESIGN.md` and `.impeccable/design.json` capture the pages' tokens and rules from
 `tracker/viewer.py`. `PRODUCT.md` holds the durable product facts (one user, client hallway,
 standard library only, the 24 V switch is the only real stop). The live viewer stays a dark
-scope on purpose. The pages themselves did not change. Tickets #24 and #25 hold the follow-up.
+scope on purpose. The pages themselves did not change. Ticket #25 holds the follow-up.
+
+## Design pass 2026-09-20 (night)
+
+- **#24 done and committed** (`e474254`): the settings map draws tracks in the viewer's colours.
+  Checked on the real LiDAR: a walker is green on both pages.
+- **#23 closed**: not a software bug. Debris in jets 1 and 2. Garrett cleared it.
+- **`/settings` scored 29/40.** Snapshot in `.impeccable/critique/`. Five fix tickets, #26 to
+  #30, all small edits in `tracker/viewer.py`, same look. The four P1s sit on the safety-limit
+  unlock and on the phone layout. Decided: on a phone the map shrinks and the sliders and the
+  stop get the room.
+- **Next in the design work:** fix #26 to #30 in one pass (`/impeccable polish` on
+  `/settings`), deploy, then critique `/test` and `/`, then move the shared CSS to one served
+  file, then `/impeccable document`.
+- **Pi state at close:** the show runs in `--lights-only`, restarted at about 15:50. About 6 s
+  after that restart something opened `/test` and put it in **test mode**; it was left there.
+  Press **Resume live show** on `http://water-jets.local:8080/settings` before the next run.
+  The restart also reset every page edit: nothing on the pages saves to disk, so the profile
+  is back to the config defaults.
+- **Two eyeball checks still open on the iPad:** the bottom bar stays put while scrolling, and
+  a ticked jet tile turns green (chips render checked on load; toggling was not exercised).
+- **Loose files in the tree, not committed:** `bom/` holds ROM Raptors estimate spreadsheets
+  that look like they belong to another project; `AGENTS.md` is the Codex copy; `.claude/` is
+  local tooling. Decide whether `bom/` moves out or gets a `.gitignore` rule.
+- **Git prints "failed to delete .git/worktrees/agent-…: Permission denied" on commit.** Stale
+  agent worktrees with a locked folder. Harmless so far; `git worktree prune` from a shell
+  with no agent running should clear it.
+- **Local replay for design checks:** port 8080 on the laptop is taken by another project's
+  `server/server.py`. Use `python -m tracker.run --viewer-port 8090 show --replay <clip>
+  --baseline data/room-baseline.json --dry-run --loop` (the flag goes before `show`). Walker
+  clips live on the Pi under `~/data/`; `crossing.jsonl` works. Chrome headless clamps the
+  window to ~500 px, so a real phone layout needs an iframe wrapper at 390 px.
 
 ## UI pass 2026-09-20 (afternoon)
 

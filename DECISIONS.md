@@ -936,3 +936,21 @@ means only "selected point". Issue #24.
 
 **Ruled out:** making the viewer amber and grey to match the map. That loses the occluded state
 and breaks the "Amber Means Look" rule in `DESIGN.md`.
+
+## [2026-09-20] On a phone, the settings page is for the sliders and the stop
+
+The `/settings` review (29/40, snapshot in `.impeccable/critique/`) found that under 850 px
+the map takes 52 vh and the sticky bar wraps to two rows, leaving room for one or two sliders,
+none with the test banner up.
+
+**Decided:** on a phone the map is secondary. It shrinks to about a third of the screen and the
+sliders and the stop get the room. The map is the laptop's job. Tickets #29 and #30.
+
+**Decided:** all five review findings (#26 to #30) are filed and will be fixed. The four P1s all
+sit on the safety limit or on the phone, which is where Garrett stands wet.
+
+## [2026-09-20] Jets 1 and 2 not reacting was debris, not software
+
+Issue #23 reported the first two jets silent in the show but working in a manual test. Garrett
+checked the nozzles: debris. Cleared, both jets work. **Ruled out:** a tracker or DMX mapping
+fault for the low jets. Do not chase this in software again. Ticket closed as not planned.
