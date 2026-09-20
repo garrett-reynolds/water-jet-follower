@@ -39,8 +39,9 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   `PRODUCT.md` are committed. #24 and the five `/settings` fixes #26 to #30 are done (unlock
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
   fixes are on the Pi, the show is restarted, and all five were checked by hand on the phone.
-  Remaining: review `/test` and `/`, move the shared CSS to one served file, re-run
-  the document pass. Refinement only.
+  `/test` scored 26/40 on 2026-09-20 (snapshot in `.impeccable/critique/`); five fix tickets
+  #32 to #36, sticky bar (#32) first. Remaining: fix #32 to #36, review `/`, move the shared
+  CSS to one served file, re-run the document pass. Refinement only.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
 software tests. Issue #21 still needs its low-water bench check. Idle water defaults to off.
@@ -121,8 +122,15 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - **Pi folders `~/tracker` and `~/tracker/tests` were `r-x`**, so a new file could not be
   copied in. Fixed with `chmod u+w` on both (owner is `pi`, no sudo). Existing files always
   copied fine, which is why it was never noticed.
-- **Next in the design work:** critique `/test` and `/`, then move the shared CSS to one
-  served file, then `/impeccable document`.
+- **`/test` scored 26/40** (2026-09-20 evening, dual-agent, dry-run replay of `crossing.jsonl`
+  on the laptop at port 8090). One P0: no sticky bar, so Stop test and the status box scroll
+  apart on a phone. Three P1s: the readout leads with the clamped jet number; no "jet held"
+  state and lost tracks look live; Resume is a one-way door. One P2: the readout wraps and
+  jitters. Tickets #32 to #36, all small edits in `tracker/viewer.py`. See `DECISIONS.md`.
+- **Next in the design work:** fix #32 to #36 (sticky bar first), critique `/`, then move the
+  shared CSS to one served file, then `/impeccable document`.
+- `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
+  without the Pi.
 - **Pi state at close (2026-09-20, about 17:10):** the show runs in `--lights-only` with the
   #31 fix, PID 38048, started 16:50. Test mode is off, the cap is 40, lights-only is on. Nothing
   on the pages saves to disk, so any restart puts the profile back to the config defaults.

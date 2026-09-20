@@ -993,6 +993,25 @@ still fit under the banner, which was the test.
 
 **Ruled out:** setting `pending=true` for the hard maximum. See above.
 
+## [2026-09-20] The stop never scrolls on any page, including `/test`
+
+The `/test` review (26/40, snapshot in `.impeccable/critique/2026-09-20T21-16-32Z__localhost-test.md`)
+found no sticky bar on the test page. At 390 px Stop test sits near y=800 and the status box near
+y=150, and the tracked-jet readout grows one line per person, so a crowd pushes the stop further
+down. `DESIGN.md` names the rule for the settings bar; `PRODUCT.md` principle 1 is written for
+every page. `stop()` on `/test` calls the same `/actions/all-off` that ALL OFF calls.
+
+**Decided:** the Stop Never Scrolls Rule applies to every paper page. `/test` gets the same
+sticky bar as `/settings`, holding the status box and Stop test. Resume live show moves inline
+into the mode box, like the settings banner, and never sits next to Stop test: the button that
+makes water move must not be one wet mis-tap from the stop. Ticket #32.
+
+**Decided:** the readout leads with `jet_position`, not the clamped `jet`, and says "Past the
+end" off the strip. `run.py:326` already refuses to print the clamped number for the same reason.
+Ticket #33.
+
+**Decided:** all five review findings (#32 to #36) are filed and will be fixed, sticky bar first.
+
 ## [2026-09-20] Jets 1 and 2 not reacting was debris, not software
 
 Issue #23 reported the first two jets silent in the show but working in a manual test. Garrett
