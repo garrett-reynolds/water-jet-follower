@@ -904,3 +904,20 @@ The viewer greys its readout and shows dashes when a poll fails, so stale number
 for live ones. The look was kept; nothing here changes what the show sends.
 
 **Ruled out:** a redesign. The pages work on a bench and nobody asked for a new look.
+
+## [2026-09-20] Write down the design system as "The Bench Instrument"
+
+The three pages had a look but no record of it, so each new page risked drifting. `DESIGN.md`
+at the repo root now names the system and lists its tokens: the teal-on-paper palette from
+`SHARED_CSS` in `tracker/viewer.py`, the 4 px and 6 px corners, the 40 px and 44 px touch targets,
+the amber focus ring, and the named rules that were already in code comments (the stop never
+scrolls; a dead readout looks dead). `.impeccable/design.json` carries the rendered component
+snippets and tonal ramps for the live panel.
+
+**Decided:** the live viewer stays a dark monospace scope on purpose. Dark means "what the
+sensor sees"; light means "what you can change". The settings map canvas is the same dark world.
+
+**Open:** the viewer and the settings map use different colours for confirmed and tentative
+tracks. Noted in DESIGN.md; not changed here.
+
+**Ruled out:** a "Pool Deck" theme with more colour and play. Nobody asked for a new look.

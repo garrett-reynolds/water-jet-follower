@@ -35,6 +35,11 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 ## Open tickets
 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
+- **#23 — Bug: the first two jets do not react in the show but pass a manual test.**
+- **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
+  `PRODUCT.md` now record the look and the product facts. Remaining: #24 (one set of track
+  colours on the viewer and the settings map; recommended fix is in the ticket), a scored review
+  of each page, and a re-run of the document pass at the end. Refinement only, no redesign.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
 software tests. Issue #21 still needs its low-water bench check. Idle water defaults to off.
@@ -83,6 +88,13 @@ the two entries and `tracker/README.md` for the pages.
 - **Settings apply live.** Every edit goes out about 250 ms after the last change. The hard
   maximum, Load JSON, and Reset defaults still wait for Apply profile. Every number field on
   both pages is now a slider with a readout, for the iPad.
+
+## Design system 2026-09-20 (evening)
+
+`DESIGN.md` and `.impeccable/design.json` capture the pages' tokens and rules from
+`tracker/viewer.py`. `PRODUCT.md` holds the durable product facts (one user, client hallway,
+standard library only, the 24 V switch is the only real stop). The live viewer stays a dark
+scope on purpose. The pages themselves did not change. Tickets #24 and #25 hold the follow-up.
 
 ## UI pass 2026-09-20 (afternoon)
 
