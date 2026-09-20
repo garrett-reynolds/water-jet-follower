@@ -176,6 +176,21 @@ class TestTestMode(unittest.TestCase):
         live = [30] * 512
         self.assertIs(control.output_frame(live), live)
 
+    def test_held_jet_is_reported_and_cleared_by_stop_and_resume(self):
+        # Issue #34: the page shows the held jet from the server's record, so a
+        # reload cannot hide water that is up.
+        control = SettingsControl(Config(), send_frame=lambda frame: None,
+                                  zero_output=lambda: True)
+        self.assertIsNone(control.held)
+        control.set_test_mode(True)
+        self.assertEqual(control.test_jet(6, 30), {"jet": 6, "height": 30})
+        self.assertEqual(control.held, {"jet": 6, "height": 30})
+        control.all_off()
+        self.assertIsNone(control.held)
+        control.test_jet(2)
+        control.set_test_mode(False)
+        self.assertIsNone(control.held)
+
     def test_test_mode_flag_changes_even_when_zero_fails(self):
         control = SettingsControl(Config(), zero_output=lambda: False)
         result = control.set_test_mode(True)

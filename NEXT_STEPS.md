@@ -40,8 +40,8 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
   fixes are on the Pi, the show is restarted, and all five were checked by hand on the phone.
   `/test` scored 26/40 on 2026-09-20 (snapshot in `.impeccable/critique/`); five fix tickets
-  #32 to #36. #32 (sticky bar) and #33 (Past the end) are done and on the Pi. Remaining: fix
-  #34 to #36, review `/`,
+  #32 to #36. #32 (sticky bar), #33 (Past the end) and #34 (held jet, lost tracks) are done
+  and on the Pi. Remaining: fix #35 and #36, review `/`,
   move the shared CSS to one served file, re-run the document pass. Refinement only.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
@@ -139,7 +139,13 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   reads "Past the end". Dry-run replay of `crossing.jsonl`: `s=-0.18`, `-1.07`, `3.89` read
   Past the end; `s=3.06` reads Jet 10. 131 tests pass on the laptop and the Pi. Checked on the
   real strip 2026-09-20: standing on jet 1 reads Jet 1, off the end reads Past the end.
-- **Next in the design work:** fix #34 to #36, critique `/`, then move the shared CSS to one
+- **#34 done.** `SettingsControl.held` records the held jet test; `/state` carries `test_mode`
+  and `held`, and the test page's mode box renders from that every poll ("TEST MODE. Holding
+  jet 7 at 30 (22.9 cm). Stop test to drop it."). Tracks with `seen:false` render Muted with
+  "(lost)". 133 tests pass on the laptop and the Pi. Dry-run replay: held text and lost
+  tracks both seen at 390 px. **The held half is not checked on the Pi:** `test_jet` refuses
+  while lights-only is on, so it needs a water session. The lost half can be checked any time.
+- **Next in the design work:** fix #35 and #36, critique `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
 - **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` a red
   "ALL OFF" in the same slot, both calling `/actions/all-off`. Renaming a safety button is not
@@ -147,8 +153,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state (2026-09-20, about 17:50):** the show runs in `--lights-only` with the #31 to
-  #33 fixes, PID 48696, started 17:49. Test mode is off, the cap is 40, lights-only is on. Nothing
+- **Pi state (2026-09-20, about 18:10):** the show runs in `--lights-only` with the #31 to
+  #34 fixes, PID 50058, started 18:12. Test mode is off, the cap is 40, lights-only is on. Nothing
   on the pages saves to disk, so any restart puts the profile back to the config defaults.
   Garrett's own `/test` opens are what put it in test mode earlier in the day.
 - **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while
@@ -163,7 +169,11 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   `server/server.py`. Use `python -m tracker.run --viewer-port 8090 show --replay <clip>
   --baseline data/room-baseline.json --dry-run --loop` (the flag goes before `show`). Walker
   clips live on the Pi under `~/data/`; `crossing.jsonl` works. Chrome headless clamps the
-  window to ~500 px, so a real phone layout needs an iframe wrapper at 390 px.
+  window to ~500 px, so a real phone layout needs an iframe wrapper at 390 px. To screenshot
+  a state the page only reaches after an action (a held jet), serve the wrapper over http, have
+  it POST the action from a timer, and hold its own load event with a slow `<img>`; Chrome's
+  `--virtual-time-budget` fast-forwards the timers past the network and shows the stale page.
+  Use `--timeout` and real time instead.
 
 ## UI pass 2026-09-20 (afternoon)
 

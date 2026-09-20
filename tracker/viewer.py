@@ -428,6 +428,7 @@ button { padding:12px 14px; min-height:48px; }
   display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 #mode.on { background:var(--warn); border:1px solid var(--warn-line); }
 #mode.off { background:var(--bad); color:var(--bad-ink); border:1px solid #e9b8b0; }
+#seen .track.lost { color:var(--muted); font-weight:400; }
 #mode .text { flex:1 1 200px; }
 #resume[hidden] { display:none; }
 /* The stop button and the status line never leave the screen, same as the
@@ -465,17 +466,23 @@ button { padding:12px 14px; min-height:48px; }
 const $=id=>document.getElementById(id);
 function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
-function showMode(on){$('mode').className=on?'on':'off';$('mode-text').textContent=on?'TEST MODE. The live show is not sending.':'LIVE. The show is sending. Water can move.';$('resume').hidden=!on;}
+// One writer for the mode box. `held` is the server's {jet,height} or null; a
+// held jet must be readable from across the room, not buried in one status line.
+let held=null;
+function showMode(on){held=on?held:null;$('mode').className=on?'on':'off';$('mode-text').textContent=on?(held?'TEST MODE. Holding jet '+(held.jet+1)+' at '+held.height+' ('+(held.height*0.762).toFixed(1)+' cm). Stop test to drop it.':'TEST MODE. The live show is not sending.'):'LIVE. The show is sending. Water can move.';$('resume').hidden=!on;}
 // 0.762 cm per DMX unit, measured; see config.py
 function showHeight(){const v=$('height').value;$('height_out').textContent=v;$('height_out').insertAdjacentHTML('beforeend',' <small>'+(v*0.762).toFixed(1)+' cm</small>');}
 async function enter(){try{const d=await api('/actions/test-mode',{enabled:true});showMode(true);status(d.all_zero===false?'Test mode is on but zero could not be verified. Cut the 24 V.':'Test mode is on. All 512 slots are zero.',d.all_zero===false)}catch(e){status(e.message,true)}}
-async function start(){const jet=Number($('jet').value)-1,height=Number($('height').value);try{await api('/actions/test-jet',{jet,height});status('Holding jet '+(jet+1)+' at height '+height+'. Press Stop test.')}catch(e){status(e.message,true)}}
-async function stop(){try{const d=await api('/actions/all-off',{});showMode(true);status(d.all_zero?'Stopped. All 512 slots are zero.':'Stop could not be verified. Cut the 24 V.',!d.all_zero)}catch(e){status(e.message,true)}}
+async function start(){const jet=Number($('jet').value)-1,height=Number($('height').value);try{const d=await api('/actions/test-jet',{jet,height});held=d.held;showMode(true);status('Holding jet '+(jet+1)+' at height '+height+'. Press Stop test.')}catch(e){status(e.message,true)}}
+async function stop(){try{const d=await api('/actions/all-off',{});held=null;showMode(true);status(d.all_zero?'Stopped. All 512 slots are zero.':'Stop could not be verified. Cut the 24 V.',!d.all_zero)}catch(e){status(e.message,true)}}
 async function resume(){try{const d=await api('/actions/test-mode',{enabled:false});showMode(false);status(d.all_zero===false?'Zero could not be verified. Cut the 24 V.':'Live show resumed. Water can move.',d.all_zero===false)}catch(e){status(e.message,true)}}
 // jet_position, not the clamped jet: someone past the end of the strip must not
 // read as the last jet. See run.py's console line for the same rule.
 function jetLabel(x){const p=x.jet_position,n=Number($('jet').max)||1;return p<-0.5||p>n-0.5?'Past the end':'Jet '+(Math.round(p)+1);}
-async function poll(){try{const f=await api('/state');const t=(f.tracks||[]).filter(t=>t.confirmed);$('seen').textContent=t.length?t.map(x=>jetLabel(x)+' (s='+x.s.toFixed(2)+' m)').join(' · '):'Nobody tracked.'}catch(e){$('seen').textContent='LiDAR not available.'}setTimeout(poll,200)}
+// A track the LiDAR did not see this scan is coasting on its last velocity. It
+// renders muted with "(lost)" so a stale position never passes for a live one.
+function trackHtml(x){const lost=!x.seen;return '<span class="track'+(lost?' lost':'')+'">'+jetLabel(x)+' (s='+x.s.toFixed(2)+' m)'+(lost?' (lost)':'')+'</span>';}
+async function poll(){try{const f=await api('/state');const t=(f.tracks||[]).filter(t=>t.confirmed);$('seen').innerHTML=t.length?t.map(trackHtml).join(' · '):'Nobody tracked.';if(typeof f.test_mode==='boolean'){held=f.held||null;showMode(f.test_mode);}}catch(e){$('seen').textContent='LiDAR not available.'}setTimeout(poll,200)}
 $('jet').oninput=()=>$('jet_out').textContent=$('jet').value;$('height').oninput=showHeight;
 async function limits(){try{const s=(await api('/settings-data')).profile.settings;$('jet').max=s.jet_count;$('height').min=s.height_min;$('height').max=s.height_max;if(Number($('height').value)<s.height_min)$('height').value=s.height_min;showHeight()}catch(e){}}
 $('start').onclick=start;$('stop').onclick=stop;$('resume').onclick=resume;
@@ -512,6 +519,9 @@ def make_handler(state, cfg, control=None):
                     # handles, so the loss shows without the last frame lingering.
                     self._json({"error": "LiDAR not available"}, 503)
                 else:
+                    # The control's truth rides along so a reloaded test page
+                    # shows a held jet instead of a calm banner.
+                    frame = dict(frame, test_mode=control.test_mode, held=control.held)
                     self._send(json.dumps(frame), "application/json")
             elif self.path.startswith("/config"):
                 self._send(json.dumps({
@@ -557,8 +567,8 @@ def make_handler(state, cfg, control=None):
                 elif self.path == "/actions/test-mode":
                     self._json(control.set_test_mode(body.get("enabled")))
                 elif self.path == "/actions/test-jet":
-                    control.test_jet(body.get("jet"), body.get("height"))
-                    self._json({"sent": True})
+                    held = control.test_jet(body.get("jet"), body.get("height"))
+                    self._json({"sent": True, "held": held})
                 elif self.path == "/actions/all-off":
                     self._json({"all_zero": control.all_off()})
                 else:

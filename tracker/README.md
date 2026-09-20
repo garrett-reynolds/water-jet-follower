@@ -368,6 +368,9 @@ first jet or beyond the last reads **Past the end**, never a jet number. Nothing
 does can put water up while test mode is on.
 
 **Start test** holds one selected jet at one selected height. Keep a hand on the 24 V switch.
+While a jet is held the yellow box at the top says so ("Holding jet 7 at 30 (22.9 cm)"); it
+reads that from the Pi, so a second tab or a reload shows the same truth. A tracked person
+the LiDAR did not see on the last scan is greyed and marked "(lost)".
 **Stop test** sends zero and verifies that all 512 DMX slots are zero. It sits with the status
 line in a bar stuck to the bottom of the screen, the same as ALL OFF on the settings page, so
 the stop and its answer never scroll apart. A jet test is rejected outside test mode and while

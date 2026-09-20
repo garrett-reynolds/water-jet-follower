@@ -120,6 +120,20 @@ class TestSettingsMap(unittest.TestCase):
         # #32 guard: the mode text lives in a span so Resume is never wiped.
         self.assertNotIn("$('mode').textContent", page)
 
+    def test_test_page_shows_the_held_jet_and_greys_lost_tracks(self):
+        # Issue #34: the mode box is the one writer of the held state, fed from
+        # /state, and a coasting track renders muted with "(lost)".
+        with urlopen(self.base + "/test") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("'TEST MODE. Holding jet '+(held.jet+1)+' at '+held.height+'", page)
+        self.assertIn("held=f.held||null;showMode(f.test_mode);", page)
+        self.assertIn("const lost=!x.seen;", page)
+        self.assertIn("#seen .track.lost { color:var(--muted);", page)
+        with urlopen(self.base + "/state") as response:
+            frame = json.loads(response.read())
+        self.assertIs(frame["test_mode"], False)
+        self.assertIsNone(frame["held"])
+
     def test_load_and_reset_stay_in_preview_until_apply(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")

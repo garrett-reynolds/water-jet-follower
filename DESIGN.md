@@ -211,7 +211,7 @@ A muted teal family on pale mint paper, with a small set of loud signal colours 
 
 **The Amber Means Look Rule.** Amber marks the thing that needs your eye next: focus, a pending Apply, a selected point. It is never a fill.
 
-**The Dead Looks Dead Rule.** When the link to the Pi drops, the readout turns Scope Dead and the border turns Scope Lost, and the settings map wipes its scan and tracks and says so in the status box. Stale numbers and stale dots must not pass for live ones.
+**The Dead Looks Dead Rule.** When the link to the Pi drops, the readout turns Scope Dead and the border turns Scope Lost, and the settings map wipes its scan and tracks and says so in the status box. On the test page a track the LiDAR did not see this scan renders in Muted with "(lost)". Stale numbers and stale dots must not pass for live ones.
 
 ## Typography
 

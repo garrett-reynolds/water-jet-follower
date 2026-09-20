@@ -120,6 +120,8 @@ class SettingsControl:
         # by an explicit resume, never by a page closing.
         self.test_mode = False
         self._manual_frame = None
+        # The held jet test, {"jet", "height"}, so a reloaded page can show it.
+        self.held = None
         self._undo = []
         self._reset = profile_for(Config())
 
@@ -174,6 +176,7 @@ class SettingsControl:
             raise ValueError("test_mode must be true or false")
         all_zero = self._zero_if_possible()
         self._manual_frame = None
+        self.held = None
         self.test_mode = enabled
         return {"enabled": self.test_mode, "all_zero": all_zero}
 
@@ -189,6 +192,7 @@ class SettingsControl:
             raise RuntimeError("ALL OFF is not available in this run mode")
         result = bool(self.zero_output())
         self._manual_frame = None
+        self.held = None
         self.test_mode = True
         return result
 
@@ -218,8 +222,9 @@ class SettingsControl:
             frame[base - 1 + offset] = dmx.clamp(value)
         frame[base + 3] = dmx.clamp(height, high=self.cfg.height_max)
         self._manual_frame = frame
+        self.held = {"jet": jet, "height": height}
         self.send_frame(frame)
-        return True
+        return dict(self.held)
 
     def output_frame(self, normal_frame):
         """Return a held jet-test frame, a blank frame in test mode, or the normal
