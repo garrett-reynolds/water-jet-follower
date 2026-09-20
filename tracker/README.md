@@ -344,18 +344,31 @@ runs with nobody watching, and the modules latch.
 
 ### Browser settings
 
-While `show` is running, open `http://water-jets:8080/settings`. Edits are a preview until
-**Apply profile** sends one complete versioned profile. Unlock the hard maximum before changing
-it. **Test** holds one jet at the configured minimum until **ALL OFF**. Lights-only always forces
-the water channel to zero. **Save JSON** downloads the profile to the browser computer; **Load
-JSON** previews a saved profile before apply. The layout map draws the live LiDAR scan behind
-the editable path. Use the mouse wheel or the `−`, **Fit**, and `+` buttons to zoom around the
-selected path point.
+While `show` is running, open `http://water-jets:8080/settings`. Edits go live on their own,
+about a quarter of a second after the last change, as one complete versioned profile. Three
+things wait for **Apply profile** because they are big jumps: the hard maximum (unlock it first),
+**Load JSON**, and **Reset defaults**. Live-apply never touches the hard maximum. **Undo applied**
+steps back one edit burst, up to 50. Lights-only always forces the water channel to zero. **Save JSON** downloads the profile to
+the browser computer; **Load JSON** previews a saved profile before apply. The layout map draws
+the live LiDAR scan behind the editable path. Use the mouse wheel or the `−`, **Fit**, and `+`
+buttons to zoom around the selected path point.
 
-The **Water jet tester** holds one selected jet at one selected height. Turn lights-only mode off,
-keep a hand on the 24 V switch, and press **Start water test**. Press **Stop water test** when the
-check is complete; it sends zero and verifies that all 512 DMX slots are zero. A water test is
-rejected while lights-only mode is on.
+**ALL OFF** zeroes every slot *and halts the live show*. Without the halt, the next scan put the
+hill straight back and the button looked dead. The settings page shows a banner while the show
+is halted; press **Resume live show** to continue.
+
+### Test page
+
+`http://water-jets:8080/test` is the testing area. Opening it enters **test mode**: the output is
+zeroed and the live show stops sending. Tracking keeps running, so the page shows which jet the
+tracker thinks you are standing on (numbered from 1, like the settings map). Nothing a walker
+does can put water up while test mode is on.
+
+**Start test** holds one selected jet at one selected height. Keep a hand on the 24 V switch.
+**Stop test** sends zero and verifies that all 512 DMX slots are zero. A jet test is rejected
+outside test mode and while lights-only mode is on. **Resume live show** zeroes first, then hands
+the output back to the show. Closing the page does *not* resume the show; only that button does,
+so a dropped tablet cannot restart the water. The console line reads `TEST` while test mode is on.
 
 ### The height cap
 

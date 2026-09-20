@@ -851,3 +851,39 @@ still enforcing a superseded version of global CLAUDE.md section 6, and two `ski
 trying to disable `create-readme` and `decision-log` -- the two wonderMakr skills that this
 repo's own `CLAUDE.md` and `NEXT_STEPS.md` instruct agents to use. Two duplicate personal copies
 of those skills were deleted in favour of the plugin versions. General mode now stands unopposed.
+
+## [2026-09-20] Jet tests run only in a test mode that halts the live show
+
+On the bench, **ALL OFF** on the settings page looked broken: the zero went out, and the next
+LiDAR scan put Garrett's own hill straight back up. The same thing made the jet tester useless
+while anybody was in the hallway. The live show always won, because the tester and the show
+shared one output with no rule about who owned it.
+
+**Decided:** a `test_mode` flag on `SettingsControl` owns the output. On, the show loop sends
+only the held test frame or zeros, on its normal resend cadence so the watchdog heartbeat and
+olad's buffer stay alive. Jet tests are refused outside test mode. Entering and leaving test
+mode both zero the output first, and the flag flips even when the zero cannot be verified,
+because halting the live show is the safer half of either move. ALL OFF now enters test mode.
+The tester moved off `/settings` onto its own `/test` page, which enters test mode on load and
+shows the jet the tracker sees under the walker, so a calibration check needs no console.
+
+**Ruled out:** resuming the show when the test page closes (`pagehide`/`beforeunload`). A
+dropped or backgrounded tablet must not restart the water. Only the **Resume live show** button
+leaves test mode.
+
+**Still open:** the first two jets did not react in the show earlier today while `show.log`
+proves height 29 went to jet 0 and about 18 to jet 1. Manual tests at the default height of 5
+worked. The test page is the tool for the next check: hold those jets at 30 and 18, and read
+the tracked jet number while standing on the first physical jet.
+
+## [2026-09-20] Settings apply live; only the hard maximum, Load JSON, and Reset wait for Apply
+
+Tuning on the bench meant edit, press Apply, watch, repeat. Garrett asked for the page to be
+responsive: no submit for most things. The idle animation drop-downs also turned out never to
+preview at all; only Apply read them.
+
+**Decided:** every edit applies itself about 250 ms after the last change, as the same complete
+validated profile the Apply button sends. Live-apply always sends the *applied* hard maximum, so
+the one safety limit still needs the unlock and a deliberate press. **Load JSON** and **Reset
+defaults** stay in preview until Apply, because both replace the whole profile at once. The undo
+stack is capped at 50 so a slider drag cannot grow it without bound.

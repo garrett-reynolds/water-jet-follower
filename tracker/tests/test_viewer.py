@@ -44,14 +44,62 @@ class TestSettingsMap(unittest.TestCase):
             "profile.settings.strip_points=jetPoints("
             "profile.settings.strip_points,count)", page)
 
-    def test_settings_page_has_a_water_jet_tester(self):
+    def test_settings_page_has_no_jet_tester_but_links_to_the_test_page(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")
-        self.assertIn('id="water-test-jet"', page)
-        self.assertIn('id="water-test-height"', page)
-        self.assertIn('id="start-water-test"', page)
-        self.assertIn('id="stop-water-test"', page)
-        self.assertIn('Holds one jet until you stop the test.', page)
+        self.assertNotIn("/actions/test-jet", page)
+        self.assertIn('href="/test"', page)
+        self.assertIn('id="test-banner"', page)
+        self.assertIn('id="resume-live"', page)
+
+    def test_test_page_enters_test_mode_and_holds_one_jet(self):
+        with urlopen(self.base + "/test") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("'/actions/test-mode',{enabled:true}", page)
+        self.assertIn("'/actions/test-mode',{enabled:false}", page)
+        self.assertIn("'/actions/test-jet'", page)
+        self.assertIn("'/actions/all-off'", page)
+        self.assertIn('id="seen"', page)
+        self.assertNotIn("pagehide", page)
+        self.assertNotIn("beforeunload", page)
+
+    def test_settings_page_applies_edits_live_but_never_the_hard_maximum(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("applyTimer=setTimeout(autoApply,250)", page)
+        self.assertIn("p.settings.height_max=original.settings.height_max", page)
+        self.assertIn("unlock_height_max:false", page)
+        self.assertIn("$('idle_water_animation').onchange=dirty", page)
+        self.assertNotIn("Preview only. Nothing is live yet.", page)
+
+    def test_water_shape_fields_are_sliders_with_readouts(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        for name in ("jet_count", "height_min", "hill_peak", "height_max",
+                     "hill_jets", "lead_seconds", "follow_response",
+                     "slow_speed", "fast_speed", "idle_brightness",
+                     "idle_seconds", "idle_height"):
+            self.assertIn(f'id="{name}" type="range"', page)
+            self.assertIn(f'<output id="{name}_out">', page)
+        self.assertIn('id="height_max" type="range" min="1" max="255" step="1" disabled', page)
+        self.assertIn("$('height_min').max=s.height_max", page)
+        self.assertIn("$('hill_peak').max=s.height_max", page)
+        self.assertNotIn('type="number"', page)
+
+    def test_test_page_uses_sliders_bounded_by_the_applied_profile(self):
+        with urlopen(self.base + "/test") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn('id="jet" type="range"', page)
+        self.assertIn('id="height" type="range"', page)
+        self.assertNotIn('type="number"', page)
+        self.assertIn("$('jet').max=s.jet_count", page)
+        self.assertIn("$('height').max=s.height_max", page)
+
+    def test_load_and_reset_stay_in_preview_until_apply(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("pending=true;fill();status('Loaded profile previewed.", page)
+        self.assertIn("pending=true;fill();status('Default profile previewed.", page)
 
     def test_settings_page_uses_an_inline_colour_wheel_and_mode_selector(self):
         with urlopen(self.base + "/settings") as response:

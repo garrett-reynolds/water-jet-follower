@@ -103,6 +103,9 @@ def validate_profile(profile):
     return clean
 
 
+UNDO_DEPTH = 50
+
+
 class SettingsControl:
     """Own settings history and hardware actions for one viewer process."""
 
@@ -111,6 +114,11 @@ class SettingsControl:
         self.send_frame = send_frame
         self.zero_output = zero_output
         self.lights_only = False
+        # Test mode: the live show sends nothing. Only a held jet test or zeros go
+        # out, so a person walking past the LiDAR cannot put water up while somebody
+        # has their hand on a jet. Entered by the /test page or by ALL OFF. Left only
+        # by an explicit resume, never by a page closing.
+        self.test_mode = False
         self._manual_frame = None
         self._undo = []
         self._reset = profile_for(Config())
@@ -130,6 +138,8 @@ class SettingsControl:
         clean["strip_end"] = clean["strip_points"][-1]
         self.cfg.__dict__.update(clean)
         self._undo.append(previous)
+        # Live-apply sends a profile per edit burst, so the stack is bounded.
+        del self._undo[:-UNDO_DEPTH]
         return self.profile()
 
     def undo(self):
@@ -151,12 +161,35 @@ class SettingsControl:
         self.lights_only = enabled
         return self.lights_only
 
+    def set_test_mode(self, enabled):
+        """Turn test mode on or off. Both directions zero the output first.
+
+        On: the live show stops sending, so the modules must not be left latched
+        at whatever hill was up. Off: any held jet test is dropped before the show
+        gets the output back. The flag changes even when the zero cannot be
+        verified, because halting the live show is the safer half of either move;
+        the caller gets the verification result to report.
+        """
+        if not isinstance(enabled, bool):
+            raise ValueError("test_mode must be true or false")
+        all_zero = self._zero_if_possible()
+        self._manual_frame = None
+        self.test_mode = enabled
+        return {"enabled": self.test_mode, "all_zero": all_zero}
+
+    def _zero_if_possible(self):
+        if self.zero_output is None:
+            return None
+        return bool(self.zero_output())
+
     def all_off(self):
+        """Zero everything and halt the live show. ALL OFF always enters test mode,
+        otherwise the next scan puts the hill straight back and the button looks dead."""
         if self.zero_output is None:
             raise RuntimeError("ALL OFF is not available in this run mode")
         result = bool(self.zero_output())
-        if result:
-            self._manual_frame = None
+        self._manual_frame = None
+        self.test_mode = True
         return result
 
     def test_jet(self, jet, height=None):
@@ -164,6 +197,8 @@ class SettingsControl:
             raise RuntimeError("jet test is not available in this run mode")
         if self.lights_only:
             raise ValueError("turn lights-only off before starting a water test")
+        if not self.test_mode:
+            raise ValueError("open the test page first; jet tests only run in test mode")
         if not isinstance(jet, int) or not 0 <= jet < self.cfg.jet_count:
             raise ValueError("jet is outside the configured range")
         if not _enabled(self.cfg)[jet]:
@@ -187,9 +222,11 @@ class SettingsControl:
         return True
 
     def output_frame(self, normal_frame):
-        """Return a held jet-test frame, or the normal live-show frame."""
+        """Return a held jet-test frame, a blank frame in test mode, or the normal
+        live-show frame. The show loop keeps sending on its resend cadence in test
+        mode so the watchdog keeps its heartbeat and olad's buffer stays warm."""
         if self._manual_frame is None:
-            return normal_frame
+            return dmx.blank_frame() if self.test_mode else normal_frame
         frame = self._manual_frame[:]
         if self.lights_only:
             for channel in dmx.height_channels(self.cfg.jet_count):

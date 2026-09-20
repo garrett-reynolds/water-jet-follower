@@ -1,6 +1,6 @@
 # Next steps
 
-Last updated 2026-09-19.
+Last updated 2026-09-20.
 
 ## Where the plan actually lives
 
@@ -68,6 +68,47 @@ clips of the same still bench, baseline built from the first and the tracker run
 second: **2 false people without the baseline, 0 with it**. And on a 60-second clip of the
 real room, **one real person was held as a single track in 78% of scans**, longest hold 17.1 s
 over 4.81 m. **Two people crossing is still unverified** — that needs clips 2 and 3 merged.
+
+## Bench session 2026-09-20: test mode, live-apply, sliders
+
+The show ran with water again. Three operator problems came out of it and are fixed, deployed
+to the Pi, and covered by tests (123 pass on the laptop and the Pi). See `DECISIONS.md` for
+the two entries and `tracker/README.md` for the pages.
+
+- **ALL OFF looked dead.** It zeroed, then the next scan put the walker's own hill straight
+  back. ALL OFF now halts the live show (enters test mode) until **Resume live show**.
+- **Jet tests moved to `http://water-jets.local:8080/test`.** Opening it enters test mode: output
+  zeroed, live show muted, tracking still running so the page shows which jet the tracker sees
+  under the walker. Only the Resume button leaves test mode; a closed tab does not.
+- **Settings apply live.** Every edit goes out about 250 ms after the last change. The hard
+  maximum, Load JSON, and Reset defaults still wait for Apply profile. Every number field on
+  both pages is now a slider with a readout, for the iPad.
+
+**Do first, next session:**
+
+1. **Prove test mode with a real walker.** Every check so far ran on a replay or an empty
+   hallway. Walk, get a hill up, open `/test` on the iPad: the water must drop and stay down
+   while walking, and the `show.log` line must read `TEST`. Also confirm `/settings` loads on
+   the iPad (the page scripts are only syntax-checked, not run in a browser).
+2. **The first two jets did not react in the show** (issue #23). `show.log` proves height 29
+   went to jet 0 and about 18 to jet 1 while Garrett stood at `s=-0.04`; manual tests at height
+   5 worked. On `/test`: hold jet 1 at 30 and jet 2 at 18 (page numbering, from 1), then stand
+   on the first physical jet and read the tracked jet number. Jet 1 means hardware; anything
+   else means the map.
+3. **iPad as the only control surface.** Garrett asked for the app to be functional on the
+   iPad. The pages are now touch-sized and reachable at `http://water-jets.local:8080/`. Still
+   open: starting and stopping `show` needs SSH from the laptop, and the pages have not been
+   tried in iPad Safari yet. Decide whether a start/stop control belongs on the Pi (a service
+   plus a button) before charting anything.
+
+Restart the show from the laptop, in PowerShell:
+
+```
+ssh pi@water-jets "pkill -f '^/home/pi/wj-venv/bin/python -m tracker'"
+ssh pi@water-jets "cd ~ && setsid nohup ~/wj-venv/bin/python -m tracker.run show --baseline data/baseline.json > ~/show.log 2>&1 < /dev/null & disown"
+```
+
+The old `pkill -f 'python -m tracker'` also kills the SSH shell that runs it; use the anchored form.
 
 ## Do next, in order
 

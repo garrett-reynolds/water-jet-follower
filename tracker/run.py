@@ -238,16 +238,24 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
             scans += 1
 
             heights, colours = wave.heights_and_colours(frame, timestamp)
-            peak_height = max(peak_height, max(heights) if heights else 0)
             now = time.time()
+            if control.test_mode:
+                # Live output is off. Keep the heartbeat and olad's buffer alive by
+                # re-sending the held test frame (or zeros) on the resend cadence.
+                heights = [0] * len(heights)
+                if now - last_sent >= cfg.resend_seconds:
+                    _send_with_heartbeat(send_frame, control.output_frame(None),
+                                         heartbeat)
+                    last_sent = now
             # Re-send on a change or on the heartbeat, whichever comes first.
-            if now - last_sent >= cfg.resend_seconds or any(heights):
+            elif now - last_sent >= cfg.resend_seconds or any(heights):
                 live_frame = wave.frame(frame, timestamp,
                                         lights_only=control.lights_only)
                 _send_with_heartbeat(send_frame,
                                      control.output_frame(live_frame),
                                      heartbeat)
                 last_sent = now
+            peak_height = max(peak_height, max(heights) if heights else 0)
 
             elapsed = max(1e-6, time.time() - started)
             frame["fg"] = [[round(x, 4), round(y, 4)] for x, y in foreground]
@@ -265,7 +273,8 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
                 # like they are stood on it. s tells the truth about where they are.
                 summary = "  ".join(
                     f"#{t['id']} s={t['s']:.2f} v={t['speed']:.2f}" for t in confirmed)
-                print(f"\r{scans / elapsed:5.2f} Hz  tracks={len(confirmed)}  "
+                mode = "TEST  " if control.test_mode else ""
+                print(f"\r{scans / elapsed:5.2f} Hz  {mode}tracks={len(confirmed)}  "
                       f"peak={max(heights) if heights else 0:3d}/{cfg.height_max}  "
                       f"{summary}      ", end="", flush=True)
     except KeyboardInterrupt:

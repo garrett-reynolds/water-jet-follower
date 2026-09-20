@@ -7,7 +7,7 @@ validates, because a half-applied safety limit is worse than a rejected edit.
 import unittest
 
 from tracker.config import Config
-from tracker.settings import PROFILE_VERSION, SettingsControl, profile_for
+from tracker.settings import PROFILE_VERSION, UNDO_DEPTH, SettingsControl, profile_for
 
 
 class TestProfiles(unittest.TestCase):
@@ -26,6 +26,13 @@ class TestProfiles(unittest.TestCase):
             self.control.apply(profile)
         self.assertEqual(self.cfg.hill_peak, 30)
         self.assertEqual(self.cfg.jet_count, 10)
+
+    def test_undo_stack_is_bounded_for_live_apply(self):
+        profile = profile_for(self.cfg)
+        for step in range(UNDO_DEPTH + 10):
+            profile["settings"]["hill_peak"] = 10 + step % 20
+            self.control.apply(profile)
+        self.assertEqual(len(self.control._undo), UNDO_DEPTH)
 
     def test_hard_max_needs_the_lock_open(self):
         profile = profile_for(self.cfg)
@@ -74,6 +81,7 @@ class TestActions(unittest.TestCase):
         frames = []
         cfg = Config(height_min=7)
         control = SettingsControl(cfg, send_frame=frames.append)
+        control.set_test_mode(True)
         control.test_jet(0)
         self.assertEqual(len(frames[0]), 512)
         self.assertEqual(frames[0][4], 7)
@@ -83,17 +91,20 @@ class TestActions(unittest.TestCase):
         frames = []
         cfg = Config(height_max=40)
         control = SettingsControl(cfg, send_frame=frames.append)
+        control.set_test_mode(True)
         control.test_jet(2, height=20)
         self.assertEqual(frames[0][14], 20)
 
     def test_water_test_rejects_height_above_the_hard_maximum(self):
         control = SettingsControl(Config(height_max=40), send_frame=lambda frame: None)
+        control.set_test_mode(True)
         with self.assertRaises(ValueError):
             control.test_jet(0, height=41)
 
     def test_water_test_is_blocked_in_lights_only_mode(self):
         frames = []
         control = SettingsControl(Config(), send_frame=frames.append)
+        control.set_test_mode(True)
         control.set_lights_only(True)
         with self.assertRaises(ValueError):
             control.test_jet(0, height=5)
@@ -102,6 +113,7 @@ class TestActions(unittest.TestCase):
     def test_disabled_jet_cannot_be_tested(self):
         cfg = Config(jet_enabled=(False,) + (True,) * 9)
         control = SettingsControl(cfg, send_frame=lambda frame: None)
+        control.set_test_mode(True)
         with self.assertRaises(ValueError):
             control.test_jet(0)
 
@@ -109,16 +121,81 @@ class TestActions(unittest.TestCase):
         control = SettingsControl(Config(), send_frame=lambda frame: None,
                                   zero_output=lambda: True)
         normal = [0] * 512
+        control.set_test_mode(True)
         control.test_jet(0)
         self.assertEqual(control.output_frame(normal)[4], 5)
         control.all_off()
+        # Still in test mode: the show gets a blank frame, not the live one.
+        self.assertFalse(any(control.output_frame(normal)))
+        control.set_test_mode(False)
         self.assertIs(control.output_frame(normal), normal)
 
     def test_lights_only_forces_a_held_test_jet_dry(self):
         control = SettingsControl(Config(), send_frame=lambda frame: None)
+        control.set_test_mode(True)
         control.test_jet(0)
         control.lights_only = True
         self.assertEqual(control.output_frame([0] * 512)[4], 0)
+
+
+class TestTestMode(unittest.TestCase):
+    """Test mode is the one state where a walker cannot put water up."""
+
+    def test_jet_test_is_refused_outside_test_mode(self):
+        frames = []
+        control = SettingsControl(Config(), send_frame=frames.append)
+        with self.assertRaises(ValueError):
+            control.test_jet(0)
+        self.assertEqual(frames, [])
+
+    def test_entering_test_mode_zeroes_first(self):
+        calls = []
+        control = SettingsControl(Config(), zero_output=lambda: calls.append(True) or True)
+        result = control.set_test_mode(True)
+        self.assertEqual(calls, [True])
+        self.assertEqual(result, {"enabled": True, "all_zero": True})
+        self.assertTrue(control.test_mode)
+
+    def test_test_mode_hides_the_live_frame(self):
+        control = SettingsControl(Config(), zero_output=lambda: True)
+        live = [30] * 512
+        control.set_test_mode(True)
+        out = control.output_frame(live)
+        self.assertEqual(len(out), 512)
+        self.assertFalse(any(out))
+
+    def test_leaving_test_mode_zeroes_and_drops_the_held_jet(self):
+        calls = []
+        control = SettingsControl(Config(), send_frame=lambda frame: None,
+                                  zero_output=lambda: calls.append(True) or True)
+        control.set_test_mode(True)
+        control.test_jet(0)
+        control.set_test_mode(False)
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(control.test_mode)
+        live = [30] * 512
+        self.assertIs(control.output_frame(live), live)
+
+    def test_test_mode_flag_changes_even_when_zero_fails(self):
+        control = SettingsControl(Config(), zero_output=lambda: False)
+        result = control.set_test_mode(True)
+        self.assertEqual(result, {"enabled": True, "all_zero": False})
+        self.assertTrue(control.test_mode)
+
+    def test_test_mode_works_with_no_hardware_callbacks(self):
+        control = SettingsControl(Config())
+        self.assertEqual(control.set_test_mode(True),
+                         {"enabled": True, "all_zero": None})
+
+    def test_all_off_enters_test_mode(self):
+        control = SettingsControl(Config(), zero_output=lambda: True)
+        control.all_off()
+        self.assertTrue(control.test_mode)
+
+    def test_test_mode_rejects_non_booleans(self):
+        control = SettingsControl(Config())
+        with self.assertRaises(ValueError):
+            control.set_test_mode("yes")
 
 
 if __name__ == "__main__":

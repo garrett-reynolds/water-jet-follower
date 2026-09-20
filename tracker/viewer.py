@@ -217,6 +217,10 @@ h2 { font-size:17px; margin:0 0 12px; }
 label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
 input, button { font:inherit; }
 input[type=number] { width:100%; padding:8px; border:1px solid var(--line); border-radius:3px; }
+label.slider { grid-column:1 / -1; }
+label.slider > span:first-child { display:flex; justify-content:space-between; color:var(--ink); font-size:14px; }
+label.slider output { font-weight:650; font-variant-numeric:tabular-nums; }
+input[type=range] { width:100%; height:44px; margin:0; accent-color:var(--water); touch-action:pan-y; }
 button, .file { border:1px solid #789b9c; background:white; color:var(--ink);
   border-radius:4px; padding:8px 11px; cursor:pointer; }
 button.primary { background:var(--water); border-color:var(--water); color:white; font-weight:650; }
@@ -229,14 +233,13 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
 .colour-sliders { display:grid; gap:12px; }
 .jets { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
 .jet { border:1px solid var(--line); padding:7px; display:grid; gap:5px; border-radius:4px; }
-.water-tester { border:2px solid var(--water); background:#f4fffc; }
-.water-tester .warning { border-left:4px solid var(--danger); padding-left:10px; }
+#test-banner { margin:0 0 12px; padding:10px; border-left:4px solid var(--danger); background:#fff3d6; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 #status { min-height:42px; padding:10px; background:#dce9e6; border-radius:4px; }
 #status.bad { background:#ffe4df; color:#7d211b; }
 .note { color:var(--muted); font-size:13px; }
 @media (max-width:850px) { main { grid-template-columns:1fr; } .map { position:relative; height:52vh; } }
 </style></head><body>
-<header><h1>Water and light control</h1><a href="/">Live viewer</a></header>
+<header><h1>Water and light control</h1><nav><a href="/test">Test jets</a> · <a href="/">Live viewer</a></nav></header>
 <main>
   <div class="map"><canvas id="path"></canvas><div class="map-view">
     <span id="live-state">LiDAR waiting</span><button id="zoom-out" aria-label="Zoom out">−</button>
@@ -246,16 +249,17 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
     <button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
   </div></div>
   <div class="controls">
+    <div id="test-banner" hidden>Test mode is on. The live show is not sending. <button id="resume-live">Resume live show</button></div>
     <div id="status">Loading settings.</div>
     <section><h2>Water shape</h2><div class="grid">
-      <label>Jet count<input id="jet_count" type="number" min="1" max="20"></label>
-      <label>Minimum active height<input id="height_min" type="number" min="1" max="255"></label>
-      <label>Normal hill height<input id="hill_peak" type="number" min="1" max="255"></label>
-      <label class="lock">Hard maximum height<input id="height_max" type="number" min="1" max="255" disabled>
+      <label class="slider"><span>Jet count <output id="jet_count_out"></output></span><input id="jet_count" type="range" min="1" max="20" step="1"></label>
+      <label class="slider"><span>Minimum active height <output id="height_min_out"></output></span><input id="height_min" type="range" min="1" max="255" step="1"></label>
+      <label class="slider"><span>Normal hill height <output id="hill_peak_out"></output></span><input id="hill_peak" type="range" min="1" max="255" step="1"></label>
+      <label class="slider lock"><span>Hard maximum height <output id="height_max_out"></output></span><input id="height_max" type="range" min="1" max="255" step="1" disabled>
         <span><input id="unlock" type="checkbox"> Unlock this safety limit</span></label>
-      <label>Hill width in jets<input id="hill_jets" type="number" min="1" max="20"></label>
-      <label>Lead time in seconds<input id="lead_seconds" type="number" min="0" max="2" step="0.01"></label>
-      <label>Follow response in seconds<input id="follow_response" type="number" min="0" max="5" step="0.01"></label>
+      <label class="slider"><span>Hill width in jets <output id="hill_jets_out"></output></span><input id="hill_jets" type="range" min="1" max="20" step="1"></label>
+      <label class="slider"><span>Lead time in seconds <output id="lead_seconds_out"></output></span><input id="lead_seconds" type="range" min="0" max="2" step="0.01"></label>
+      <label class="slider"><span>Follow response in seconds <output id="follow_response_out"></output></span><input id="follow_response" type="range" min="0" max="5" step="0.01"></label>
       <label><span><input id="reverse_jets" type="checkbox"> Reverse jet order</span></label>
     </div></section>
     <section><h2>Colours</h2>
@@ -267,33 +271,22 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
         </div>
       </div>
       <div class="grid" style="margin-top:10px">
-        <label>Slow speed<input id="slow_speed" type="number" min="0" max="10" step="0.1"></label>
-        <label>Fast speed<input id="fast_speed" type="number" min="0" max="10" step="0.1"></label>
+        <label class="slider"><span>Slow speed in m/s <output id="slow_speed_out"></output></span><input id="slow_speed" type="range" min="0" max="4" step="0.05"></label>
+        <label class="slider"><span>Fast speed in m/s <output id="fast_speed_out"></output></span><input id="fast_speed" type="range" min="0" max="4" step="0.05"></label>
       </div></section>
     <section><h2>Idle animations</h2><div class="grid">
       <label>Water<select id="idle_water_animation"><option value="off">Off</option><option value="roll">Roll</option><option value="ripple">Ripple</option><option value="pulse">Pulse</option></select></label>
       <label>Colour<select id="idle_colour_animation"><option value="off">Off</option><option value="chase">Chase</option><option value="fade">Fade</option><option value="breathe">Breathe</option></select></label>
-      <label>Idle brightness<input id="idle_brightness" type="number" min="0" max="255"></label>
-      <label>Cycle time in seconds<input id="idle_seconds" type="number" min="0.5" max="120" step="0.5"></label>
-      <label>Idle water height<input id="idle_height" type="number" min="1" max="255"></label>
+      <label class="slider"><span>Idle brightness <output id="idle_brightness_out"></output></span><input id="idle_brightness" type="range" min="0" max="255" step="1"></label>
+      <label class="slider"><span>Cycle time in seconds <output id="idle_seconds_out"></output></span><input id="idle_seconds" type="range" min="0.5" max="120" step="0.5"></label>
+      <label class="slider"><span>Idle water height <output id="idle_height_out"></output></span><input id="idle_height" type="range" min="1" max="255" step="1"></label>
     </div></section>
     <section><h2>Jet enable</h2><div class="jets" id="jets"></div></section>
-    <section class="water-tester"><h2>Water jet tester</h2>
-      <p class="note warning">Holds one jet until you stop the test. Keep your hand on the 24 V switch.</p>
-      <div class="grid">
-        <label>Jet number<input id="water-test-jet" type="number" min="1" max="20" value="1"></label>
-        <label>Test height<input id="water-test-height" type="number" min="1" max="40" value="5"></label>
-      </div>
-      <div class="actions" style="margin-top:12px">
-        <button id="start-water-test" class="primary">Start water test</button>
-        <button id="stop-water-test" class="danger">Stop water test</button>
-      </div>
-    </section>
     <section><h2>Run controls</h2><div class="actions">
       <button id="lights">Lights only: off</button>
       <button id="all-off" class="danger">ALL OFF</button>
     </div></section>
-    <section><h2>Profile</h2><p class="note">Edits stay in preview until you apply the complete profile.</p>
+    <section><h2>Profile</h2><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile.</p>
       <div class="actions"><button id="apply" class="primary">Apply profile</button>
       <button id="save">Save JSON</button><label class="file">Load JSON<input id="load" type="file" accept="application/json" hidden></label></div>
     </section>
@@ -315,7 +308,8 @@ function setWheel(e){const c=$('colour_wheel'),b=c.getBoundingClientRect(),r=c.w
 function saveColour(){const rgb=hsvToRgb(wheelHue,wheelSat,Number($('colour_value').value)/255);profile.settings[colourMode]=[...rgb,Number($('white_level').value)];}
 function fillColour(){const c=profile.settings[colourMode],hsv=rgbToHsv(c);wheelHue=hsv[0];wheelSat=hsv[1];$('colour_mode').value=colourMode;$('colour_value').value=Math.round(hsv[2]*255);$('white_level').value=c[3];drawColourWheel();}
 function readForm(){const s=copy(profile.settings);saveColour();for(const n of fields)s[n]=Number($(n).value);s[colourMode]=profile.settings[colourMode];s.idle_water_animation=$('idle_water_animation').value;s.idle_colour_animation=$('idle_colour_animation').value;s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);profile.settings=s;return profile;}
-function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('water-test-jet').max=s.jet_count;$('water-test-height').min=s.height_min;$('water-test-height').max=s.height_max;if(Number($('water-test-height').value)<s.height_min)$('water-test-height').value=s.height_min;if(Number($('water-test-height').value)>s.height_max)$('water-test-height').value=s.height_max;fillColour();buildJets();draw();status('Preview only. Apply the complete profile when it looks right.');}
+function readouts(){for(const n of fields){const o=$(n+'_out');if(o)o.textContent=$(n).value}}
+function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];readouts();$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('height_min').max=s.height_max;$('hill_peak').min=s.height_min;$('hill_peak').max=s.height_max;fillColour();buildJets();draw();status('Live. Edits apply as you make them.');}
 function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><span>Jet '+(i+1)+'</span><input type="checkbox" '+(on?'checked':'')+'></label></div>'));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
 function bounds(){const cx=viewCentre?viewCentre[0]:(roi.xmin+roi.xmax)/2,cy=viewCentre?viewCentre[1]:(roi.ymin+roi.ymax)/2,hw=(roi.xmax-roi.xmin)/zoom/2,hh=(roi.ymax-roi.ymin)/zoom/2;return {xmin:cx-hw,xmax:cx+hw,ymin:cy-hh,ymax:cy+hh};}
@@ -325,27 +319,30 @@ function scanDot(ctx,p,r,colour){const q=xy(p);ctx.fillStyle=colour;ctx.beginPat
 function jetPoints(points,count){if(count===points.length)return points;const lengths=points.slice(1).map((p,i)=>Math.hypot(p[0]-points[i][0],p[1]-points[i][1])),total=lengths.reduce((a,b)=>a+b,0);if(count<=1||!total)return [points[0]];let segment=0,before=0;return Array.from({length:count},(_,i)=>{const target=total*i/(count-1);while(segment<lengths.length-1&&before+lengths[segment]<target){before+=lengths[segment++]}const a=points[segment],b=points[segment+1],t=lengths[segment]?(target-before)/lengths[segment]:0;return [a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])]});}
 function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);const v=bounds();ctx.strokeStyle='#17474d';ctx.lineWidth=1;for(let x=Math.ceil(v.xmin*2)/2;x<=v.xmax;x+=.5){const a=xy([x,v.ymin]),b=xy([x,v.ymax]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}for(let y=Math.ceil(v.ymin*2)/2;y<=v.ymax;y+=.5){const a=xy([v.xmin,y]),b=xy([v.xmax,y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}if(liveFrame){for(const p of liveFrame.bg||[])scanDot(ctx,p,1.3,'#527277');for(const p of liveFrame.fg||[])scanDot(ctx,p,2.2,'#45dce7');for(const t of liveFrame.tracks||[])scanDot(ctx,[t.x,t.y],t.confirmed?7:5,t.confirmed?'#f3b61f':'#92aaa8')}scanDot(ctx,[0,0],6,'#fff06a');const pts=profile.settings.strip_points;ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();jetPoints(profile.settings.strip_points,profile.settings.jet_count).forEach((p,i)=>{const q=xy(p);ctx.fillStyle='#45dce7';ctx.beginPath();ctx.arc(...q,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(String(i+1),q[0]+6,q[1]-6)});pts.forEach((p,i)=>{const q=xy(p);ctx.strokeStyle=i===selected?'#f3b61f':'#e9fffa';ctx.lineWidth=2;ctx.strokeRect(q[0]-6,q[1]-6,12,12)});}
 function nearest(x,y){let best=0,dist=Infinity;profile.settings.strip_points.forEach((p,i)=>{const q=xy(p),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<900?best:null;}
-function dirty(){readForm();draw();status('Preview only. Nothing is live yet.');}
-async function apply(){try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
-async function startWaterTest(){const jet=Number($('water-test-jet').value)-1,height=Number($('water-test-height').value);try{await api('/actions/test-jet',{jet,height});status('Water test is holding jet '+(jet+1)+' at height '+height+'. Press Stop water test.');}catch(e){status(e.message,true)}}
-async function stopWaterTest(){try{const d=await api('/actions/all-off',{});status(d.all_zero?'Water test stopped. All 512 slots are zero.':'Water test could not be stopped.',!d.all_zero)}catch(e){status(e.message,true)}}
-async function init(){try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');size();}catch(e){status(e.message,true)}}
+let applyTimer=null,pending=false;
+function dirty(){readForm();draw();if(pending){status('Preview only. Press Apply profile to make it live.');return}clearTimeout(applyTimer);applyTimer=setTimeout(autoApply,250);}
+async function autoApply(){const p=copy(readForm());p.settings.height_max=original.settings.height_max;try{const r=await api('/settings/apply',{profile:p,unlock_height_max:false});original=copy(r);status(Number($('height_max').value)!==original.settings.height_max?'Live. Applied. The hard maximum still needs Apply profile.':'Live. Applied.')}catch(e){status(e.message+' Nothing changed.',true)}}
+async function apply(){clearTimeout(applyTimer);try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;pending=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
+function showTestMode(on){$('test-banner').hidden=!on;}
+async function init(){try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');showTestMode(data.test_mode);size();}catch(e){status(e.message,true)}}
 async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';draw()}catch(e){$('live-state').textContent='LiDAR not available'}setTimeout(pollState,100)}
 function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
 $('unlock').onchange=()=>{$('height_max').disabled=!$('unlock').checked};
-$('jet_count').onchange=()=>{const count=Number($('jet_count').value);profile.settings.strip_points=jetPoints(profile.settings.strip_points,count);selected=Math.min(selected,count-1);readForm();buildJets();dirty()};
+$('jet_count').oninput=()=>{const count=Number($('jet_count').value);profile.settings.strip_points=jetPoints(profile.settings.strip_points,count);selected=Math.min(selected,count-1);readForm();buildJets();dirty()};
 $('colour_mode').onchange=()=>{saveColour();colourMode=$('colour_mode').value;fillColour();dirty()};
 $('colour_value').oninput=dirty;$('white_level').oninput=dirty;
 const wheel=$('colour_wheel');wheel.onpointerdown=e=>{wheelDrag=true;wheel.setPointerCapture(e.pointerId);setWheel(e)};wheel.onpointermove=e=>{if(wheelDrag)setWheel(e)};wheel.onpointerup=()=>wheelDrag=false;
-document.querySelector('.controls').addEventListener('change',e=>{if(e.target.matches('input')&&!['load','jet_count','unlock'].includes(e.target.id))dirty()});
+document.querySelector('.controls').addEventListener('input',e=>{if(e.target.matches('input[type=range]')){readouts();if(!['jet_count','colour_value','white_level'].includes(e.target.id))dirty()}});
+document.querySelector('.controls').addEventListener('change',e=>{if(e.target.matches('input[type=range]'))return;if(e.target.matches('input,select')&&!['load','jet_count','unlock','colour_mode','idle_water_animation','idle_colour_animation'].includes(e.target.id))dirty()});
+$('idle_water_animation').onchange=dirty;$('idle_colour_animation').onchange=dirty;
 $('apply').onclick=apply;
 $('save').onclick=()=>{readForm();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(profile,null,2)],{type:'application/json'}));a.download='water-jet-profile.json';a.click();URL.revokeObjectURL(a.href)};
-$('load').onchange=async e=>{try{profile=JSON.parse(await e.target.files[0].text());fill()}catch(err){status('Could not read that JSON file.',true)}};
-$('undo').onclick=async()=>{try{profile=await api('/settings/undo',{});fill();status('Last applied profile restored.')}catch(e){status(e.message,true)}};
-$('reset').onclick=()=>{profile=copy(defaultProfile);fill();status('Default profile previewed. Press Apply profile to make it live.');};
+$('load').onchange=async e=>{try{profile=JSON.parse(await e.target.files[0].text());pending=true;fill();status('Loaded profile previewed. Press Apply profile to make it live.')}catch(err){status('Could not read that JSON file.',true)}};
+$('undo').onclick=async()=>{clearTimeout(applyTimer);try{profile=await api('/settings/undo',{});original=copy(profile);pending=false;fill();status('Last applied profile restored.')}catch(e){status(e.message,true)}};
+$('reset').onclick=()=>{profile=copy(defaultProfile);pending=true;fill();status('Default profile previewed. Press Apply profile to make it live.');};
 $('lights').onclick=async()=>{try{const d=await api('/actions/lights-only',{enabled:!lightsOnly});lightsOnly=d.enabled;$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');}catch(e){status(e.message,true)}};
-$('all-off').onclick=async()=>{try{const d=await api('/actions/all-off',{});status(d.all_zero?'ALL OFF verified. All 512 slots are zero.':'ALL OFF could not be verified.',!d.all_zero)}catch(e){status(e.message,true)}};
-$('start-water-test').onclick=startWaterTest;$('stop-water-test').onclick=stopWaterTest;
+$('all-off').onclick=async()=>{try{const d=await api('/actions/all-off',{});showTestMode(true);status(d.all_zero?'ALL OFF verified. All 512 slots are zero. The live show is halted; press Resume live show to continue.':'ALL OFF could not be verified. Cut the 24 V.',!d.all_zero)}catch(e){status(e.message,true)}};
+$('resume-live').onclick=async()=>{try{const d=await api('/actions/test-mode',{enabled:false});showTestMode(false);status(d.all_zero===false?'Zero could not be verified. Cut the 24 V.':'Live show resumed.',d.all_zero===false)}catch(e){status(e.message,true)}};
 $('zoom-in').onclick=()=>setZoom(zoom*1.5);$('zoom-out').onclick=()=>setZoom(zoom/1.5);$('zoom-fit').onclick=()=>setZoom(1);
 $('add-point').onclick=()=>{readForm();const p=profile.settings.strip_points, a=p[Math.max(0,p.length-2)], b=p[p.length-1];p.splice(p.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);selected=p.length-2;dirty()};
 $('remove-point').onclick=()=>{readForm();if(profile.settings.strip_points.length<=2)return status('The path needs at least two points.',true);profile.settings.strip_points.splice(selected,1);selected=Math.max(0,selected-1);dirty()};
@@ -353,6 +350,86 @@ const canvas=$('path');canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY<0?
 canvas.onpointermove=e=>{if(!dragging)return;const r=canvas.getBoundingClientRect();profile.settings.strip_points[selected]=world(e.clientX-r.left,e.clientY-r.top);dirty()};
 canvas.onpointerup=()=>dragging=false;window.onresize=size;init();pollState();
 </script></body></html>"""
+
+TEST_PAGE = r"""<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Water jet test</title>
+<style>
+:root { --ink:#16353a; --paper:#edf5f3; --panel:#fff; --water:#087e8b;
+  --light:#d9fff5; --danger:#b9382f; --line:#b7cbc8; --muted:#587276; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:var(--paper);
+  font:15px/1.35 "Segoe UI", Arial, sans-serif; }
+header { display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:16px 22px; background:var(--ink); color:white; }
+h1 { margin:0; font-size:22px; font-weight:650; }
+header a { color:var(--light); }
+main { max-width:640px; margin:0 auto; padding:18px; }
+section { background:var(--panel); border:1px solid var(--line); margin:0 0 14px;
+  padding:16px; border-radius:6px; }
+h2 { font-size:17px; margin:0 0 12px; }
+.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
+label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
+input, button { font:inherit; }
+label.slider { grid-column:1 / -1; }
+label.slider > span:first-child { display:flex; justify-content:space-between; color:var(--ink); font-size:14px; }
+label.slider output { font-weight:650; font-size:20px; font-variant-numeric:tabular-nums; }
+input[type=range] { width:100%; height:44px; margin:0; accent-color:var(--water); touch-action:pan-y; }
+button { border:1px solid #789b9c; background:white; color:var(--ink);
+  border-radius:4px; padding:12px 14px; cursor:pointer; min-height:48px; }
+button.primary { background:var(--water); border-color:var(--water); color:white; font-weight:650; }
+button.danger { border-color:var(--danger); color:var(--danger); font-weight:650; }
+button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; }
+.actions { display:flex; flex-wrap:wrap; gap:8px; }
+#mode { padding:12px; border-radius:4px; font-weight:650; margin:0 0 14px; }
+#mode.on { background:#fff3d6; border-left:4px solid var(--danger); }
+#mode.off { background:#ffe4df; color:#7d211b; }
+#status { min-height:42px; padding:10px; background:#dce9e6; border-radius:4px; margin:0 0 14px; }
+#status.bad { background:#ffe4df; color:#7d211b; }
+#seen { font-size:22px; font-weight:650; }
+.note { color:var(--muted); font-size:13px; }
+.warning { border-left:4px solid var(--danger); padding-left:10px; }
+</style></head><body>
+<header><h1>Water jet test</h1><nav><a href="/settings">Settings</a> · <a href="/">Live viewer</a></nav></header>
+<main>
+  <div id="mode" class="off">Entering test mode.</div>
+  <div id="status">Loading.</div>
+  <section><h2>Where the tracker sees you</h2>
+    <div id="seen">Nobody tracked.</div>
+    <p class="note">Jet numbers count from 1, the same as the settings map. Stand on a jet and check the number matches. Tracking stays on in test mode; only the water and lights are off.</p>
+  </section>
+  <section><h2>Hold one jet</h2>
+    <p class="note warning">Holds one jet until you press Stop. Keep your hand on the 24 V switch.</p>
+    <div class="grid">
+      <label class="slider"><span>Jet number <output id="jet_out">1</output></span><input id="jet" type="range" min="1" max="20" step="1" value="1"></label>
+      <label class="slider"><span>Height (DMX) <output id="height_out">5</output></span><input id="height" type="range" min="1" max="40" step="1" value="5"></label>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button id="start" class="primary">Start test</button>
+      <button id="stop" class="danger">Stop test</button>
+    </div>
+  </section>
+  <section><h2>Leave test mode</h2>
+    <p class="note">Everything is zeroed first. Then the live show follows people again and water moves.</p>
+    <div class="actions"><button id="resume">Resume live show</button></div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'bad':'';}
+async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
+function showMode(on){$('mode').className=on?'on':'off';$('mode').textContent=on?'TEST MODE. The live show is not sending.':'LIVE. The show is sending. Water can move.';}
+async function enter(){try{const d=await api('/actions/test-mode',{enabled:true});showMode(true);status(d.all_zero===false?'Test mode is on but zero could not be verified. Cut the 24 V.':'Test mode is on. All 512 slots are zero.',d.all_zero===false)}catch(e){status(e.message,true)}}
+async function start(){const jet=Number($('jet').value)-1,height=Number($('height').value);try{await api('/actions/test-jet',{jet,height});status('Holding jet '+(jet+1)+' at height '+height+'. Press Stop test.')}catch(e){status(e.message,true)}}
+async function stop(){try{const d=await api('/actions/all-off',{});showMode(true);status(d.all_zero?'Stopped. All 512 slots are zero.':'Stop could not be verified. Cut the 24 V.',!d.all_zero)}catch(e){status(e.message,true)}}
+async function resume(){try{const d=await api('/actions/test-mode',{enabled:false});showMode(false);status(d.all_zero===false?'Zero could not be verified. Cut the 24 V.':'Live show resumed. Water can move.',d.all_zero===false)}catch(e){status(e.message,true)}}
+async function poll(){try{const f=await api('/state');const t=(f.tracks||[]).filter(t=>t.confirmed);$('seen').textContent=t.length?t.map(x=>'Jet '+(x.jet+1)+' (s='+x.s.toFixed(2)+' m)').join(' · '):'Nobody tracked.'}catch(e){$('seen').textContent='LiDAR not available.'}setTimeout(poll,200)}
+$('jet').oninput=()=>$('jet_out').textContent=$('jet').value;$('height').oninput=()=>$('height_out').textContent=$('height').value;
+async function limits(){try{const s=(await api('/settings-data')).profile.settings;$('jet').max=s.jet_count;$('height').min=s.height_min;$('height').max=s.height_max;if(Number($('height').value)<s.height_min){$('height').value=s.height_min;$('height_out').textContent=s.height_min}}catch(e){}}
+$('start').onclick=start;$('stop').onclick=stop;$('resume').onclick=resume;
+enter();limits();poll();
+</script></body></html>
+"""
 
 
 def make_handler(state, cfg, control=None):
@@ -393,11 +470,14 @@ def make_handler(state, cfg, control=None):
                     "profile": control.profile(),
                     "default_profile": control.defaults(),
                     "lights_only": control.lights_only,
+                    "test_mode": control.test_mode,
                     "roi": {"xmin": cfg.roi_x_min, "xmax": cfg.roi_x_max,
                             "ymin": cfg.roi_y_min, "ymax": cfg.roi_y_max},
                 })
             elif self.path == "/settings":
                 self._send(SETTINGS_PAGE, "text/html; charset=utf-8")
+            elif self.path == "/test":
+                self._send(TEST_PAGE, "text/html; charset=utf-8")
             elif self.path in ("/", "/index.html"):
                 self._send(PAGE, "text/html; charset=utf-8")
             else:
@@ -416,6 +496,8 @@ def make_handler(state, cfg, control=None):
                     self._json(control.reset())
                 elif self.path == "/actions/lights-only":
                     self._json({"enabled": control.set_lights_only(body.get("enabled"))})
+                elif self.path == "/actions/test-mode":
+                    self._json(control.set_test_mode(body.get("enabled")))
                 elif self.path == "/actions/test-jet":
                     control.test_jet(body.get("jet"), body.get("height"))
                     self._json({"sent": True})
