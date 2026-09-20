@@ -40,7 +40,8 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
   fixes are on the Pi, the show is restarted, and all five were checked by hand on the phone.
   `/test` scored 26/40 on 2026-09-20 (snapshot in `.impeccable/critique/`); five fix tickets
-  #32 to #36. #32 (sticky bar) is done and on the Pi. Remaining: fix #33 to #36, review `/`,
+  #32 to #36. #32 (sticky bar) and #33 (Past the end) are done and on the Pi. Remaining: fix
+  #34 to #36, review `/`,
   move the shared CSS to one served file, re-run the document pass. Refinement only.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
@@ -134,7 +135,11 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   the Pi. Checked at 390 px on a dry-run replay: the bar pins to the bottom on a short and a
   tall viewport. Checked on the real iPad 2026-09-20: the bar holds while scrolling, Resume
   sits in the mode box, Stop test answers in place.
-- **Next in the design work:** fix #33 to #36, critique `/`, then move the shared CSS to one
+- **#33 done.** The `/test` readout uses `jet_position`, not the clamped `jet`. Off the strip it
+  reads "Past the end". Dry-run replay of `crossing.jsonl`: `s=-0.18`, `-1.07`, `3.89` read
+  Past the end; `s=3.06` reads Jet 10. 131 tests pass on the laptop and the Pi. Not yet checked
+  with a real walker on jet 1.
+- **Next in the design work:** fix #34 to #36, critique `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
 - **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` a red
   "ALL OFF" in the same slot, both calling `/actions/all-off`. Renaming a safety button is not
@@ -142,8 +147,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state (2026-09-20, about 17:40):** the show runs in `--lights-only` with the #31 and
-  #32 fixes, PID 46752, started 17:38. Test mode is off, the cap is 40, lights-only is on. Nothing
+- **Pi state (2026-09-20, about 17:50):** the show runs in `--lights-only` with the #31 to
+  #33 fixes, PID 48696, started 17:49. Test mode is off, the cap is 40, lights-only is on. Nothing
   on the pages saves to disk, so any restart puts the profile back to the config defaults.
   Garrett's own `/test` opens are what put it in test mode earlier in the day.
 - **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while

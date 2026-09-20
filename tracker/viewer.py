@@ -472,7 +472,10 @@ async function enter(){try{const d=await api('/actions/test-mode',{enabled:true}
 async function start(){const jet=Number($('jet').value)-1,height=Number($('height').value);try{await api('/actions/test-jet',{jet,height});status('Holding jet '+(jet+1)+' at height '+height+'. Press Stop test.')}catch(e){status(e.message,true)}}
 async function stop(){try{const d=await api('/actions/all-off',{});showMode(true);status(d.all_zero?'Stopped. All 512 slots are zero.':'Stop could not be verified. Cut the 24 V.',!d.all_zero)}catch(e){status(e.message,true)}}
 async function resume(){try{const d=await api('/actions/test-mode',{enabled:false});showMode(false);status(d.all_zero===false?'Zero could not be verified. Cut the 24 V.':'Live show resumed. Water can move.',d.all_zero===false)}catch(e){status(e.message,true)}}
-async function poll(){try{const f=await api('/state');const t=(f.tracks||[]).filter(t=>t.confirmed);$('seen').textContent=t.length?t.map(x=>'Jet '+(x.jet+1)+' (s='+x.s.toFixed(2)+' m)').join(' · '):'Nobody tracked.'}catch(e){$('seen').textContent='LiDAR not available.'}setTimeout(poll,200)}
+// jet_position, not the clamped jet: someone past the end of the strip must not
+// read as the last jet. See run.py's console line for the same rule.
+function jetLabel(x){const p=x.jet_position,n=Number($('jet').max)||1;return p<-0.5||p>n-0.5?'Past the end':'Jet '+(Math.round(p)+1);}
+async function poll(){try{const f=await api('/state');const t=(f.tracks||[]).filter(t=>t.confirmed);$('seen').textContent=t.length?t.map(x=>jetLabel(x)+' (s='+x.s.toFixed(2)+' m)').join(' · '):'Nobody tracked.'}catch(e){$('seen').textContent='LiDAR not available.'}setTimeout(poll,200)}
 $('jet').oninput=()=>$('jet_out').textContent=$('jet').value;$('height').oninput=showHeight;
 async function limits(){try{const s=(await api('/settings-data')).profile.settings;$('jet').max=s.jet_count;$('height').min=s.height_min;$('height').max=s.height_max;if(Number($('height').value)<s.height_min)$('height').value=s.height_min;showHeight()}catch(e){}}
 $('start').onclick=start;$('stop').onclick=stop;$('resume').onclick=resume;

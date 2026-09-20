@@ -110,6 +110,16 @@ class TestSettingsMap(unittest.TestCase):
         self.assertNotIn("Leave test mode", page)
         self.assertIn(".bar { position:sticky; bottom:0;", page)
 
+    def test_test_page_reads_past_the_end_instead_of_a_clamped_jet(self):
+        # Issue #33: the readout uses jet_position, never the clamped jet, so a
+        # walker off the strip cannot read as the first or last jet.
+        with urlopen(self.base + "/test") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("p<-0.5||p>n-0.5?'Past the end':'Jet '+(Math.round(p)+1)", page)
+        self.assertNotIn("'Jet '+(x.jet+1)", page)
+        # #32 guard: the mode text lives in a span so Resume is never wiped.
+        self.assertNotIn("$('mode').textContent", page)
+
     def test_load_and_reset_stay_in_preview_until_apply(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")

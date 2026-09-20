@@ -363,7 +363,8 @@ height slider shows its DMX value and the matching centimetres (0.762 cm per uni
 
 `http://water-jets:8080/test` is the testing area. Opening it enters **test mode**: the output is
 zeroed and the live show stops sending. Tracking keeps running, so the page shows which jet the
-tracker thinks you are standing on (numbered from 1, like the settings map). Nothing a walker
+tracker thinks you are standing on (numbered from 1, like the settings map). Someone before the
+first jet or beyond the last reads **Past the end**, never a jet number. Nothing a walker
 does can put water up while test mode is on.
 
 **Start test** holds one selected jet at one selected height. Keep a hand on the 24 V switch.
