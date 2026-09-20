@@ -288,7 +288,6 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 /* On a phone the page is for the sliders and the stop. The map is the laptop's job. */
 @media (max-width:850px) {
   main { grid-template-columns:1fr; }
-  h1 { font-size:19px; }
   .map { position:relative; height:38vh; }
   .bar .status { flex-basis:100%; }
   .colour-control { grid-template-columns:1fr; justify-items:center; }

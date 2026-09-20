@@ -37,8 +37,9 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
   `PRODUCT.md` are committed. #24 and the five `/settings` fixes #26 to #30 are done (unlock
-  target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row), copied
-  to the Pi. Remaining: review `/test` and `/`, move the shared CSS to one served file, re-run
+  target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
+  files are on the Pi but **the running show still serves the old page** until it is restarted.
+  Remaining: review `/test` and `/`, move the shared CSS to one served file, re-run
   the document pass. Refinement only.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
@@ -105,10 +106,14 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   #30, all small edits in `tracker/viewer.py`, same look. The four P1s sit on the safety-limit
   unlock and on the phone layout. Decided: on a phone the map shrinks and the sliders and the
   stop get the room.
-- **#26 to #30 done** (see `DECISIONS.md`). Not checked by hand yet: tap the words "Unlock
-  this safety limit" on the phone (the box must tick), drag the hard maximum (Apply goes
-  amber), and pull the LiDAR USB with `/settings` open (the map empties, the status box goes
-  red). The header still wraps to two lines at 390 px; the title is too long for one row.
+- **#26 to #30 done, committed `cf96d38`** (see `DECISIONS.md`). The Pi has the files but the
+  show that was running (`--lights-only`, PID 30644) still serves the old page; restart it with
+  the `setsid nohup` line below. Not checked by hand yet: tap the words "Unlock this safety
+  limit" on the phone (the box must tick); tick Unlock, drag the hard maximum (Apply goes amber),
+  then drag Normal hill height and confirm the status still says "Applied." (live-apply must
+  survive #27); pull the LiDAR USB with `/settings` open (the map empties, the status box goes
+  red). The header still wraps to two lines at 390 px; the title and nav are too wide for one
+  row at any font size.
 - **Next in the design work:** critique `/test` and `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
 - **Pi state at close:** the show runs in `--lights-only`, restarted at about 15:50. About 6 s

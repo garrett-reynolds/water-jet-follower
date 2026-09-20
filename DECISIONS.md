@@ -963,9 +963,11 @@ poll runs ten times a second and would otherwise overwrite "Profile applied." be
 read. On a phone the map is 38 vh, the status takes its own row, and the three buttons share one
 row with ALL OFF bottom-right.
 
-**Open:** the ticket's 19 px `h1` does not keep the header on one line at 390 px; the title plus
-the two nav links need about 410 px. The header still wraps to 84 px. Two sliders still fit
-under the banner, which was the test, so it was left.
+**Ruled out:** the ticket's 19 px `h1` on a phone. No font size gets the header on one line at
+390 px: the header padding, the two nav links, and the 23-character title together need about
+410 px at any readable size. The lever is shorter copy or a smaller nav, both out of scope. The
+line was dropped so `DESIGN.md` stays true; the header wraps to 84 px on a phone and two sliders
+still fit under the banner, which was the test.
 
 **Ruled out:** setting `pending=true` for the hard maximum. See above.
 
