@@ -40,8 +40,8 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
   fixes are on the Pi, the show is restarted, and all five were checked by hand on the phone.
   `/test` scored 26/40 on 2026-09-20 (snapshot in `.impeccable/critique/`); five fix tickets
-  #32 to #36, sticky bar (#32) first. Remaining: fix #32 to #36, review `/`, move the shared
-  CSS to one served file, re-run the document pass. Refinement only.
+  #32 to #36. #32 (sticky bar) is done and on the Pi. Remaining: fix #33 to #36, review `/`,
+  move the shared CSS to one served file, re-run the document pass. Refinement only.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
 software tests. Issue #21 still needs its low-water bench check. Idle water defaults to off.
@@ -127,19 +127,22 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   apart on a phone. Three P1s: the readout leads with the clamped jet number; no "jet held"
   state and lost tracks look live; Resume is a one-way door. One P2: the readout wraps and
   jitters. Tickets #32 to #36, all small edits in `tracker/viewer.py`. See `DECISIONS.md`.
-- **Next in the design work:** fix #32 to #36 (sticky bar first), critique `/`, then move the
-  shared CSS to one served file, then `/impeccable document`.
-- **Two docs disagree until #32 lands:** `DECISIONS.md` says the Stop Never Scrolls Rule is
-  for every paper page; `DESIGN.md` Layout still scopes the bar to the settings column. #32
-  carries the `DESIGN.md` edit.
-- **Not ticketed, Garrett's call:** after #32, `/test` has a red "Stop test" and `/settings`
-  a red "ALL OFF" in the same slot, both calling `/actions/all-off`. Renaming a safety button
-  is not a refinement.
+- **#32 done.** `/test` ends in the same sticky bar as `/settings`: status on the left, Stop
+  test bottom-right. Resume live show moved into the yellow test-mode box at the top; the
+  Leave test mode section is gone. `DESIGN.md` Layout and the Stop Never Scrolls Rule now name
+  the page's stop, not ALL OFF, so it matches `DECISIONS.md`. 130 tests pass on the laptop and
+  the Pi. Checked at 390 px on a dry-run replay: the bar pins to the bottom on a short and a
+  tall viewport. **Not yet checked on the iPad.**
+- **Next in the design work:** fix #33 to #36, critique `/`, then move the shared CSS to one
+  served file, then `/impeccable document`.
+- **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` a red
+  "ALL OFF" in the same slot, both calling `/actions/all-off`. Renaming a safety button is not
+  a refinement.
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state at close (2026-09-20, about 17:10):** the show runs in `--lights-only` with the
-  #31 fix, PID 38048, started 16:50. Test mode is off, the cap is 40, lights-only is on. Nothing
+- **Pi state (2026-09-20, about 17:40):** the show runs in `--lights-only` with the #31 and
+  #32 fixes, PID 46752, started 17:38. Test mode is off, the cap is 40, lights-only is on. Nothing
   on the pages saves to disk, so any restart puts the profile back to the config defaults.
   Garrett's own `/test` opens are what put it in test mode earlier in the day.
 - **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while

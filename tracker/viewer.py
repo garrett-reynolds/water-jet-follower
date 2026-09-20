@@ -420,20 +420,28 @@ TEST_PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Water jet test</title>
 <style>""" + SHARED_CSS + r"""
-main { max-width:640px; margin:0 auto; padding:18px; }
+main { max-width:640px; margin:0 auto; padding:18px 18px 0; min-height:calc(100vh - 62px);
+  display:flex; flex-direction:column; }
 label.slider output { font-size:20px; }
 button { padding:12px 14px; min-height:48px; }
-#mode { padding:12px; border-radius:4px; font-weight:650; margin:0 0 14px; }
+#mode { padding:12px; border-radius:4px; font-weight:650; margin:0 0 14px;
+  display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 #mode.on { background:var(--warn); border:1px solid var(--warn-line); }
 #mode.off { background:var(--bad); color:var(--bad-ink); border:1px solid #e9b8b0; }
-#status { margin:0 0 14px; }
+#mode .text { flex:1 1 200px; }
+#resume[hidden] { display:none; }
+/* The stop button and the status line never leave the screen, same as the
+   settings bar. A stop you have to scroll to is not a stop. */
+.bar { position:sticky; bottom:0; margin-top:auto; padding:10px 0 14px; display:flex; gap:8px;
+  align-items:center; flex-wrap:wrap; background:var(--paper); border-top:1px solid var(--line); }
+.bar .status { flex:1 1 120px; min-width:0; }
+.bar button { flex:0 0 auto; }
 #seen { font-size:22px; font-weight:650; }
 .warn { margin:0 0 12px; }
 </style></head><body>
 <header><h1>Water jet test</h1><nav><a href="/settings">Settings</a><a href="/">Live viewer</a></nav></header>
 <main>
-  <div id="mode" class="off">Entering test mode.</div>
-  <div id="status" class="status" aria-live="polite">Loading.</div>
+  <div id="mode" class="off"><span id="mode-text" class="text">Entering test mode.</span><button id="resume" hidden>Resume live show</button></div>
   <section><h2>Where the tracker sees you</h2>
     <div id="seen">Nobody tracked.</div>
     <p class="note">Jet numbers count from 1, the same as the settings map. Stand on a jet and check the number matches. Tracking stays on in test mode; only the water and lights are off.</p>
@@ -446,19 +454,18 @@ button { padding:12px 14px; min-height:48px; }
     </div>
     <div class="actions" style="margin-top:12px">
       <button id="start" class="primary">Start test</button>
-      <button id="stop" class="danger">Stop test</button>
     </div>
   </section>
-  <section><h2>Leave test mode</h2>
-    <p class="note">Everything is zeroed first. Then the live show follows people again and water moves.</p>
-    <div class="actions"><button id="resume">Resume live show</button></div>
-  </section>
+  <div class="bar" id="bar">
+    <div id="status" class="status" aria-live="polite">Loading.</div>
+    <button id="stop" class="danger">Stop test</button>
+  </div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
-function showMode(on){$('mode').className=on?'on':'off';$('mode').textContent=on?'TEST MODE. The live show is not sending.':'LIVE. The show is sending. Water can move.';}
+function showMode(on){$('mode').className=on?'on':'off';$('mode-text').textContent=on?'TEST MODE. The live show is not sending.':'LIVE. The show is sending. Water can move.';$('resume').hidden=!on;}
 // 0.762 cm per DMX unit, measured; see config.py
 function showHeight(){const v=$('height').value;$('height_out').textContent=v;$('height_out').insertAdjacentHTML('beforeend',' <small>'+(v*0.762).toFixed(1)+' cm</small>');}
 async function enter(){try{const d=await api('/actions/test-mode',{enabled:true});showMode(true);status(d.all_zero===false?'Test mode is on but zero could not be verified. Cut the 24 V.':'Test mode is on. All 512 slots are zero.',d.all_zero===false)}catch(e){status(e.message,true)}}

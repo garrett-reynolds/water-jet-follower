@@ -367,10 +367,13 @@ tracker thinks you are standing on (numbered from 1, like the settings map). Not
 does can put water up while test mode is on.
 
 **Start test** holds one selected jet at one selected height. Keep a hand on the 24 V switch.
-**Stop test** sends zero and verifies that all 512 DMX slots are zero. A jet test is rejected
-outside test mode and while lights-only mode is on. **Resume live show** zeroes first, then hands
-the output back to the show. Closing the page does *not* resume the show; only that button does,
-so a dropped tablet cannot restart the water. The console line reads `TEST` while test mode is on.
+**Stop test** sends zero and verifies that all 512 DMX slots are zero. It sits with the status
+line in a bar stuck to the bottom of the screen, the same as ALL OFF on the settings page, so
+the stop and its answer never scroll apart. A jet test is rejected outside test mode and while
+lights-only mode is on. **Resume live show** sits in the yellow test-mode box at the top, away
+from the stop. It zeroes first, then hands the output back to the show. Closing the page does
+*not* resume the show; only that button does, so a dropped tablet cannot restart the water. The
+console line reads `TEST` while test mode is on.
 
 ### The height cap
 

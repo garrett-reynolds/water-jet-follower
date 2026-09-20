@@ -95,6 +95,21 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn("$('jet').max=s.jet_count", page)
         self.assertIn("$('height').max=s.height_max", page)
 
+    def test_test_page_keeps_stop_and_status_in_a_sticky_bar(self):
+        # Issue #32: the stop and its answer never scroll apart. Resume lives
+        # in the mode box, not next to the stop, so the two are never confused.
+        with urlopen(self.base + "/test") as response:
+            page = response.read().decode("utf-8")
+        bar = page[page.index('<div class="bar" id="bar">'):page.index("</main>")]
+        self.assertIn('id="status"', bar)
+        self.assertIn('id="stop" class="danger">Stop test', bar)
+        self.assertNotIn('id="resume"', bar)
+        self.assertIn('<span id="mode-text" class="text">', page)
+        self.assertIn('<button id="resume" hidden>', page)
+        self.assertIn("$('resume').hidden=!on;", page)
+        self.assertNotIn("Leave test mode", page)
+        self.assertIn(".bar { position:sticky; bottom:0;", page)
+
     def test_load_and_reset_stay_in_preview_until_apply(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")

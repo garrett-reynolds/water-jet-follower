@@ -237,14 +237,14 @@ A muted teal family on pale mint paper, with a small set of loud signal colours 
 Two column widths, one bar.
 
 - **Settings page:** a two-column grid, map on the left (`minmax(360px, 1.35fr)`), controls on the right (`minmax(340px, 1fr)`), filling the viewport below a 62 px header. The map is sticky at full remaining height. Under 850 px it stacks: map on top at 38 vh, controls below. On a phone the page is for the sliders and the stop; the map is the laptop's job.
-- **Test page:** one column, max 640 px, centred, 18 px padding.
+- **Test page:** one column, max 640 px, centred, 18 px padding, filling the viewport below the header so the bar sits at the bottom even when the page is short. Resume live show lives inside the yellow test-mode box at the top, never next to the stop.
 - **Live viewer:** a full-bleed canvas with fixed overlays pinned to corners at 8 px (HUD top-left, readout top-right, nav bottom-right at 12 px). Under 600 px the HUD drops below the readout.
 - **Inside sections:** a two-column control grid (`repeat(2, minmax(0, 1fr))`, gap 10 px by 14 px). Sliders span both columns. Jet chips use `auto-fill, minmax(96px, 1fr)` at 6 px gaps.
 - **Rhythm:** 4 / 6 / 8 / 10 / 12 / 14 / 16 / 18 / 22 px. Section padding 16 px; sections stack at 14 px; controls stack at 18 px; header padding 12 px by 22 px.
-- **The bar:** status, Lights only, Apply profile, and ALL OFF sit in one row in a bar stuck to the bottom of the controls column, with the test-mode banner above it. Under 850 px the status takes its own row and the three buttons share one row, ALL OFF bottom-right. It has a top rule in Line and the page's Paper fill so it reads as part of the page, not a toast.
+- **The bar:** every paper page ends in a bar stuck to the bottom of its column: the status line on the left, the page's stop (ALL OFF or Stop test) bottom-right in Danger, and any page-level actions between them. On the settings page that is status, Lights only, Apply profile, ALL OFF, with the test-mode banner above; under 850 px the status takes its own row and the three buttons share one row. On the test page it is status and Stop test. It has a top rule in Line and the page's Paper fill so it reads as part of the page, not a toast.
 
 ### Named Rules
-**The Stop Never Scrolls Rule.** ALL OFF and the status line are always in the viewport. A stop you have to scroll to is not a stop.
+**The Stop Never Scrolls Rule.** On every page, the stop button (ALL OFF, Stop test) and the status line are always in the viewport. A stop you have to scroll to is not a stop, and a stop whose answer you cannot see is not verified.
 
 ## Elevation & Depth
 
@@ -306,7 +306,7 @@ The x / y / jet block on the viewer: `#000e` fill, white Display type, 2 px Scop
 
 ### Do:
 - **Do** keep every control at 40 px tall or more, sliders at 44 px. Wet hands miss small targets.
-- **Do** keep ALL OFF and the status box in a sticky bottom bar. Never let them scroll away.
+- **Do** keep the page's stop button and the status box in a sticky bottom bar, on every page. Never let them scroll away.
 - **Do** use Amber only for "look here": focus, pending Apply, selected point.
 - **Do** put one primary button per page. Everything else is plain.
 - **Do** use borders and washes for depth. No shadows.
