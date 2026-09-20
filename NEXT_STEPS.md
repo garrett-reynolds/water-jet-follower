@@ -129,6 +129,12 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   jitters. Tickets #32 to #36, all small edits in `tracker/viewer.py`. See `DECISIONS.md`.
 - **Next in the design work:** fix #32 to #36 (sticky bar first), critique `/`, then move the
   shared CSS to one served file, then `/impeccable document`.
+- **Two docs disagree until #32 lands:** `DECISIONS.md` says the Stop Never Scrolls Rule is
+  for every paper page; `DESIGN.md` Layout still scopes the bar to the settings column. #32
+  carries the `DESIGN.md` edit.
+- **Not ticketed, Garrett's call:** after #32, `/test` has a red "Stop test" and `/settings`
+  a red "ALL OFF" in the same slot, both calling `/actions/all-off`. Renaming a safety button
+  is not a refinement.
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
