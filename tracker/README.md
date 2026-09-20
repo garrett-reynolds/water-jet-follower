@@ -400,6 +400,11 @@ That path was tested on hardware with a real LED.
 SIGKILLed.** All three were tested and the modules held their value. The only stop that
 covers those is the switch on the 24 V supply. Keep a hand on it.
 
+**If the LiDAR USB comes out, `show` keeps running.** It zeroes the water once, stops the
+watchdog beat, and every page says "LiDAR not available" until the plug is back. Then it
+reconnects and tracks again. Proven on the Pi 2026-09-20. `record`, `live`, and `check` do not
+do this; they fail loudly, which is what you want from a recording.
+
 ### Aiming it at the real strip
 
 `config.py` holds ten measured LiDAR x/y control-path points for the bench profile. The settings

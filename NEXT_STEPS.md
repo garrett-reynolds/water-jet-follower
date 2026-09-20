@@ -113,11 +113,15 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   then drag Normal hill height and confirm the status still says "Applied." (live-apply must
   survive #27). The header still wraps to two lines at 390 px; the title and nav are too wide for
   one row at any font size.
-- **Pulling the LiDAR USB kills the show.** Found while checking #28: the whole process exits
-  (outputs zeroed first), so the pages die with it. Filed as **#31**. The #28 check cannot be
-  done by pulling the plug until #31 is fixed; stop the show over SSH instead. Show restarted
-  at 16:37, lights-only, serving the new page. It was mystery-free this time: the earlier
-  "something opened /test" was Garrett.
+- **#31 done, committed `3814bd8`.** Pulling the LiDAR USB used to exit the whole process.
+  Now the show zeroes once, shows "LiDAR not available" on every page, and reconnects when the
+  plug goes back. Garrett pulled the plug on the Pi and it came back; the log shows one zero,
+  five failed attempts, then "lidar: back". This is also the #28 check, done. Show running
+  lights-only (PID 38048) with the fix; the cap is back at 40 and test mode is off after the
+  restart.
+- **Pi folders `~/tracker` and `~/tracker/tests` were `r-x`**, so a new file could not be
+  copied in. Fixed with `chmod u+w` on both (owner is `pi`, no sudo). Existing files always
+  copied fine, which is why it was never noticed.
 - **Next in the design work:** critique `/test` and `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
 - **Pi state at close:** the show runs in `--lights-only`, restarted at about 15:50. About 6 s

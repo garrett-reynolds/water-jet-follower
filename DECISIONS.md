@@ -949,6 +949,28 @@ sliders and the stop get the room. The map is the laptop's job. Tickets #29 and 
 **Decided:** all five review findings (#26 to #30) are filed and will be fixed. The four P1s all
 sit on the safety limit or on the phone, which is where Garrett stands wet.
 
+## [2026-09-20] The show survives the LiDAR plug coming out
+
+Garrett pulled the LiDAR USB while checking #28. `pyrplidar` raised a `SerialException`, nothing
+caught it, and the whole process exited, web pages included. `dmx.safe_output` did zero the
+line on the way out, so the failure was safe, but the installation was gone until a hand
+restart over SSH. Issue #31.
+
+**Decided:** `show` wraps the sensor in `_reconnecting_scans` (`tracker/run.py`). On a fault it
+yields `(time, None)` once per connect attempt. The show loop zeroes the water **once**, serves a
+dead frame so `/state` answers 503 and every page shows "LiDAR not available", and stops beating
+the watchdog on purpose: blind means the contactor (#17) should drop. Connect retries back off
+1, 2, 4, 8, then 10 s, without limit. On return the tracker is rebuilt, because the old tracks
+are stale after the gap. Proven on the Pi 2026-09-20: same PID before and after, one zero sent,
+five failed attempts, then "lidar: back".
+
+**Ruled out:** retrying inside `Lidar.scans()`. A silent stall would pad a `record` clip against
+its `--seconds` budget and quietly corrupt a baseline; `check` should fail loudly. Only `show`
+wraps. Also ruled out: beating the watchdog while blind.
+
+**Note for #28:** the pages now stay up during a plug pull, so the map goes dead through the
+503, not through a failed fetch. Both paths use the same `catch` in `pollState`.
+
 ## [2026-09-20] The five `/settings` review fixes, #26 to #30
 
 All five were small edits in `tracker/viewer.py`, same look. Checked with headless Chrome at
