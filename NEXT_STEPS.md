@@ -123,11 +123,10 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   copied fine, which is why it was never noticed.
 - **Next in the design work:** critique `/test` and `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
-- **Pi state at close:** the show runs in `--lights-only`, restarted at about 15:50. About 6 s
-  after that restart something opened `/test` and put it in **test mode**; it was left there.
-  Press **Resume live show** on `http://water-jets.local:8080/settings` before the next run.
-  The restart also reset every page edit: nothing on the pages saves to disk, so the profile
-  is back to the config defaults.
+- **Pi state at close (2026-09-20, about 17:10):** the show runs in `--lights-only` with the
+  #31 fix, PID 38048, started 16:50. Test mode is off, the cap is 40, lights-only is on. Nothing
+  on the pages saves to disk, so any restart puts the profile back to the config defaults.
+  Garrett's own `/test` opens are what put it in test mode earlier in the day.
 - **Two eyeball checks still open on the iPad:** the bottom bar stays put while scrolling, and
   a ticked jet tile turns green (chips render checked on load; toggling was not exercised).
 - **Loose files in the tree, not committed:** `bom/` holds ROM Raptors estimate spreadsheets
