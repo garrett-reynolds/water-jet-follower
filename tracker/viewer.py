@@ -34,7 +34,8 @@ class State:
 
 
 PAGE = """<!doctype html>
-<html><head><meta charset="utf-8"><title>water-jet tracker</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>water-jet tracker</title>
 <style>
   body { margin:0; background:#111; color:#ddd; font:13px/1.4 monospace; }
   #hud { position:fixed; top:8px; left:8px; background:#000a; padding:8px 10px;
@@ -42,13 +43,22 @@ PAGE = """<!doctype html>
   #position { position:fixed; top:8px; right:8px; background:#000e; color:#fff;
               padding:10px 16px; border:2px solid #0f6; font:bold 48px/1.15 monospace;
               white-space:pre; text-align:right; }
+  /* The big readout is the thing people read from across the room, so a dead
+     link must look dead. Stale numbers would pass for live ones. */
+  #position.stale { color:#666; border-color:#f44; }
   canvas { display:block; }
-  #settings-link { position:fixed; right:12px; bottom:12px; color:#fff;
-    background:#126b72; padding:10px 14px; text-decoration:none; border-radius:4px; }
+  nav { position:fixed; right:12px; bottom:12px; display:flex; gap:8px; }
+  nav a { color:#fff; background:#126b72; padding:10px 14px; text-decoration:none;
+          border-radius:4px; }
+  nav a:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; }
+  @media (max-width:600px) {
+    #position { font-size:32px; }
+    #hud { top:148px; max-width:calc(100vw - 16px); overflow:hidden; text-overflow:ellipsis; }
+  }
 </style></head><body>
 <div id="hud">connecting...</div>
 <div id="position">x=--\ny=--\njet=--</div>
-<a id="settings-link" href="/settings">Settings</a>
+<nav><a href="/test">Test jets</a><a id="settings-link" href="/settings">Settings</a></nav>
 <canvas id="c"></canvas>
 <script>
 let CFG = null, FRAME = null;
@@ -111,14 +121,11 @@ function draw() {
     const up = CFG.height_max > 0 ? Math.min(1, h / CFG.height_max) : 0;
     dot(ctx, t, x, y, 2.5 + 9 * up, up > 0 ? '#4cf' : '#2a6');
     if (h > 0) {
-      ctx.fillStyle = '#9ef'; ctx.font = '10px system-ui';
+      ctx.fillStyle = '#9ef'; ctx.font = '10px monospace';
       ctx.fillText(h, t.sx(x) - 6, t.sy(y) - 14);
     }
   }
   const peak = H.length ? Math.max.apply(null, H) : 0;
-  ctx.fillStyle = peak > 0 ? '#4cf' : '#666'; ctx.font = '13px system-ui';
-  ctx.fillText('tallest jet ' + peak + ' / ' + CFG.height_max
-               + '  (' + (peak * 0.762).toFixed(1) + ' cm)', 12, 22);
 
   // the LiDAR itself
   dot(ctx, t, 0, 0, 6, '#ff0');
@@ -148,6 +155,9 @@ function draw() {
   }
 
   const lines = [
+    // 0.762 cm per DMX unit, measured; see config.py
+    'tallest jet ' + peak + ' / ' + CFG.height_max
+      + '  (' + (peak * 0.762).toFixed(1) + ' cm)',
     'scan rate   ' + FRAME.hz.toFixed(2) + ' Hz',
     'points      ' + (FRAME.fg.length + FRAME.bg.length) +
       '  (' + FRAME.fg.length + ' moving)',
@@ -166,7 +176,9 @@ function draw() {
   }
   document.getElementById('hud').textContent = lines.join('\\n');
   const person = FRAME.tracks.find(k => k.seen) || FRAME.tracks[0];
-  document.getElementById('position').textContent = person
+  const position = document.getElementById('position');
+  position.className = '';
+  position.textContent = person
     ? 'x=' + person.x.toFixed(2) + '\\ny=' + person.y.toFixed(2)
       + '\\njet=' + person.jet
     : 'x=--\\ny=--\\njet=--';
@@ -179,6 +191,9 @@ async function poll() {
     draw();
   } catch (e) {
     document.getElementById('hud').textContent = 'lost the Pi: ' + e;
+    const position = document.getElementById('position');
+    position.className = 'stale';
+    position.textContent = 'x=--\\ny=--\\njet=--';
   }
   setTimeout(poll, 66);
 }
@@ -187,19 +202,57 @@ fit(); poll();
 """
 
 
-SETTINGS_PAGE = r"""<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>Water jet settings</title>
-<style>
+# The settings and test pages share one look. Keep the shared rules here so the
+# two pages cannot drift apart.
+SHARED_CSS = r"""
 :root { --ink:#16353a; --paper:#edf5f3; --panel:#fff; --water:#087e8b;
-  --light:#d9fff5; --danger:#b9382f; --line:#b7cbc8; --muted:#587276; }
+  --light:#d9fff5; --danger:#b9382f; --line:#b7cbc8; --muted:#587276;
+  --warn:#fff3d6; --warn-line:#e6c77a; --bad:#ffe4df; --bad-ink:#7d211b; }
 * { box-sizing:border-box; }
+html { scrollbar-color:#789b9c var(--paper); }
 body { margin:0; color:var(--ink); background:var(--paper);
   font:15px/1.35 "Segoe UI", Arial, sans-serif; }
+::selection { background:var(--water); color:white; }
 header { display:flex; align-items:center; justify-content:space-between; gap:16px;
-  padding:16px 22px; background:var(--ink); color:white; }
+  padding:12px 22px; min-height:62px; background:var(--ink); color:white; }
 h1 { margin:0; font-size:22px; font-weight:650; }
-header a { color:var(--light); }
+header nav { display:flex; gap:6px; white-space:nowrap; }
+header nav a { color:var(--light); text-decoration:none; padding:8px 12px;
+  border:1px solid #3e686c; border-radius:4px; }
+header nav a:hover { background:#123f45; }
+section { background:var(--panel); border:1px solid var(--line); margin:0 0 14px;
+  padding:16px; border-radius:6px; }
+h2 { font-size:17px; margin:0 0 12px; }
+.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
+label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
+input, button, select { font:inherit; }
+select { padding:8px; border:1px solid var(--line); border-radius:4px; background:white; color:var(--ink); }
+label.slider { grid-column:1 / -1; }
+label.slider > span:first-child { display:flex; justify-content:space-between; gap:12px; color:var(--ink); font-size:14px; }
+label.slider output { font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; }
+label.slider output small { font-weight:400; font-size:13px; color:var(--muted); }
+input[type=range] { width:100%; height:44px; margin:0; accent-color:var(--water); touch-action:pan-y; }
+input[type=checkbox] { width:20px; height:20px; margin:0 6px 0 0; accent-color:var(--water); vertical-align:-5px; }
+button, .file { border:1px solid #789b9c; background:white; color:var(--ink);
+  border-radius:4px; padding:8px 11px; min-height:40px; cursor:pointer; }
+.file { display:inline-flex; align-items:center; font-size:15px; }
+button:hover, .file:hover { background:#f2f8f7; }
+button.primary { background:var(--water); border-color:var(--water); color:white; font-weight:650; }
+button.primary:hover { background:#06707c; }
+button.danger { background:var(--danger); border-color:var(--danger); color:white; font-weight:650; }
+button.danger:hover { background:#9e2f27; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; }
+.actions { display:flex; flex-wrap:wrap; gap:8px; }
+.note { color:var(--muted); font-size:13px; }
+.warn { color:var(--ink); background:var(--warn); border:1px solid var(--warn-line); border-radius:4px; padding:10px 12px; }
+.status { min-height:40px; padding:10px; background:#dce9e6; border-radius:4px; }
+.status.bad { background:var(--bad); color:var(--bad-ink); }
+"""
+
+SETTINGS_PAGE = r"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Water jet settings</title>
+<style>""" + SHARED_CSS + r"""
 main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr);
   min-height:calc(100vh - 62px); }
 .map { position:sticky; top:0; height:calc(100vh - 62px); background:#092f35; }
@@ -209,48 +262,42 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
   padding:6px; border:1px solid #3e686c; border-radius:5px; background:#08272ccc; color:#d7efeb; }
 .map-view button { min-width:38px; background:#123f45; border-color:#47777b; color:white; }
 #live-state { padding:0 5px; font-size:13px; }
-.controls { padding:18px; overflow:auto; }
-section { background:var(--panel); border:1px solid var(--line); margin:0 0 14px;
-  padding:16px; border-radius:6px; }
-h2 { font-size:17px; margin:0 0 12px; }
-.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
-label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
-input, button { font:inherit; }
-input[type=number] { width:100%; padding:8px; border:1px solid var(--line); border-radius:3px; }
-label.slider { grid-column:1 / -1; }
-label.slider > span:first-child { display:flex; justify-content:space-between; color:var(--ink); font-size:14px; }
-label.slider output { font-weight:650; font-variant-numeric:tabular-nums; }
-input[type=range] { width:100%; height:44px; margin:0; accent-color:var(--water); touch-action:pan-y; }
-button, .file { border:1px solid #789b9c; background:white; color:var(--ink);
-  border-radius:4px; padding:8px 11px; cursor:pointer; }
-button.primary { background:var(--water); border-color:var(--water); color:white; font-weight:650; }
-button.danger { border-color:var(--danger); color:var(--danger); font-weight:650; }
-button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; }
-.actions { display:flex; flex-wrap:wrap; gap:8px; }
-.lock { border-left:4px solid var(--danger); padding-left:10px; }
-.colour-control { display:grid; grid-template-columns:190px 1fr; gap:12px 16px; align-items:center; }
+.controls { padding:18px 18px 0; display:flex; flex-direction:column; }
+.lock { background:#fff6f4; border:1px solid #e9c2bd; border-radius:4px; padding:10px 12px; }
+.lock > span:last-child { color:var(--ink); }
+.colour-control { display:grid; grid-template-columns:180px minmax(0,1fr); gap:12px 16px; align-items:center; }
 #colour_wheel { width:180px; height:180px; display:block; touch-action:none; cursor:crosshair; }
-.colour-sliders { display:grid; gap:12px; }
-.jets { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
-.jet { border:1px solid var(--line); padding:7px; display:grid; gap:5px; border-radius:4px; }
-#test-banner { margin:0 0 12px; padding:10px; border-left:4px solid var(--danger); background:#fff3d6; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-#status { min-height:42px; padding:10px; background:#dce9e6; border-radius:4px; }
-#status.bad { background:#ffe4df; color:#7d211b; }
-.note { color:var(--muted); font-size:13px; }
-@media (max-width:850px) { main { grid-template-columns:1fr; } .map { position:relative; height:52vh; } }
+.colour-sliders { display:grid; gap:4px; }
+#swatch { height:36px; border:1px solid var(--line); border-radius:4px; }
+.jets { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:6px; }
+.jet label { display:flex; align-items:center; gap:4px; min-height:44px; padding:9px 10px;
+  border:1px solid var(--line); border-radius:4px; color:var(--ink); font-size:14px; cursor:pointer; }
+.jet label:has(input:checked) { background:var(--light); border-color:var(--water); }
+/* The stop button and the apply button never leave the screen. A stop you have
+   to scroll to is not a stop. */
+.bar { position:sticky; bottom:0; margin-top:auto; padding:10px 0 14px; display:grid; gap:8px;
+  background:var(--paper); border-top:1px solid var(--line); }
+.bar .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.bar .status { flex:1 1 220px; }
+.bar.pending #apply { outline:3px solid #f3b61f; outline-offset:2px; }
+#test-banner { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+#test-banner[hidden] { display:none; }
+@media (max-width:850px) {
+  main { grid-template-columns:1fr; }
+  .map { position:relative; height:52vh; }
+  .colour-control { grid-template-columns:1fr; justify-items:center; }
+  .colour-sliders { width:100%; }
+}
 </style></head><body>
-<header><h1>Water and light control</h1><nav><a href="/test">Test jets</a> · <a href="/">Live viewer</a></nav></header>
+<header><h1>Water and light control</h1><nav><a href="/test">Test jets</a><a href="/">Live viewer</a></nav></header>
 <main>
   <div class="map"><canvas id="path"></canvas><div class="map-view">
     <span id="live-state">LiDAR waiting</span><button id="zoom-out" aria-label="Zoom out">−</button>
     <button id="zoom-fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button>
   </div><div class="map-tools">
     <button id="add-point">Add point</button><button id="remove-point">Remove point</button>
-    <button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
   </div></div>
   <div class="controls">
-    <div id="test-banner" hidden>Test mode is on. The live show is not sending. <button id="resume-live">Resume live show</button></div>
-    <div id="status">Loading settings.</div>
     <section><h2>Water shape</h2><div class="grid">
       <label class="slider"><span>Jet count <output id="jet_count_out"></output></span><input id="jet_count" type="range" min="1" max="20" step="1"></label>
       <label class="slider"><span>Minimum active height <output id="height_min_out"></output></span><input id="height_min" type="range" min="1" max="255" step="1"></label>
@@ -266,8 +313,9 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
       <label>Set colour for<select id="colour_mode"><option value="base_colour">Base</option><option value="slow_colour">Slow person</option><option value="fast_colour">Fast person</option><option value="idle_colour">Idle animation</option></select></label>
       <div class="colour-control"><canvas id="colour_wheel" width="180" height="180" aria-label="Colour wheel"></canvas>
         <div class="colour-sliders">
-          <label>Colour level<input id="colour_value" type="range" min="0" max="255" value="255"></label>
-          <label>White level<input id="white_level" type="range" min="0" max="255" value="0"></label>
+          <label class="slider"><span>Colour level <output id="colour_value_out"></output></span><input id="colour_value" type="range" min="0" max="255" value="255"></label>
+          <label class="slider"><span>White level <output id="white_level_out"></output></span><input id="white_level" type="range" min="0" max="255" value="0"></label>
+          <div id="swatch" role="img" aria-label="The colour as chosen"></div>
         </div>
       </div>
       <div class="grid" style="margin-top:10px">
@@ -282,14 +330,17 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
       <label class="slider"><span>Idle water height <output id="idle_height_out"></output></span><input id="idle_height" type="range" min="1" max="255" step="1"></label>
     </div></section>
     <section><h2>Jet enable</h2><div class="jets" id="jets"></div></section>
-    <section><h2>Run controls</h2><div class="actions">
-      <button id="lights">Lights only: off</button>
-      <button id="all-off" class="danger">ALL OFF</button>
-    </div></section>
     <section><h2>Profile</h2><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile.</p>
-      <div class="actions"><button id="apply" class="primary">Apply profile</button>
+      <div class="actions"><button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
       <button id="save">Save JSON</button><label class="file">Load JSON<input id="load" type="file" accept="application/json" hidden></label></div>
     </section>
+    <div class="bar" id="bar">
+      <div id="test-banner" class="warn" hidden>Test mode is on. The live show is not sending. <button id="resume-live">Resume live show</button></div>
+      <div class="row"><div id="status" class="status" aria-live="polite">Loading settings.</div>
+        <button id="lights">Lights only: off</button>
+        <button id="apply" class="primary">Apply profile</button>
+        <button id="all-off" class="danger">ALL OFF</button></div>
+    </div>
   </div>
 </main>
 <script>
@@ -297,20 +348,23 @@ let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging
 let zoom=1, viewCentre=null;
 const $=id=>document.getElementById(id);
 const fields=['jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed','idle_brightness','idle_seconds','idle_height'];
-function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'bad':'';}
+const heights=['height_min','hill_peak','height_max','idle_height'];
+function cm(dmx){return (dmx*0.762).toFixed(1)} // 0.762 cm per DMX unit, measured; see config.py
+function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
 function copy(v){return JSON.parse(JSON.stringify(v));}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
 let wheelHue=0,wheelSat=0,wheelDrag=false;
 function hsvToRgb(h,s,v){const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);const a=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i%6];return a.map(x=>Math.round(x*255));}
 function rgbToHsv(c){const r=c[0]/255,g=c[1]/255,b=c[2]/255,m=Math.max(r,g,b),n=Math.min(r,g,b),d=m-n;let h=0;if(d){if(m===r)h=((g-b)/d)%6;else if(m===g)h=(b-r)/d+2;else h=(r-g)/d+4;h=(h/6+1)%1}return [h,m?d/m:0,m];}
 function drawColourWheel(){const c=$('colour_wheel'),x=c.getContext('2d'),r=c.width/2,img=x.createImageData(c.width,c.height);for(let py=0;py<c.height;py++)for(let px=0;px<c.width;px++){const dx=px-r,dy=py-r,d=Math.hypot(dx,dy),i=(py*c.width+px)*4;if(d<=r){const rgb=hsvToRgb((Math.atan2(dy,dx)/(2*Math.PI)+1)%1,d/r,1);img.data.set([...rgb,255],i)}}x.putImageData(img,0,0);const a=wheelHue*2*Math.PI,rr=wheelSat*r;x.strokeStyle='white';x.lineWidth=3;x.beginPath();x.arc(r+Math.cos(a)*rr,r+Math.sin(a)*rr,6,0,2*Math.PI);x.stroke();x.strokeStyle='#092f35';x.lineWidth=1;x.stroke();}
+function swatch(){const rgb=hsvToRgb(wheelHue,wheelSat,Number($('colour_value').value)/255),w=Number($('white_level').value)/255;$('swatch').style.background='rgb('+rgb.map(x=>Math.round(x+(255-x)*w)).join(',')+')';}
 function setWheel(e){const c=$('colour_wheel'),b=c.getBoundingClientRect(),r=c.width/2,dx=(e.clientX-b.left)*c.width/b.width-r,dy=(e.clientY-b.top)*c.height/b.height-r;wheelHue=(Math.atan2(dy,dx)/(2*Math.PI)+1)%1;wheelSat=Math.min(1,Math.hypot(dx,dy)/r);drawColourWheel();dirty();}
 function saveColour(){const rgb=hsvToRgb(wheelHue,wheelSat,Number($('colour_value').value)/255);profile.settings[colourMode]=[...rgb,Number($('white_level').value)];}
-function fillColour(){const c=profile.settings[colourMode],hsv=rgbToHsv(c);wheelHue=hsv[0];wheelSat=hsv[1];$('colour_mode').value=colourMode;$('colour_value').value=Math.round(hsv[2]*255);$('white_level').value=c[3];drawColourWheel();}
+function fillColour(){const c=profile.settings[colourMode],hsv=rgbToHsv(c);wheelHue=hsv[0];wheelSat=hsv[1];$('colour_mode').value=colourMode;$('colour_value').value=Math.round(hsv[2]*255);$('white_level').value=c[3];drawColourWheel();readouts();}
 function readForm(){const s=copy(profile.settings);saveColour();for(const n of fields)s[n]=Number($(n).value);s[colourMode]=profile.settings[colourMode];s.idle_water_animation=$('idle_water_animation').value;s.idle_colour_animation=$('idle_colour_animation').value;s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);profile.settings=s;return profile;}
-function readouts(){for(const n of fields){const o=$(n+'_out');if(o)o.textContent=$(n).value}}
-function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];readouts();$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('height_min').max=s.height_max;$('hill_peak').min=s.height_min;$('hill_peak').max=s.height_max;fillColour();buildJets();draw();status('Live. Edits apply as you make them.');}
-function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><span>Jet '+(i+1)+'</span><input type="checkbox" '+(on?'checked':'')+'></label></div>'));}
+function readouts(){for(const n of fields){const o=$(n+'_out'),v=$(n).value;if(!o)continue;o.textContent=v;if(heights.includes(n))o.insertAdjacentHTML('beforeend',' <small>'+cm(v)+' cm</small>')}$('colour_value_out').textContent=$('colour_value').value;$('white_level_out').textContent=$('white_level').value;swatch();}
+function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('height_min').max=s.height_max;$('hill_peak').min=s.height_min;$('hill_peak').max=s.height_max;fillColour();buildJets();$('bar').classList.toggle('pending',pending);draw();status('Edits apply as you make them.');}
+function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><input type="checkbox" '+(on?'checked':'')+'><span>Jet '+(i+1)+'</span></label></div>'));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
 function bounds(){const cx=viewCentre?viewCentre[0]:(roi.xmin+roi.xmax)/2,cy=viewCentre?viewCentre[1]:(roi.ymin+roi.ymax)/2,hw=(roi.xmax-roi.xmin)/zoom/2,hh=(roi.ymax-roi.ymin)/zoom/2;return {xmin:cx-hw,xmax:cx+hw,ymin:cy-hh,ymax:cy+hh};}
 function xy(p){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [pad+(p[0]-v.xmin)/(v.xmax-v.xmin)*w,pad+h-(p[1]-v.ymin)/(v.ymax-v.ymin)*h];}
@@ -320,8 +374,8 @@ function jetPoints(points,count){if(count===points.length)return points;const le
 function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);const v=bounds();ctx.strokeStyle='#17474d';ctx.lineWidth=1;for(let x=Math.ceil(v.xmin*2)/2;x<=v.xmax;x+=.5){const a=xy([x,v.ymin]),b=xy([x,v.ymax]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}for(let y=Math.ceil(v.ymin*2)/2;y<=v.ymax;y+=.5){const a=xy([v.xmin,y]),b=xy([v.xmax,y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}if(liveFrame){for(const p of liveFrame.bg||[])scanDot(ctx,p,1.3,'#527277');for(const p of liveFrame.fg||[])scanDot(ctx,p,2.2,'#45dce7');for(const t of liveFrame.tracks||[])scanDot(ctx,[t.x,t.y],t.confirmed?7:5,t.confirmed?'#f3b61f':'#92aaa8')}scanDot(ctx,[0,0],6,'#fff06a');const pts=profile.settings.strip_points;ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();jetPoints(profile.settings.strip_points,profile.settings.jet_count).forEach((p,i)=>{const q=xy(p);ctx.fillStyle='#45dce7';ctx.beginPath();ctx.arc(...q,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(String(i+1),q[0]+6,q[1]-6)});pts.forEach((p,i)=>{const q=xy(p);ctx.strokeStyle=i===selected?'#f3b61f':'#e9fffa';ctx.lineWidth=2;ctx.strokeRect(q[0]-6,q[1]-6,12,12)});}
 function nearest(x,y){let best=0,dist=Infinity;profile.settings.strip_points.forEach((p,i)=>{const q=xy(p),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<900?best:null;}
 let applyTimer=null,pending=false;
-function dirty(){readForm();draw();if(pending){status('Preview only. Press Apply profile to make it live.');return}clearTimeout(applyTimer);applyTimer=setTimeout(autoApply,250);}
-async function autoApply(){const p=copy(readForm());p.settings.height_max=original.settings.height_max;try{const r=await api('/settings/apply',{profile:p,unlock_height_max:false});original=copy(r);status(Number($('height_max').value)!==original.settings.height_max?'Live. Applied. The hard maximum still needs Apply profile.':'Live. Applied.')}catch(e){status(e.message+' Nothing changed.',true)}}
+function dirty(){readForm();readouts();draw();if(pending){status('Preview only. Press Apply profile to make it live.');return}clearTimeout(applyTimer);applyTimer=setTimeout(autoApply,250);}
+async function autoApply(){const p=copy(readForm());p.settings.height_max=original.settings.height_max;try{const r=await api('/settings/apply',{profile:p,unlock_height_max:false});original=copy(r);status(Number($('height_max').value)!==original.settings.height_max?'Applied. The hard maximum still needs Apply profile.':$('test-banner').hidden?'Applied.':'Applied. Test mode is on, so nothing is sent yet.')}catch(e){status(e.message+' Nothing changed.',true)}}
 async function apply(){clearTimeout(applyTimer);try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;pending=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
 function showTestMode(on){$('test-banner').hidden=!on;}
 async function init(){try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');showTestMode(data.test_mode);size();}catch(e){status(e.message,true)}}
@@ -352,54 +406,29 @@ canvas.onpointerup=()=>dragging=false;window.onresize=size;init();pollState();
 </script></body></html>"""
 
 TEST_PAGE = r"""<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Water jet test</title>
-<style>
-:root { --ink:#16353a; --paper:#edf5f3; --panel:#fff; --water:#087e8b;
-  --light:#d9fff5; --danger:#b9382f; --line:#b7cbc8; --muted:#587276; }
-* { box-sizing:border-box; }
-body { margin:0; color:var(--ink); background:var(--paper);
-  font:15px/1.35 "Segoe UI", Arial, sans-serif; }
-header { display:flex; align-items:center; justify-content:space-between; gap:16px;
-  padding:16px 22px; background:var(--ink); color:white; }
-h1 { margin:0; font-size:22px; font-weight:650; }
-header a { color:var(--light); }
+<style>""" + SHARED_CSS + r"""
 main { max-width:640px; margin:0 auto; padding:18px; }
-section { background:var(--panel); border:1px solid var(--line); margin:0 0 14px;
-  padding:16px; border-radius:6px; }
-h2 { font-size:17px; margin:0 0 12px; }
-.grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
-label { display:grid; gap:4px; color:var(--muted); font-size:13px; }
-input, button { font:inherit; }
-label.slider { grid-column:1 / -1; }
-label.slider > span:first-child { display:flex; justify-content:space-between; color:var(--ink); font-size:14px; }
-label.slider output { font-weight:650; font-size:20px; font-variant-numeric:tabular-nums; }
-input[type=range] { width:100%; height:44px; margin:0; accent-color:var(--water); touch-action:pan-y; }
-button { border:1px solid #789b9c; background:white; color:var(--ink);
-  border-radius:4px; padding:12px 14px; cursor:pointer; min-height:48px; }
-button.primary { background:var(--water); border-color:var(--water); color:white; font-weight:650; }
-button.danger { border-color:var(--danger); color:var(--danger); font-weight:650; }
-button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; }
-.actions { display:flex; flex-wrap:wrap; gap:8px; }
+label.slider output { font-size:20px; }
+button { padding:12px 14px; min-height:48px; }
 #mode { padding:12px; border-radius:4px; font-weight:650; margin:0 0 14px; }
-#mode.on { background:#fff3d6; border-left:4px solid var(--danger); }
-#mode.off { background:#ffe4df; color:#7d211b; }
-#status { min-height:42px; padding:10px; background:#dce9e6; border-radius:4px; margin:0 0 14px; }
-#status.bad { background:#ffe4df; color:#7d211b; }
+#mode.on { background:var(--warn); border:1px solid var(--warn-line); }
+#mode.off { background:var(--bad); color:var(--bad-ink); border:1px solid #e9b8b0; }
+#status { margin:0 0 14px; }
 #seen { font-size:22px; font-weight:650; }
-.note { color:var(--muted); font-size:13px; }
-.warning { border-left:4px solid var(--danger); padding-left:10px; }
+.warn { margin:0 0 12px; }
 </style></head><body>
-<header><h1>Water jet test</h1><nav><a href="/settings">Settings</a> · <a href="/">Live viewer</a></nav></header>
+<header><h1>Water jet test</h1><nav><a href="/settings">Settings</a><a href="/">Live viewer</a></nav></header>
 <main>
   <div id="mode" class="off">Entering test mode.</div>
-  <div id="status">Loading.</div>
+  <div id="status" class="status" aria-live="polite">Loading.</div>
   <section><h2>Where the tracker sees you</h2>
     <div id="seen">Nobody tracked.</div>
     <p class="note">Jet numbers count from 1, the same as the settings map. Stand on a jet and check the number matches. Tracking stays on in test mode; only the water and lights are off.</p>
   </section>
   <section><h2>Hold one jet</h2>
-    <p class="note warning">Holds one jet until you press Stop. Keep your hand on the 24 V switch.</p>
+    <p class="warn">Holds one jet until you press Stop. Keep your hand on the 24 V switch.</p>
     <div class="grid">
       <label class="slider"><span>Jet number <output id="jet_out">1</output></span><input id="jet" type="range" min="1" max="20" step="1" value="1"></label>
       <label class="slider"><span>Height (DMX) <output id="height_out">5</output></span><input id="height" type="range" min="1" max="40" step="1" value="5"></label>
@@ -416,18 +445,20 @@ button:focus-visible, input:focus-visible { outline:3px solid #f3b61f; outline-o
 </main>
 <script>
 const $=id=>document.getElementById(id);
-function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'bad':'';}
+function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
 function showMode(on){$('mode').className=on?'on':'off';$('mode').textContent=on?'TEST MODE. The live show is not sending.':'LIVE. The show is sending. Water can move.';}
+// 0.762 cm per DMX unit, measured; see config.py
+function showHeight(){const v=$('height').value;$('height_out').textContent=v;$('height_out').insertAdjacentHTML('beforeend',' <small>'+(v*0.762).toFixed(1)+' cm</small>');}
 async function enter(){try{const d=await api('/actions/test-mode',{enabled:true});showMode(true);status(d.all_zero===false?'Test mode is on but zero could not be verified. Cut the 24 V.':'Test mode is on. All 512 slots are zero.',d.all_zero===false)}catch(e){status(e.message,true)}}
 async function start(){const jet=Number($('jet').value)-1,height=Number($('height').value);try{await api('/actions/test-jet',{jet,height});status('Holding jet '+(jet+1)+' at height '+height+'. Press Stop test.')}catch(e){status(e.message,true)}}
 async function stop(){try{const d=await api('/actions/all-off',{});showMode(true);status(d.all_zero?'Stopped. All 512 slots are zero.':'Stop could not be verified. Cut the 24 V.',!d.all_zero)}catch(e){status(e.message,true)}}
 async function resume(){try{const d=await api('/actions/test-mode',{enabled:false});showMode(false);status(d.all_zero===false?'Zero could not be verified. Cut the 24 V.':'Live show resumed. Water can move.',d.all_zero===false)}catch(e){status(e.message,true)}}
 async function poll(){try{const f=await api('/state');const t=(f.tracks||[]).filter(t=>t.confirmed);$('seen').textContent=t.length?t.map(x=>'Jet '+(x.jet+1)+' (s='+x.s.toFixed(2)+' m)').join(' · '):'Nobody tracked.'}catch(e){$('seen').textContent='LiDAR not available.'}setTimeout(poll,200)}
-$('jet').oninput=()=>$('jet_out').textContent=$('jet').value;$('height').oninput=()=>$('height_out').textContent=$('height').value;
-async function limits(){try{const s=(await api('/settings-data')).profile.settings;$('jet').max=s.jet_count;$('height').min=s.height_min;$('height').max=s.height_max;if(Number($('height').value)<s.height_min){$('height').value=s.height_min;$('height_out').textContent=s.height_min}}catch(e){}}
+$('jet').oninput=()=>$('jet_out').textContent=$('jet').value;$('height').oninput=showHeight;
+async function limits(){try{const s=(await api('/settings-data')).profile.settings;$('jet').max=s.jet_count;$('height').min=s.height_min;$('height').max=s.height_max;if(Number($('height').value)<s.height_min)$('height').value=s.height_min;showHeight()}catch(e){}}
 $('start').onclick=start;$('stop').onclick=stop;$('resume').onclick=resume;
-enter();limits();poll();
+enter();limits();showHeight();poll();
 </script></body></html>
 """
 

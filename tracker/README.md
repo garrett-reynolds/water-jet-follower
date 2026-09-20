@@ -353,9 +353,11 @@ the browser computer; **Load JSON** previews a saved profile before apply. The l
 the live LiDAR scan behind the editable path. Use the mouse wheel or the `−`, **Fit**, and `+`
 buttons to zoom around the selected path point.
 
-**ALL OFF** zeroes every slot *and halts the live show*. Without the halt, the next scan put the
-hill straight back and the button looked dead. The settings page shows a banner while the show
-is halted; press **Resume live show** to continue.
+**ALL OFF**, **Apply profile**, **Lights only**, and the status line sit in a bar that stays
+on screen however far the page is scrolled. **ALL OFF** zeroes every slot *and halts the live
+show*. Without the halt, the next scan put the hill straight back and the button looked dead.
+The bar shows a banner while the show is halted; press **Resume live show** to continue. Every
+height slider shows its DMX value and the matching centimetres (0.762 cm per unit).
 
 ### Test page
 

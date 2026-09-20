@@ -84,12 +84,35 @@ the two entries and `tracker/README.md` for the pages.
   maximum, Load JSON, and Reset defaults still wait for Apply profile. Every number field on
   both pages is now a slider with a readout, for the iPad.
 
+## UI pass 2026-09-20 (afternoon)
+
+A design review of the three pages, run against a dry-run replay on the laptop with headless
+Chrome at desktop and phone widths. Eight fixes, same look, deployed to the Pi, 123 tests pass.
+See `DECISIONS.md` ("The stop button never leaves the screen") and `tracker/README.md`.
+
+- **ALL OFF, Apply profile, Lights only, and the status line sit in a bar stuck to the bottom
+  of the screen.** The test-mode banner sits in the same bar. Undo applied and Reset defaults
+  moved from the map corner into the Profile box.
+- **Heights show DMX and cm** on both pages, using the measured 0.762 cm per unit.
+- **The live viewer** has a viewport tag, a Test jets link, the tallest-jet line in the stats
+  box (it was drawn under it), and a grey readout with dashes when the Pi drops.
+- Colour level and White level have readouts and a swatch. Header links are buttons.
+
+Left running when the session closed: the show in `--lights-only` (no water), started from
+the laptop at about 11:55 with the standard `setsid nohup` line below. The previous run was
+stopped by SIGTERM at 11:52:40 with the hard maximum at **156** (about 119 cm); on restart the
+cap read 40 again, so the unlocked value did not survive the restart.
+
+Still unverified: the pages in headless Chrome are not the iPad. Two things to eyeball on the
+real device: the bottom bar stays put while scrolling, and a ticked jet tile turns green.
+
 **Do first, next session:**
 
 1. **Prove test mode with a real walker.** Every check so far ran on a replay or an empty
    hallway. Walk, get a hill up, open `/test` on the iPad: the water must drop and stay down
    while walking, and the `show.log` line must read `TEST`. Also confirm `/settings` loads on
-   the iPad (the page scripts are only syntax-checked, not run in a browser).
+   the iPad and the bottom bar with ALL OFF stays on screen while scrolling (the pages were
+   only run in headless Chrome, not iPad Safari).
 2. **The first two jets did not react in the show** (issue #23). `show.log` proves height 29
    went to jet 0 and about 18 to jet 1 while Garrett stood at `s=-0.04`; manual tests at height
    5 worked. On `/test`: hold jet 1 at 30 and jet 2 at 18 (page numbering, from 1), then stand

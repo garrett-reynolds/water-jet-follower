@@ -887,3 +887,20 @@ validated profile the Apply button sends. Live-apply always sends the *applied* 
 the one safety limit still needs the unlock and a deliberate press. **Load JSON** and **Reset
 defaults** stay in preview until Apply, because both replace the whole profile at once. The undo
 stack is capped at 50 so a slider drag cannot grow it without bound.
+
+## [2026-09-20] The stop button never leaves the screen
+
+A UI pass over the three pages found **ALL OFF** last in a long scrolling column, out of sight
+on any laptop or phone. It also found the live viewer had no viewport tag (a phone shrank it to
+a desktop page), a "tallest jet" readout drawn under the stats box, and a big x/y/jet readout
+that kept its last numbers after the Pi dropped.
+
+**Decided:** the settings page keeps status, **Apply profile**, **Lights only**, and **ALL OFF**
+in a bar stuck to the bottom of the screen, with the test-mode banner above it, so the stop and
+the "preview, not live" state are always in view together. **Undo applied** and **Reset
+defaults** moved from the map corner into the Profile box, because they act on the profile, not
+the map. Heights show DMX and centimetres side by side using the measured 0.762 cm per unit.
+The viewer greys its readout and shows dashes when a poll fails, so stale numbers cannot pass
+for live ones. The look was kept; nothing here changes what the show sends.
+
+**Ruled out:** a redesign. The pages work on a bench and nobody asked for a new look.
