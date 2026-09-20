@@ -187,7 +187,9 @@ function draw() {
 async function poll() {
   try {
     if (!CFG) CFG = await (await fetch('/config')).json();
-    FRAME = await (await fetch('/state')).json();
+    const r = await fetch('/state');
+    if (!r.ok) throw Error((await r.json()).error || r.statusText);
+    FRAME = await r.json();
     draw();
   } catch (e) {
     document.getElementById('hud').textContent = 'lost the Pi: ' + e;
@@ -494,7 +496,13 @@ def make_handler(state, cfg, control=None):
 
         def do_GET(self):                       # noqa: N802 - http.server's name
             if self.path.startswith("/state"):
-                self._send(json.dumps(state.get()), "application/json")
+                frame = state.get()
+                if frame.get("lidar_ok") is False:
+                    # Dead looks dead: a failed poll is what every page already
+                    # handles, so the loss shows without the last frame lingering.
+                    self._json({"error": "LiDAR not available"}, 503)
+                else:
+                    self._send(json.dumps(frame), "application/json")
             elif self.path.startswith("/config"):
                 self._send(json.dumps({
                     "roi_x_min": cfg.roi_x_min, "roi_x_max": cfg.roi_x_max,

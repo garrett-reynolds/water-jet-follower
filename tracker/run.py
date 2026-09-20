@@ -33,6 +33,36 @@ def _lidar_source(cfg):
     return lidar, lidar.scans()
 
 
+def _reconnecting_scans(lidar, delays=(1.0, 2.0, 4.0, 8.0, 10.0)):
+    """Scans from `lidar` that survive the plug coming out (issue #31).
+
+    While the sensor is gone this yields (time, None) once per connect attempt, so
+    the caller can zero the water and show a dead map instead of holding the last
+    hill. Only `show` uses it: a stall in `record` would pad a clip, and `check`
+    should fail loudly. The same Lidar object is reused so the caller's close()
+    still means something.
+    """
+    while True:
+        try:
+            yield from lidar.scans()
+            error = "scan stream ended"
+        except Exception as exc:                # noqa: BLE001 - any fault on the serial path
+            error = exc
+        print(f"\nlidar: lost: {error}", file=sys.stderr)
+        lidar.close()
+        attempt = 0
+        while True:
+            yield time.time(), None
+            time.sleep(delays[min(attempt, len(delays) - 1)])
+            attempt += 1
+            try:
+                lidar.connect(attempts=1)
+                break
+            except Exception:                   # noqa: BLE001 - connect() already printed why
+                lidar.close()
+        print("lidar: back", file=sys.stderr)
+
+
 # --- subcommands --------------------------------------------------------
 
 def _send_with_heartbeat(send_frame, frame, heartbeat=None):
@@ -206,6 +236,13 @@ def cmd_jog(args):
     return 0
 
 
+def _dead_frame(timestamp, label):
+    """What the viewer serves while the sensor is gone: nothing, marked as such."""
+    return {"t": timestamp, "tracks": [], "clusters": [], "legs": [], "detections": [],
+            "fg": [], "bg": [], "hz": 0.0, "heights": [], "source": label,
+            "lidar_ok": False}
+
+
 def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
                heartbeat=None):
     """Track, build the wave, hand each frame to `send_frame`. The whole show.
@@ -229,8 +266,26 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
     last_print = time.time()
     last_sent = 0.0
     peak_height = 0
+    lidar_ok = True
     try:
         for timestamp, points in source:
+            if points is None:
+                # The sensor is gone (see _reconnecting_scans). The modules latch, so
+                # zero now, and do not beat the watchdog: blind means the contactor
+                # should drop. The dead frame makes /state answer 503 so every page
+                # shows the loss instead of the last walker.
+                if lidar_ok:
+                    lidar_ok = False
+                    zero_output()
+                    state.set(_dead_frame(timestamp, label))
+                    print("\nshow: LiDAR lost. Water zeroed; waiting for the sensor",
+                          file=sys.stderr)
+                continue
+            if not lidar_ok:
+                lidar_ok = True
+                tracker = Tracker(cfg)          # old tracks are stale after the gap
+                last_sent = 0.0
+                print("show: LiDAR back, tracking again", file=sys.stderr)
             if started is None:
                 started = time.time()
             foreground, background = geometry.to_world(points, cfg, baseline)
@@ -314,6 +369,7 @@ def cmd_show(args):
         lidar = None
     else:
         lidar, source = _lidar_source(cfg)
+        source = _reconnecting_scans(lidar)
         label = "lidar"
 
     mode = ("DRY RUN, no DMX" if args.dry_run
