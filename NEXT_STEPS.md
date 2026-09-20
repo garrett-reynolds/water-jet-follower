@@ -38,7 +38,7 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
   `PRODUCT.md` are committed. #24 and the five `/settings` fixes #26 to #30 are done (unlock
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
-  files are on the Pi but **the running show still serves the old page** until it is restarted.
+  fixes are on the Pi, the show is restarted, and all five were checked by hand on the phone.
   Remaining: review `/test` and `/`, move the shared CSS to one served file, re-run
   the document pass. Refinement only.
 
@@ -108,10 +108,9 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   stop get the room.
 - **#26 to #30 done, committed `cf96d38`** (see `DECISIONS.md`). The Pi has the files but the
   show that was running (`--lights-only`, PID 30644) still serves the old page; restart it with
-  the `setsid nohup` line below. Not checked by hand yet: tap the words "Unlock this safety
-  limit" on the phone (the box must tick); tick Unlock, drag the hard maximum (Apply goes amber),
-  then drag Normal hill height and confirm the status still says "Applied." (live-apply must
-  survive #27). The header still wraps to two lines at 390 px; the title and nav are too wide for
+  the `setsid nohup` line below. Checked by hand on the phone 2026-09-20: the unlock words tick
+  the box; the hard maximum turns Apply amber; a normal slider still live-applies with the cap
+  pending. The header still wraps to two lines at 390 px; the title and nav are too wide for
   one row at any font size.
 - **#31 done, committed `3814bd8`.** Pulling the LiDAR USB used to exit the whole process.
   Now the show zeroes once, shows "LiDAR not available" on every page, and reconnects when the
