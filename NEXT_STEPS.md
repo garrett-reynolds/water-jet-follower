@@ -144,7 +144,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   jet 7 at 30 (22.9 cm). Stop test to drop it."). Tracks with `seen:false` render Muted with
   "(lost)". 133 tests pass on the laptop and the Pi. Dry-run replay: held text and lost
   tracks both seen at 390 px. **The held half is not checked on the Pi:** `test_jet` refuses
-  while lights-only is on, so it needs a water session. The lost half can be checked any time.
+  while lights-only is on, so it needs a water session. The lost half was checked on the real
+  iPad 2026-09-20: stepping out of view turns the entry grey with (lost), then it vanishes.
 - **Next in the design work:** fix #35 and #36, critique `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
 - **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` a red
