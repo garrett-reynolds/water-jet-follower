@@ -211,7 +211,7 @@ A muted teal family on pale mint paper, with a small set of loud signal colours 
 
 **The Amber Means Look Rule.** Amber marks the thing that needs your eye next: focus, a pending Apply, a selected point. It is never a fill.
 
-**The Dead Looks Dead Rule.** When the link to the Pi drops, the readout turns Scope Dead and the border turns Scope Lost. Stale numbers must not pass for live ones.
+**The Dead Looks Dead Rule.** When the link to the Pi drops, the readout turns Scope Dead and the border turns Scope Lost, and the settings map wipes its scan and tracks and says so in the status box. Stale numbers and stale dots must not pass for live ones.
 
 ## Typography
 
@@ -236,12 +236,12 @@ A muted teal family on pale mint paper, with a small set of loud signal colours 
 
 Two column widths, one bar.
 
-- **Settings page:** a two-column grid, map on the left (`minmax(360px, 1.35fr)`), controls on the right (`minmax(340px, 1fr)`), filling the viewport below a 62 px header. The map is sticky at full remaining height. Under 850 px it stacks: map on top at 52 vh, controls below.
+- **Settings page:** a two-column grid, map on the left (`minmax(360px, 1.35fr)`), controls on the right (`minmax(340px, 1fr)`), filling the viewport below a 62 px header. The map is sticky at full remaining height. Under 850 px it stacks: map on top at 38 vh, controls below. On a phone the page is for the sliders and the stop; the map is the laptop's job.
 - **Test page:** one column, max 640 px, centred, 18 px padding.
 - **Live viewer:** a full-bleed canvas with fixed overlays pinned to corners at 8 px (HUD top-left, readout top-right, nav bottom-right at 12 px). Under 600 px the HUD drops below the readout.
 - **Inside sections:** a two-column control grid (`repeat(2, minmax(0, 1fr))`, gap 10 px by 14 px). Sliders span both columns. Jet chips use `auto-fill, minmax(96px, 1fr)` at 6 px gaps.
 - **Rhythm:** 4 / 6 / 8 / 10 / 12 / 14 / 16 / 18 / 22 px. Section padding 16 px; sections stack at 14 px; controls stack at 18 px; header padding 12 px by 22 px.
-- **The bar:** status, Lights only, Apply profile, and ALL OFF sit in one row in a bar stuck to the bottom of the controls column, with the test-mode banner above it. It has a top rule in Line and the page's Paper fill so it reads as part of the page, not a toast.
+- **The bar:** status, Lights only, Apply profile, and ALL OFF sit in one row in a bar stuck to the bottom of the controls column, with the test-mode banner above it. Under 850 px the status takes its own row and the three buttons share one row, ALL OFF bottom-right. It has a top rule in Line and the page's Paper fill so it reads as part of the page, not a toast.
 
 ### Named Rules
 **The Stop Never Scrolls Rule.** ALL OFF and the status line are always in the viewport. A stop you have to scroll to is not a stop.
@@ -271,7 +271,7 @@ Small, even corners. Buttons, selects, chips, inputs, status boxes, and banners 
 ### Slider (signature)
 - **Style:** a label row (name left, value right) above a full-width native range. The row is Ink at 14 px; the value is 650 weight with a Muted 13 px unit suffix.
 - **Track:** `accent-color` Water, 44 px tall, `touch-action: pan-y` so a thumb drag does not scroll the page.
-- **Locked variant:** Lock Wash fill, Lock Line border, 10 px by 12 px padding, disabled until its unlock checkbox is ticked.
+- **Locked variant:** Lock Wash fill, Lock Line border, 10 px by 12 px padding, disabled until its unlock checkbox is ticked. The unlock is its own 40 px label row inside the wash, not part of the slider label. While the cap differs from what is live, Apply is Pending.
 
 ### Jet chips
 - **Style:** a checkbox inside a bordered label, 44 px min-height, 4 px corners, Line border, Ink 14 px text.

@@ -263,8 +263,10 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 .map-view button { min-width:38px; background:#123f45; border-color:#47777b; color:white; }
 #live-state { padding:0 5px; font-size:13px; }
 .controls { padding:18px 18px 0; display:flex; flex-direction:column; }
-.lock { background:#fff6f4; border:1px solid #e9c2bd; border-radius:4px; padding:10px 12px; }
-.lock > span:last-child { color:var(--ink); }
+/* The unlock is the one control that can raise water above the cap. It gets its
+   own 40 px row, not a corner of the slider label, so wet hands can hit it. */
+.lock { grid-column:1 / -1; display:grid; gap:4px; background:#fff6f4; border:1px solid #e9c2bd; border-radius:4px; padding:10px 12px; }
+.lock .unlock { display:flex; align-items:center; min-height:40px; color:var(--ink); font-size:14px; cursor:pointer; }
 .colour-control { display:grid; grid-template-columns:180px minmax(0,1fr); gap:12px 16px; align-items:center; }
 #colour_wheel { width:180px; height:180px; display:block; touch-action:none; cursor:crosshair; }
 .colour-sliders { display:grid; gap:4px; }
@@ -278,13 +280,17 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 .bar { position:sticky; bottom:0; margin-top:auto; padding:10px 0 14px; display:grid; gap:8px;
   background:var(--paper); border-top:1px solid var(--line); }
 .bar .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.bar .status { flex:1 1 220px; }
+.bar .status { flex:1 1 120px; min-width:0; }
+.bar .row button { flex:0 0 auto; }
 .bar.pending #apply { outline:3px solid #f3b61f; outline-offset:2px; }
 #test-banner { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 #test-banner[hidden] { display:none; }
+/* On a phone the page is for the sliders and the stop. The map is the laptop's job. */
 @media (max-width:850px) {
   main { grid-template-columns:1fr; }
-  .map { position:relative; height:52vh; }
+  h1 { font-size:19px; }
+  .map { position:relative; height:38vh; }
+  .bar .status { flex-basis:100%; }
   .colour-control { grid-template-columns:1fr; justify-items:center; }
   .colour-sliders { width:100%; }
 }
@@ -302,8 +308,8 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
       <label class="slider"><span>Jet count <output id="jet_count_out"></output></span><input id="jet_count" type="range" min="1" max="20" step="1"></label>
       <label class="slider"><span>Minimum active height <output id="height_min_out"></output></span><input id="height_min" type="range" min="1" max="255" step="1"></label>
       <label class="slider"><span>Normal hill height <output id="hill_peak_out"></output></span><input id="hill_peak" type="range" min="1" max="255" step="1"></label>
-      <label class="slider lock"><span>Hard maximum height <output id="height_max_out"></output></span><input id="height_max" type="range" min="1" max="255" step="1" disabled>
-        <span><input id="unlock" type="checkbox"> Unlock this safety limit</span></label>
+      <div class="lock"><label class="slider"><span>Hard maximum height <output id="height_max_out"></output></span><input id="height_max" type="range" min="1" max="255" step="1" disabled></label>
+        <label for="unlock" class="unlock"><input id="unlock" type="checkbox"> Unlock this safety limit</label></div>
       <label class="slider"><span>Hill width in jets <output id="hill_jets_out"></output></span><input id="hill_jets" type="range" min="1" max="20" step="1"></label>
       <label class="slider"><span>Lead time in seconds <output id="lead_seconds_out"></output></span><input id="lead_seconds" type="range" min="0" max="2" step="0.01"></label>
       <label class="slider"><span>Follow response in seconds <output id="follow_response_out"></output></span><input id="follow_response" type="range" min="0" max="5" step="0.01"></label>
@@ -352,6 +358,8 @@ const heights=['height_min','hill_peak','height_max','idle_height'];
 function cm(dmx){return (dmx*0.762).toFixed(1)} // 0.762 cm per DMX unit, measured; see config.py
 function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
 function copy(v){return JSON.parse(JSON.stringify(v));}
+// Amber on Apply when something waits for it: a previewed profile, or a hard maximum that is not yet live.
+function markPending(){$('bar').classList.toggle('pending',pending||Number($('height_max').value)!==original.settings.height_max);}
 async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
 let wheelHue=0,wheelSat=0,wheelDrag=false;
 function hsvToRgb(h,s,v){const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);const a=[[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i%6];return a.map(x=>Math.round(x*255));}
@@ -363,7 +371,7 @@ function saveColour(){const rgb=hsvToRgb(wheelHue,wheelSat,Number($('colour_valu
 function fillColour(){const c=profile.settings[colourMode],hsv=rgbToHsv(c);wheelHue=hsv[0];wheelSat=hsv[1];$('colour_mode').value=colourMode;$('colour_value').value=Math.round(hsv[2]*255);$('white_level').value=c[3];drawColourWheel();readouts();}
 function readForm(){const s=copy(profile.settings);saveColour();for(const n of fields)s[n]=Number($(n).value);s[colourMode]=profile.settings[colourMode];s.idle_water_animation=$('idle_water_animation').value;s.idle_colour_animation=$('idle_colour_animation').value;s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);profile.settings=s;return profile;}
 function readouts(){for(const n of fields){const o=$(n+'_out'),v=$(n).value;if(!o)continue;o.textContent=v;if(heights.includes(n))o.insertAdjacentHTML('beforeend',' <small>'+cm(v)+' cm</small>')}$('colour_value_out').textContent=$('colour_value').value;$('white_level_out').textContent=$('white_level').value;swatch();}
-function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('height_min').max=s.height_max;$('hill_peak').min=s.height_min;$('hill_peak').max=s.height_max;fillColour();buildJets();$('bar').classList.toggle('pending',pending);draw();status('Edits apply as you make them.');}
+function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('height_min').max=s.height_max;$('hill_peak').min=s.height_min;$('hill_peak').max=s.height_max;fillColour();buildJets();markPending();draw();status('Edits apply as you make them.');}
 function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><input type="checkbox" '+(on?'checked':'')+'><span>Jet '+(i+1)+'</span></label></div>'));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
 function bounds(){const cx=viewCentre?viewCentre[0]:(roi.xmin+roi.xmax)/2,cy=viewCentre?viewCentre[1]:(roi.ymin+roi.ymax)/2,hw=(roi.xmax-roi.xmin)/zoom/2,hh=(roi.ymax-roi.ymin)/zoom/2;return {xmin:cx-hw,xmax:cx+hw,ymin:cy-hh,ymax:cy+hh};}
@@ -375,11 +383,13 @@ function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d'
 function nearest(x,y){let best=0,dist=Infinity;profile.settings.strip_points.forEach((p,i)=>{const q=xy(p),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<900?best:null;}
 let applyTimer=null,pending=false;
 function dirty(){readForm();readouts();draw();if(pending){status('Preview only. Press Apply profile to make it live.');return}clearTimeout(applyTimer);applyTimer=setTimeout(autoApply,250);}
-async function autoApply(){const p=copy(readForm());p.settings.height_max=original.settings.height_max;try{const r=await api('/settings/apply',{profile:p,unlock_height_max:false});original=copy(r);status(Number($('height_max').value)!==original.settings.height_max?'Applied. The hard maximum still needs Apply profile.':$('test-banner').hidden?'Applied.':'Applied. Test mode is on, so nothing is sent yet.')}catch(e){status(e.message+' Nothing changed.',true)}}
+async function autoApply(){const p=copy(readForm());p.settings.height_max=original.settings.height_max;try{const r=await api('/settings/apply',{profile:p,unlock_height_max:false});original=copy(r);markPending();status(Number($('height_max').value)!==original.settings.height_max?'Applied. The hard maximum still needs Apply profile.':$('test-banner').hidden?'Applied.':'Applied. Test mode is on, so nothing is sent yet.')}catch(e){status(e.message+' Nothing changed.',true)}}
 async function apply(){clearTimeout(applyTimer);try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;pending=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
 function showTestMode(on){$('test-banner').hidden=!on;}
 async function init(){try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');showTestMode(data.test_mode);size();}catch(e){status(e.message,true)}}
-async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';draw()}catch(e){$('live-state').textContent='LiDAR not available'}setTimeout(pollState,100)}
+let linkDown=false;
+// Dead looks dead: when the poll fails the scan and the tracks are wiped, not left painted under a small pill.
+async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';if(linkDown){linkDown=false;status('LiDAR is back.')}draw()}catch(e){$('live-state').textContent='LiDAR not available';if(!linkDown){linkDown=true;liveFrame=null;draw();status('LiDAR not available.',true)}}setTimeout(pollState,100)}
 function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
 $('unlock').onchange=()=>{$('height_max').disabled=!$('unlock').checked};
 $('jet_count').oninput=()=>{const count=Number($('jet_count').value);profile.settings.strip_points=jetPoints(profile.settings.strip_points,count);selected=Math.min(selected,count-1);readForm();buildJets();dirty()};

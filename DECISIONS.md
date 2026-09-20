@@ -949,6 +949,26 @@ sliders and the stop get the room. The map is the laptop's job. Tickets #29 and 
 **Decided:** all five review findings (#26 to #30) are filed and will be fixed. The four P1s all
 sit on the safety limit or on the phone, which is where Garrett stands wet.
 
+## [2026-09-20] The five `/settings` review fixes, #26 to #30
+
+All five were small edits in `tracker/viewer.py`, same look. Checked with headless Chrome at
+1280 px and in a 390 px iframe, with and without the test banner; 126 tests pass.
+
+**Decided:** the unlock is its own `<label for="unlock">` row inside a `.lock` wrapper, not part
+of the slider label (a label's click goes to its first labelable child, which was the readout).
+Apply goes amber when the hard maximum differs from what is live, by toggling the **class only**;
+the `pending` variable also blocks live-apply, so setting it would have broken every other slider.
+A failed `/state` poll wipes the map and writes the status box **once**, on the edge, because the
+poll runs ten times a second and would otherwise overwrite "Profile applied." before it can be
+read. On a phone the map is 38 vh, the status takes its own row, and the three buttons share one
+row with ALL OFF bottom-right.
+
+**Open:** the ticket's 19 px `h1` does not keep the header on one line at 390 px; the title plus
+the two nav links need about 410 px. The header still wraps to 84 px. Two sliders still fit
+under the banner, which was the test, so it was left.
+
+**Ruled out:** setting `pending=true` for the hard maximum. See above.
+
 ## [2026-09-20] Jets 1 and 2 not reacting was debris, not software
 
 Issue #23 reported the first two jets silent in the show but working in a manual test. Garrett

@@ -101,6 +101,28 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn("pending=true;fill();status('Loaded profile previewed.", page)
         self.assertIn("pending=true;fill();status('Default profile previewed.", page)
 
+    def test_unlock_has_its_own_label_row(self):
+        # Issue #26: the unlock must not sit inside the slider label, where the
+        # label's click goes to the readout instead of the box.
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn('<label for="unlock" class="unlock"><input id="unlock"', page)
+        self.assertNotIn('class="slider lock"', page)
+
+    def test_apply_goes_amber_when_the_hard_maximum_waits(self):
+        # Issue #27: the class, not the `pending` variable, so live-apply of the
+        # other sliders keeps working while the cap waits.
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("!==original.settings.height_max);}", page)
+        self.assertIn("original=copy(r);markPending();", page)
+
+    def test_map_clears_when_the_state_poll_fails(self):
+        # Issue #28: dead looks dead. The catch wipes the frame and redraws once.
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("linkDown=true;liveFrame=null;draw();status('LiDAR not available.',true)", page)
+
     def test_settings_page_uses_an_inline_colour_wheel_and_mode_selector(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")

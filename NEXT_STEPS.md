@@ -36,11 +36,10 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
-  `PRODUCT.md` are committed. #24 is done: the settings map now uses the viewer's track colours
-  (green seen, red occluded, grey tentative), deployed to the Pi. `/settings` reviewed
-  2026-09-20 at 29/40; fixes filed as #26 to #30 (unlock target, amber on Apply, dead map on
-  link drop, phone room for sliders, bar on one row). Remaining: fix #26 to #30, review `/test`
-  and `/`, move the shared CSS to one served file, re-run the document pass. Refinement only.
+  `PRODUCT.md` are committed. #24 and the five `/settings` fixes #26 to #30 are done (unlock
+  target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row), copied
+  to the Pi. Remaining: review `/test` and `/`, move the shared CSS to one served file, re-run
+  the document pass. Refinement only.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
 software tests. Issue #21 still needs its low-water bench check. Idle water defaults to off.
@@ -106,9 +105,12 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   #30, all small edits in `tracker/viewer.py`, same look. The four P1s sit on the safety-limit
   unlock and on the phone layout. Decided: on a phone the map shrinks and the sliders and the
   stop get the room.
-- **Next in the design work:** fix #26 to #30 in one pass (`/impeccable polish` on
-  `/settings`), deploy, then critique `/test` and `/`, then move the shared CSS to one served
-  file, then `/impeccable document`.
+- **#26 to #30 done** (see `DECISIONS.md`). Not checked by hand yet: tap the words "Unlock
+  this safety limit" on the phone (the box must tick), drag the hard maximum (Apply goes
+  amber), and pull the LiDAR USB with `/settings` open (the map empties, the status box goes
+  red). The header still wraps to two lines at 390 px; the title is too long for one row.
+- **Next in the design work:** critique `/test` and `/`, then move the shared CSS to one
+  served file, then `/impeccable document`.
 - **Pi state at close:** the show runs in `--lights-only`, restarted at about 15:50. About 6 s
   after that restart something opened `/test` and put it in **test mode**; it was left there.
   Press **Resume live show** on `http://water-jets.local:8080/settings` before the next run.
