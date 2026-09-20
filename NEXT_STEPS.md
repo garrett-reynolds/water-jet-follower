@@ -154,8 +154,10 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state (2026-09-20, about 18:10):** the show runs in `--lights-only` with the #31 to
-  #34 fixes, PID 50058, started 18:12. Test mode is off, the cap is 40, lights-only is on. Nothing
+- **Pi state at close (2026-09-20, about 18:25):** the show was stopped clean (log: `ALL ZERO`)
+  and the Pi left for Garrett to power off with `ssh -t pi@water-jets "sudo poweroff"`; `sudo`
+  needs a password over SSH, so an agent cannot do it. The Pi has the #31 to #34 files. Nothing
+  on the pages saves to disk, so the next start puts the profile back to the config defaults. Test mode is off, the cap is 40, lights-only is on. Nothing
   on the pages saves to disk, so any restart puts the profile back to the config defaults.
   Garrett's own `/test` opens are what put it in test mode earlier in the day.
 - **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while
@@ -198,17 +200,20 @@ cap read 40 again, so the unlocked value did not survive the restart.
 Checked on the real iPad 2026-09-20: the bottom bar stays put while scrolling, and a tapped
 jet tile turns green.
 
+**Design tickets:** #32, #33, #34 are done. Next is **#35** (a way back into test mode after
+Resume; the mode box is its obvious home, see the ticket comment), then #36 (readout typesetting;
+expect to update #34's test assertions when the spans change).
+
 **Do first, next session:**
 
 1. **Prove test mode with a real walker.** Every check so far ran on a replay or an empty
    hallway. Walk, get a hill up, open `/test` on the iPad: the water must drop and stay down
    while walking, and the `show.log` line must read `TEST`. (`/settings` loads on the iPad
    and the bottom bar with ALL OFF stays on screen while scrolling: checked 2026-09-20.)
-2. **The first two jets did not react in the show** (issue #23). `show.log` proves height 29
-   went to jet 0 and about 18 to jet 1 while Garrett stood at `s=-0.04`; manual tests at height
-   5 worked. On `/test`: hold jet 1 at 30 and jet 2 at 18 (page numbering, from 1), then stand
-   on the first physical jet and read the tracked jet number. Jet 1 means hardware; anything
-   else means the map.
+2. **Check the held-jet text with water** (#34's unverified half). Lights-only off, hand on the
+   24 V switch, Start test on `/test`: the yellow box must read "Holding jet N at H (cm)", and
+   Stop test must clear it. `test_jet` refuses while lights-only is on, so this needs water.
+   (#23, the first two jets not reacting, was debris; closed.)
 3. **iPad as the only control surface.** Garrett asked for the app to be functional on the
    iPad. The pages are now touch-sized and reachable at `http://water-jets.local:8080/`. Still
    open: starting and stopping `show` needs SSH from the laptop. The pages work in iPad

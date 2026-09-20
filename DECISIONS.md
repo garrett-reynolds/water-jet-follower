@@ -1017,3 +1017,21 @@ Ticket #33.
 Issue #23 reported the first two jets silent in the show but working in a manual test. Garrett
 checked the nozzles: debris. Cleared, both jets work. **Ruled out:** a tracker or DMX mapping
 fault for the low jets. Do not chase this in software again. Ticket closed as not planned.
+
+## [2026-09-20] The test page shows the Pi's state, not its own
+
+Fixing #34 raised a choice: keep the held jet as a client variable set by Start test, or have
+the Pi record it and let the page read it back. A client variable is lost on reload, and iPad
+Safari reloads background tabs, so a page could say "the live show is not sending" while a jet
+was up.
+
+**Decided:** `SettingsControl.held` records the held jet test and `/state` carries `test_mode`
+and `held` on every poll. The test page's mode box has one writer, `showMode()`, and renders
+from that poll; the button handlers only set it early for snap. A second tab, a reload, or an
+ALL OFF from the settings page all show the same truth within 200 ms. Opening `/test` still
+zeroes first, so a reload drops a held jet rather than resuming it.
+
+**Ruled out:** a new colour for the held state. The critique asked for the held text in the
+existing `.on` yellow box and the design system keeps its signal colours small; the words carry
+the state. (Logged at session close, not when decided.)
+

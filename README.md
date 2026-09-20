@@ -176,7 +176,7 @@ forced to zero, so nothing gets wet. The third moves water. The last is the stop
 | `tracker/wave.py` | Tracks in, one DMX frame out. |
 | `tracker/dmx.py` | DMX out through `olad`, and the stop path. |
 | `tracker/viewer.py` | The web page, served from the Pi. |
-| `tracker/tests/` | 69 tests. Synthetic walkers, so no hardware is needed. |
+| `tracker/tests/` | 133 tests. Synthetic walkers, so no hardware is needed. |
 | `bench/` | Throwaway LiDAR probe scripts from the sensor bring-up. |
 | `data/` | Recorded scans and baselines. |
 | `docs/` | The signal chain diagram and the agent docs. |
