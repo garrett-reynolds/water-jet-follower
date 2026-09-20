@@ -132,7 +132,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   Leave test mode section is gone. `DESIGN.md` Layout and the Stop Never Scrolls Rule now name
   the page's stop, not ALL OFF, so it matches `DECISIONS.md`. 130 tests pass on the laptop and
   the Pi. Checked at 390 px on a dry-run replay: the bar pins to the bottom on a short and a
-  tall viewport. **Not yet checked on the iPad.**
+  tall viewport. Checked on the real iPad 2026-09-20: the bar holds while scrolling, Resume
+  sits in the mode box, Stop test answers in place.
 - **Next in the design work:** fix #33 to #36, critique `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
 - **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` a red
