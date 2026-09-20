@@ -921,3 +921,18 @@ sensor sees"; light means "what you can change". The settings map canvas is the 
 tracks. Noted in DESIGN.md; not changed here.
 
 **Ruled out:** a "Pool Deck" theme with more colour and play. Nobody asked for a new look.
+
+## [2026-09-20] One set of track colours on the viewer and the settings map
+
+The live viewer and the settings map drew the same track states in different colours. The map
+used Amber for a confirmed person, which is also the "look here" colour for the selected strip
+point and the pending Apply button. The map also had no colour for a confirmed track the sensor
+had lost.
+
+**Decided:** the map uses the viewer's set. Scope Live (`#0f6`) for confirmed and seen, Scope
+Lost (`#f44`) for confirmed but occluded, `#888` for tentative. One expression changed in the
+settings `draw()` in `tracker/viewer.py`; `/state` already carried `seen`. Amber on the map now
+means only "selected point". Issue #24.
+
+**Ruled out:** making the viewer amber and grey to match the map. That loses the occluded state
+and breaks the "Amber Means Look" rule in `DESIGN.md`.

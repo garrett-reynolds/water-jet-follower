@@ -37,9 +37,10 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
 - **#23 — Bug: the first two jets do not react in the show but pass a manual test.**
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
-  `PRODUCT.md` now record the look and the product facts. Remaining: #24 (one set of track
-  colours on the viewer and the settings map; recommended fix is in the ticket), a scored review
-  of each page, and a re-run of the document pass at the end. Refinement only, no redesign.
+  `PRODUCT.md` are committed. #24 is done: the settings map now uses the viewer's track colours
+  (green seen, red occluded, grey tentative), deployed to the Pi. Remaining: a scored review of
+  each page, the shared CSS moved to one served file, and a re-run of the document pass at the
+  end. Refinement only, no redesign.
 
 Issue #22 is complete. Chase passed on the real lights. Fade and Breathe have repeatable
 software tests. Issue #21 still needs its low-water bench check. Idle water defaults to off.

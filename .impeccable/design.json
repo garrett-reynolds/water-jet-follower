@@ -532,8 +532,9 @@
       "map-origin": "#fff06a",
       "map-point-rest": "#e9fffa",
       "map-point-selected": "#f3b61f",
-      "map-track-confirmed": "#f3b61f",
-      "map-track-tentative": "#92aaa8",
+      "map-track-seen": "#00ff66",
+      "map-track-lost": "#ff4444",
+      "map-track-tentative": "#888888",
       "viewer-grid": "#222222",
       "viewer-strip": "#22aa66",
       "viewer-shadow": "#ff8800",
@@ -685,8 +686,7 @@
       "Don't add a third accent. Water is the accent. Amber is attention.",
       "Don't let a stale readout keep its last numbers. Grey it and show dashes.",
       "Don't make the live viewer light to match settings. The split is deliberate.",
-      "Don't add a round or pill shape. Corners are 4 px or 6 px.",
-      "Don't reuse track state colours loosely. Today the viewer uses Scope Live / Scope Lost / #888 and the settings map uses Amber / #92aaa8 for the same states. Pick one set before adding a third surface that shows tracks."
+      "Don't add a round or pill shape. Corners are 4 px or 6 px."
     ]
   }
 }

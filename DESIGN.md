@@ -187,7 +187,7 @@ A muted teal family on pale mint paper, with a small set of loud signal colours 
 - **Lock Wash** (`lock`) with **Lock Line** (`lock-line`): the one safety-limit slider that needs an unlock. Paler than Bad; a caution, not a fault.
 
 ### Attention
-- **Amber** (`amber`): the focus ring on every page, the outline on Apply when a change is pending, the selected strip point and confirmed track on the settings map. It is the only colour shared by the paper and scope surfaces.
+- **Amber** (`amber`): the focus ring on every page, the outline on Apply when a change is pending, and the selected strip point on the settings map. It is the only colour shared by the paper and scope surfaces.
 
 ### Neutral (paper surfaces)
 - **Ink** (`ink`): body text, headings, the header bar background, dark map tool bar.
@@ -297,7 +297,7 @@ Small, even corners. Buttons, selects, chips, inputs, status boxes, and banners 
 - **Viewer nav:** fixed bottom-right, links are `#126b72` fill with white text, 10 px by 14 px, 4 px corners.
 
 ### Map canvas (signature)
-The settings map is a dark scope inside the light page. Map fill, Map Grid lines every 0.5 m. Background scan points are `#527277` at 1.3 px; foreground points `#45dce7` at 2.2 px. The strip is a 3 px `#54d6c1` line; jets are `#45dce7` dots with white numbers. The LiDAR origin is a `#fff06a` dot. Strip points are 12 px square outlines, `#e9fffa` at rest and Amber when selected. Tracks are Amber when confirmed and `#92aaa8` when tentative.
+The settings map is a dark scope inside the light page. Map fill, Map Grid lines every 0.5 m. Background scan points are `#527277` at 1.3 px; foreground points `#45dce7` at 2.2 px. The strip is a 3 px `#54d6c1` line; jets are `#45dce7` dots with white numbers. The LiDAR origin is a `#fff06a` dot. Strip points are 12 px square outlines, `#e9fffa` at rest and Amber when selected. Tracks use the viewer's set: Scope Live when confirmed and seen, Scope Lost when confirmed but occluded, `#888` when tentative. Amber on the map means only "selected point".
 
 ### Live readout (signature)
 The x / y / jet block on the viewer: `#000e` fill, white Display type, 2 px Scope Live border, 10 px by 16 px padding, pinned top-right. Stale: text Scope Dead, border Scope Lost, values shown as dashes.
@@ -319,4 +319,3 @@ The x / y / jet block on the viewer: `#000e` fill, white Display type, 2 px Scop
 - **Don't** let a stale readout keep its last numbers. Grey it and show dashes.
 - **Don't** make the live viewer light to match settings. The split is deliberate.
 - **Don't** add a round or pill shape. Corners are 4 px or 6 px.
-- **Don't** reuse track state colours loosely. Today the viewer uses Scope Live / Scope Lost / `#888` and the settings map uses Amber / `#92aaa8` for the same states. Pick one set before adding a third surface that shows tracks.
