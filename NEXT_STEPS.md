@@ -130,7 +130,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - **Next in the design work:** fix #32 to #36 (sticky bar first), critique `/`, then move the
   shared CSS to one served file, then `/impeccable document`.
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
-  without the Pi.
+  without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
+  `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
 - **Pi state at close (2026-09-20, about 17:10):** the show runs in `--lights-only` with the
   #31 fix, PID 38048, started 16:50. Test mode is off, the cap is 40, lights-only is on. Nothing
   on the pages saves to disk, so any restart puts the profile back to the config defaults.
