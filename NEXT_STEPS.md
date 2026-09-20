@@ -137,8 +137,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   sits in the mode box, Stop test answers in place.
 - **#33 done.** The `/test` readout uses `jet_position`, not the clamped `jet`. Off the strip it
   reads "Past the end". Dry-run replay of `crossing.jsonl`: `s=-0.18`, `-1.07`, `3.89` read
-  Past the end; `s=3.06` reads Jet 10. 131 tests pass on the laptop and the Pi. Not yet checked
-  with a real walker on jet 1.
+  Past the end; `s=3.06` reads Jet 10. 131 tests pass on the laptop and the Pi. Checked on the
+  real strip 2026-09-20: standing on jet 1 reads Jet 1, off the end reads Past the end.
 - **Next in the design work:** fix #34 to #36, critique `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
 - **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` a red
