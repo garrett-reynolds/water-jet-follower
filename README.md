@@ -78,7 +78,7 @@ walker who stops keeps their hill, because their track is still there.
 
 ### Steps
 
-Run steps 1 to 5 on the Pi, over SSH.
+Run steps 1 to 4 and 6 on the Pi, over SSH.
 
 1. **Install OLA and the LiDAR driver.**
 
@@ -111,6 +111,19 @@ Run steps 1 to 5 on the Pi, over SSH.
    ```
    scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets:~/
    ```
+
+6. **Let the settings page reboot and shut down the Pi.** The **Reboot Pi** and **Shut down
+   Pi** buttons on `/settings` run `sudo -n /usr/sbin/reboot` and `sudo -n /usr/sbin/poweroff`.
+   Without this rule they are refused with "a password is required". Run
+   `sudo visudo -f /etc/sudoers.d/water-jets` and make the file exactly this:
+
+   ```
+   pi ALL=(root) NOPASSWD: /usr/sbin/reboot, /usr/sbin/poweroff
+   ```
+
+   `visudo` sets the mode (0440) and checks the syntax. Nothing else gets passwordless sudo.
+   Check it with `sudo -n /usr/sbin/reboot --help`, which must print help and not ask for a
+   password.
 
 ### Verifying it worked
 

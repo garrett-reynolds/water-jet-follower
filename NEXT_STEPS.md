@@ -39,8 +39,12 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   `roi_*` numbers are live-editable, the map draws the rectangle with corner handles, and a
   path point outside is refused. iPad check passed: a corner drag moves the area, a walker
   outside it raises no track.
-- **#38 — Shut down and reboot the Pi from `/settings`.** Ticketed 2026-09-21, not started.
-  Needs a sudoers rule on the Pi; the ticket has the order of operations (ALL OFF first).
+- **#38 — Shut down and reboot the Pi from `/settings`.** Built 2026-09-21 (see
+  `DECISIONS.md`): two plain buttons in the Profile box, `/actions/reboot` and
+  `/actions/shutdown`, zero-and-verify first, refuse otherwise. 150 tests pass on the laptop.
+  **Not yet done:** Garrett must install the sudoers rule (`README.md` Setup step 6; it needs
+  the Pi password), then the bench check in the ticket: Reboot from the iPad, log ends in
+  `ALL ZERO`, Pi comes back on SSH; Shut down, green LED out, power-cycle by hand.
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
   `PRODUCT.md` are committed. #24 and the five `/settings` fixes #26 to #30 are done (unlock
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
@@ -65,7 +69,7 @@ is step 3 below.
 ## Done since the last update
 
 - **2026-09-21:** #37 built, deployed, checked on the iPad, and closed (active area). #38
-  ticketed (Pi power control).
+  built (Pi power control); waits on the sudoers rule and the bench check.
   Profile version is now 4; a saved JSON from before is refused by version.
 
 1. ~~Write the tracker.~~ Done. `tracker/` — LiDAR driver, background subtraction, clustering,
@@ -326,8 +330,8 @@ The old `pkill -f 'python -m tracker'` also kills the SSH shell that runs it; us
    **Still open: what happens when `olad` itself dies.** The first attempt ran in the wrong
    order - the tracker was killed first, which zeroed the universe, so stopping `olad`
    afterwards proved nothing. Redone properly: channel 1 set to 40 and left lit, then `olad`
-   stopped underneath it. Note that `sudo -n` works on this Pi without a password, so this is
-   scriptable. The answer was not read back before the test moved on.
+   stopped underneath it. (An earlier note here said `sudo -n` works on this Pi without a
+   password. It does not, checked 2026-09-21; see `README.md` Setup step 6.) The answer was not read back before the test moved on.
 
    **Start low, and have three ways to stop it.** Garrett's rule, 2026-09-04. Channel 5 is
    0-255 against a 5 cm to 1.5 m throw, and the mapping is RDM-calibrated and unread, so open

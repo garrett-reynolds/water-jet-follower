@@ -357,6 +357,8 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
     <section><h2>Profile</h2><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile.</p>
       <div class="actions"><button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
       <button id="save">Save JSON</button><label class="file">Load JSON<input id="load" type="file" accept="application/json" hidden></label></div>
+      <p class="note">Power. Both zero every slot first and refuse if that cannot be verified. Nothing on this page is saved, so the profile comes back at its defaults. After a reboot the show does not start on its own.</p>
+      <div class="actions" id="power"><button id="reboot">Reboot Pi</button><button id="shutdown">Shut down Pi</button></div>
     </section>
     <div class="bar" id="bar">
       <div id="test-banner" class="warn" hidden>Test mode is on. The live show is not sending. <button id="resume-live">Resume live show</button></div>
@@ -413,9 +415,15 @@ async function autoApply(){const p=copy(readForm());p.settings.height_max=origin
 async function apply(){clearTimeout(applyTimer);try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;pending=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
 function showTestMode(on){$('test-banner').hidden=!on;}
 async function init(){try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');showTestMode(data.test_mode);size();}catch(e){status(e.message,true)}}
-let linkDown=false;
+let linkDown=false, powering=null;
 // Dead looks dead: when the poll fails the scan and the tracks are wiped, not left painted under a small pill.
-async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';if(linkDown){linkDown=false;status('LiDAR is back.')}draw()}catch(e){$('live-state').textContent='LiDAR not available';if(!linkDown){linkDown=true;liveFrame=null;draw();status('LiDAR not available.',true)}}setTimeout(pollState,100)}
+// After Reboot or Shut down the drop is expected, so the power message stays instead of "LiDAR not available".
+async function pollState(){if(powering)return;try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';if(linkDown){linkDown=false;status('LiDAR is back.')}draw()}catch(e){$('live-state').textContent='LiDAR not available';if(!linkDown){linkDown=true;liveFrame=null;draw();status('LiDAR not available.',true)}}setTimeout(pollState,100)}
+// Power: ask once, then the server zeroes and verifies before it runs anything. A refusal comes back as a red status.
+const POWER={reboot:{ask:'Reboot the Pi? The show stops, and it does not start again on its own.',done:'Rebooting. Reload this page in about a minute. The show is not running until it is started again.'},
+             shutdown:{ask:'Shut down the Pi? The show stops. Cut the power once the green LED is out.',done:'Shutting down. Wait for the green LED to go out, then cut the power.'}};
+async function power(action){if(!confirm(POWER[action].ask))return;try{await api('/actions/'+action,{});powering=action;showTestMode(true);linkDown=true;liveFrame=null;draw();$('live-state').textContent='Pi '+(action==='reboot'?'rebooting':'shutting down');$('reboot').disabled=$('shutdown').disabled=true;status(POWER[action].done)}catch(e){status(e.message,true)}}
+$('reboot').onclick=()=>power('reboot');$('shutdown').onclick=()=>power('shutdown');
 function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
 $('unlock').onchange=()=>{$('height_max').disabled=!$('unlock').checked};
 $('jet_count').oninput=()=>{const count=Number($('jet_count').value);profile.settings.strip_points=jetPoints(profile.settings.strip_points,count);selected=Math.min(selected,count-1);readForm();buildJets();dirty()};
@@ -600,6 +608,8 @@ def make_handler(state, cfg, control=None):
                     self._json({"sent": True, "held": held})
                 elif self.path == "/actions/all-off":
                     self._json({"all_zero": control.all_off()})
+                elif self.path in ("/actions/reboot", "/actions/shutdown"):
+                    self._json(control.power(self.path.rsplit("/", 1)[1]))
                 else:
                     self._json({"error": "unknown action"}, 404)
             except (ValueError, PermissionError, RuntimeError) as exc:

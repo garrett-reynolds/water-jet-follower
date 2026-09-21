@@ -362,6 +362,15 @@ show*. Without the halt, the next scan put the hill straight back and the button
 The bar shows a banner while the show is halted; press **Resume live show** to continue. Every
 height slider shows its DMX value and the matching centimetres (0.762 cm per unit).
 
+**Reboot Pi** and **Shut down Pi** sit in the Profile box, plain, not red: only stops are red.
+Each asks once. Then the server zeroes every slot and verifies it, halts the show, runs
+`sudo -n /usr/sbin/reboot` or `/usr/sbin/poweroff`, and lets the show loop exit through
+`dmx.safe_output`. If the zero cannot be verified the Pi stays up and the status says to cut
+the 24 V first. If the sudoers rule from the top-level README is missing the Pi refuses, the
+status shows sudo's message, and the show stays halted in test mode. A reboot brings back a Pi
+with **no show running**; start it by hand. Nothing on the page is saved, so the profile comes
+back at its defaults. `--dry-run` has no power buttons that work: they say so.
+
 ### Test page
 
 `http://water-jets:8080/test` is the testing area. Opening it enters **test mode**: the output is

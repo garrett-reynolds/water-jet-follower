@@ -8,7 +8,8 @@ import unittest
 
 from tracker import geometry
 from tracker.config import Config
-from tracker.settings import PROFILE_VERSION, UNDO_DEPTH, SettingsControl, profile_for
+from tracker.settings import (POWER_COMMANDS, PROFILE_VERSION, UNDO_DEPTH,
+                              SettingsControl, profile_for)
 
 
 class TestProfiles(unittest.TestCase):
@@ -253,6 +254,75 @@ class TestTestMode(unittest.TestCase):
         control = SettingsControl(Config())
         with self.assertRaises(ValueError):
             control.set_test_mode("yes")
+
+
+class TestPower(unittest.TestCase):
+    """Reboot and shut down from the page: zero first, refuse if unverified."""
+
+    def _control(self, zero=True):
+        self.calls = []
+        return SettingsControl(
+            Config(),
+            zero_output=lambda: self.calls.append("zero") or zero,
+            run_command=lambda command: self.calls.append(command))
+
+    def test_reboot_zeroes_before_the_command_and_stops_the_show(self):
+        control = self._control()
+        self.assertEqual(control.power("reboot"),
+                         {"action": "reboot", "all_zero": True})
+        self.assertEqual(self.calls, ["zero", ["sudo", "-n", "/usr/sbin/reboot"]])
+        self.assertTrue(control.test_mode)
+        self.assertTrue(control.stopping.is_set())
+        self.assertEqual(control.stop_reason, "reboot")
+
+    def test_shutdown_runs_poweroff_by_its_full_path(self):
+        control = self._control()
+        control.power("shutdown")
+        self.assertEqual(self.calls[-1], ["sudo", "-n", "/usr/sbin/poweroff"])
+        self.assertEqual(self.calls[-1], POWER_COMMANDS["shutdown"])
+
+    def test_power_refuses_when_zero_is_not_verified(self):
+        control = self._control(zero=False)
+        with self.assertRaises(RuntimeError) as caught:
+            control.power("reboot")
+        self.assertIn("24 V", str(caught.exception))
+        self.assertEqual(self.calls, ["zero"])       # the command never ran
+        self.assertFalse(control.stopping.is_set())
+
+    def test_a_refused_command_leaves_the_show_halted_not_dead(self):
+        def refuse(command):
+            raise RuntimeError("sudo: a password is required")
+        control = SettingsControl(Config(), zero_output=lambda: True,
+                                  run_command=refuse)
+        with self.assertRaises(RuntimeError):
+            control.power("shutdown")
+        self.assertTrue(control.test_mode)
+        self.assertFalse(control.stopping.is_set())
+
+    def test_power_is_unavailable_without_both_callbacks(self):
+        for control in (SettingsControl(Config()),
+                        SettingsControl(Config(), zero_output=lambda: True),
+                        SettingsControl(Config(), run_command=lambda c: None)):
+            with self.assertRaises(RuntimeError):
+                control.power("reboot")
+            self.assertFalse(control.stopping.is_set())
+
+    def test_power_drops_a_held_jet_test(self):
+        calls = []
+        control = SettingsControl(Config(), send_frame=calls.append,
+                                  zero_output=lambda: True,
+                                  run_command=lambda c: None)
+        control.set_test_mode(True)
+        control.test_jet(2, 10)
+        control.power("reboot")
+        self.assertIsNone(control.held)
+        self.assertFalse(any(control.output_frame(None)))
+
+    def test_power_rejects_any_other_action(self):
+        control = self._control()
+        with self.assertRaises(ValueError):
+            control.power("halt")
+        self.assertEqual(self.calls, [])
 
 
 if __name__ == "__main__":

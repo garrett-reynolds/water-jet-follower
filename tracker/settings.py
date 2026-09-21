@@ -1,5 +1,6 @@
 """Validated, atomic settings changes for the browser control screen."""
 
+import threading
 from copy import deepcopy
 
 from tracker import dmx
@@ -16,6 +17,13 @@ EDITABLE = (
     "idle_colour_animation", "idle_brightness",
     "idle_seconds", "idle_height", "idle_colour",
 )
+
+# The only two commands the settings page may run on the Pi. The sudoers rule in
+# README.md names these exact paths, so a bare "reboot" would ask for a password.
+POWER_COMMANDS = {
+    "reboot": ["sudo", "-n", "/usr/sbin/reboot"],
+    "shutdown": ["sudo", "-n", "/usr/sbin/poweroff"],
+}
 
 
 def _enabled(cfg):
@@ -125,10 +133,18 @@ UNDO_DEPTH = 50
 class SettingsControl:
     """Own settings history and hardware actions for one viewer process."""
 
-    def __init__(self, cfg, send_frame=None, zero_output=None):
+    def __init__(self, cfg, send_frame=None, zero_output=None, run_command=None):
         self.cfg = cfg
         self.send_frame = send_frame
         self.zero_output = zero_output
+        # Runs one of POWER_COMMANDS. Only the real show wires this; the tests,
+        # --dry-run and the laptop never get a callable that could reboot the host.
+        self.run_command = run_command
+        # Set once a reboot or shutdown is under way. The show loop checks it every
+        # scan and returns, so the process leaves through dmx.safe_output's zero
+        # instead of being killed mid-frame by the OS.
+        self.stopping = threading.Event()
+        self.stop_reason = None
         self.lights_only = False
         # Test mode: the live show sends nothing. Only a held jet test or zeros go
         # out, so a person walking past the LiDAR cannot put water up while somebody
@@ -211,6 +227,27 @@ class SettingsControl:
         self.held = None
         self.test_mode = True
         return result
+
+    def power(self, action):
+        """Reboot or shut down the Pi: zero and verify, halt the show, run the
+        command, then let the show loop exit. The modules latch, so a reboot with
+        a jet up leaves that jet up until the 24 V is cut; an unverified zero
+        refuses rather than risks it. A command that fails (no sudoers rule) leaves
+        the show halted in test mode, not dead, so Resume still works."""
+        if action not in POWER_COMMANDS:
+            raise ValueError("action must be reboot or shutdown")
+        if self.zero_output is None or self.run_command is None:
+            raise RuntimeError(f"{action} is not available in this run mode")
+        if not self.zero_output():
+            raise RuntimeError("Zero could not be verified. The Pi stays up. "
+                               "Cut the 24 V first, then try again.")
+        self._manual_frame = None
+        self.held = None
+        self.test_mode = True
+        self.run_command(list(POWER_COMMANDS[action]))
+        self.stop_reason = action
+        self.stopping.set()
+        return {"action": action, "all_zero": True}
 
     def test_jet(self, jet, height=None):
         if self.send_frame is None:

@@ -10,6 +10,7 @@
 import argparse
 from contextlib import nullcontext
 import os
+import subprocess
 import sys
 import time
 
@@ -243,8 +244,19 @@ def _dead_frame(timestamp, label):
             "lidar_ok": False}
 
 
+def _run_power_command(command):
+    """Run one of settings.POWER_COMMANDS and turn a refusal into a message the
+    page can show. `sudo -n` fails at once instead of waiting for a password, so a
+    Pi without the sudoers rule from README.md says so rather than hanging."""
+    result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip() or f"exit {result.returncode}"
+        raise RuntimeError(f"The Pi refused the command: {detail}. "
+                           "Check the sudoers rule in README.md Setup.")
+
+
 def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
-               heartbeat=None):
+               run_command=None, heartbeat=None):
     """Track, build the wave, hand each frame to `send_frame`. The whole show.
 
     `send_frame` is passed in rather than chosen here so that --dry-run, --lights-only
@@ -255,7 +267,8 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
     from tracker.wave import Wave
 
     state = viewer.State()
-    control = SettingsControl(cfg, send_frame=send_frame, zero_output=zero_output)
+    control = SettingsControl(cfg, send_frame=send_frame, zero_output=zero_output,
+                              run_command=run_command)
     control.set_lights_only(args.lights_only)
     server = viewer.serve(state, cfg, control)
     tracker = Tracker(cfg)
@@ -269,6 +282,15 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
     lidar_ok = True
     try:
         for timestamp, points in source:
+            if control.stopping.is_set():
+                # A reboot or shutdown was asked for on /settings and the command
+                # has already been accepted. Leave through the normal exit so
+                # dmx.safe_output zeroes the line once more. The pause lets the
+                # page's answer reach the iPad before the server goes away.
+                time.sleep(0.5)
+                print(f"\nshow: {control.stop_reason} requested from the settings page, "
+                      "leaving", file=sys.stderr)
+                break
             if points is None:
                 # The sensor is gone (see _reconnecting_scans). The modules latch, so
                 # zero now, and do not beat the watchdog: blind means the contactor
@@ -392,6 +414,7 @@ def cmd_show(args):
                 source, cfg, baseline, label, args,
                 send_frame=lambda frame: dmx.send(frame, args.universe),
                 zero_output=lambda: dmx.zero(args.universe),
+                run_command=_run_power_command,
                 heartbeat=watchdog)
     except RuntimeError as exc:
         print(f"show: {exc}", file=sys.stderr)

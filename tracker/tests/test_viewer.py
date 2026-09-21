@@ -2,9 +2,11 @@
 
 import json
 import unittest
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from tracker.config import Config
+from tracker.settings import SettingsControl
 from tracker.viewer import State, serve
 
 
@@ -204,6 +206,72 @@ class TestSettingsMap(unittest.TestCase):
             frame = json.load(response)
         self.assertEqual(frame["fg"], [[1.0, 0.5]])
         self.assertEqual(frame["bg"], [[1.2, 0.4]])
+
+    def test_settings_page_has_power_buttons_in_the_profile_box_not_the_bar(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        profile = page[page.index("<h2>Profile</h2>"):page.index('<div class="bar"')]
+        self.assertIn('id="reboot"', profile)
+        self.assertIn('id="shutdown"', profile)
+        self.assertNotIn('id="reboot" class="danger"', page)   # only stops are red
+        self.assertIn("confirm(POWER[action].ask)", page)
+        self.assertIn("'/actions/'+action", page)
+        self.assertIn("does not start again on its own", page)
+
+    def _post(self, path):
+        request = Request(self.base + path, data=b"{}",
+                          headers={"Content-Type": "application/json"})
+        try:
+            with urlopen(request) as response:
+                return response.status, json.load(response)
+        except HTTPError as error:
+            return error.code, json.load(error)
+
+    def test_power_routes_are_refused_without_a_verified_zero(self):
+        # The default control has no hardware callbacks, so both routes must say
+        # so. Nothing here may ever reach a real reboot command.
+        for path in ("/actions/reboot", "/actions/shutdown"):
+            status, body = self._post(path)
+            self.assertEqual(status, 400)
+            self.assertIn("not available", body["error"])
+
+    def test_power_routes_zero_first_then_run_the_named_command(self):
+        calls = []
+        control = SettingsControl(Config(), zero_output=lambda: calls.append("zero") or True,
+                                  run_command=calls.append)
+        server = serve(self.state, Config(viewer_host="127.0.0.1", viewer_port=0),
+                       control)
+        try:
+            base = f"http://127.0.0.1:{server.server_port}"
+            request = Request(base + "/actions/reboot", data=b"{}",
+                              headers={"Content-Type": "application/json"})
+            with urlopen(request) as response:
+                self.assertEqual(json.load(response),
+                                 {"action": "reboot", "all_zero": True})
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(calls, ["zero", ["sudo", "-n", "/usr/sbin/reboot"]])
+        self.assertTrue(control.stopping.is_set())
+
+    def test_power_routes_refuse_and_report_an_unverified_zero(self):
+        ran = []
+        control = SettingsControl(Config(), zero_output=lambda: False,
+                                  run_command=ran.append)
+        server = serve(self.state, Config(viewer_host="127.0.0.1", viewer_port=0),
+                       control)
+        try:
+            base = f"http://127.0.0.1:{server.server_port}"
+            request = Request(base + "/actions/shutdown", data=b"{}",
+                              headers={"Content-Type": "application/json"})
+            with self.assertRaises(HTTPError) as caught:
+                urlopen(request)
+            self.assertEqual(caught.exception.code, 400)
+            self.assertIn("Cut the 24 V", json.load(caught.exception)["error"])
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(ran, [])
 
 
 if __name__ == "__main__":

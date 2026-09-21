@@ -1060,3 +1060,36 @@ through `geometry.py`, `/config`, the live viewer and the tests for no change in
 
 **Ruled out:** number fields for the four edges. `DESIGN.md` is touch first and a test forbids
 `type="number"` on the settings page. The edges are sliders with metre readouts.
+
+## [2026-09-21] Power buttons zero first, then run, then let the loop exit
+
+Garrett asked for Reboot Pi and Shut down Pi on `/settings` (#38). The iPad is meant to be the
+only control surface and pulling the plug on a Pi 5 risks the SD card.
+
+**Decided:** `SettingsControl.power(action)` does it in this order: zero and verify, halt the
+show (test mode), run the command, then set `stopping` so the show loop returns on its next
+scan and leaves through `dmx.safe_output`'s exit zero. The ticket said "stop the loop, then
+run the command"; done literally that kills the process before the command runs. Halting the
+output is the stop that matters for safety, and the loop's exit is the tidy part. The loop
+waits half a second before it breaks so the page's answer reaches the iPad before the server
+goes away.
+
+**Decided:** an unverified zero refuses and the Pi stays up. The modules latch; a reboot with a
+jet up leaves it up until the 24 V is cut, and nobody would be watching.
+
+**Decided:** the command is injected (`run_command`) the same way as `zero_output`. Only the
+real show in `run.py` wires `subprocess`. The tests, the laptop, and `--dry-run` never hold a
+callable that could reboot the host they run on. `sudo -n` so a missing sudoers rule fails at
+once with a message the page shows, instead of hanging on a password prompt. The sudoers rule
+names `/usr/sbin/reboot` and `/usr/sbin/poweroff` by full path because `/usr/sbin` is not on
+`pi`'s non-interactive PATH (checked on the Pi: `which reboot` prints nothing).
+
+**Decided:** the buttons are plain and live in the Profile box. `DESIGN.md`'s One Red Rule
+keeps danger red for the two buttons that stop water. A `confirm()` carries the weight.
+
+**Corrected:** `NEXT_STEPS.md` said `sudo -n` works on this Pi without a password. It does
+not (`sudo -n true` → "a password is required", 2026-09-21). The rule in `README.md` Setup
+step 6 is the fix, and Garrett has to install it because that needs the password.
+
+**Ruled out:** a boot-time service so a reboot comes back running. Its own ticket; the
+message on the page says the show is not running after a reboot.
