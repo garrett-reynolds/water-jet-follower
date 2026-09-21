@@ -41,7 +41,8 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   outside it raises no track.
 - **#38 — Shut down and reboot the Pi from `/settings`.** Built 2026-09-21 (see
   `DECISIONS.md`): two plain buttons in the Profile box, `/actions/reboot` and
-  `/actions/shutdown`, zero-and-verify first, refuse otherwise. 150 tests pass on the laptop.
+  `/actions/shutdown`, zero-and-verify first, refuse otherwise. The settings banner now
+  follows `/state`, so a refused command shows Resume. 151 tests pass on the laptop and the Pi.
   **Not yet done:** Garrett must install the sudoers rule (`README.md` Setup step 6; it needs
   the Pi password), then the bench check in the ticket: Reboot from the iPad, log ends in
   `ALL ZERO`, Pi comes back on SSH; Shut down, green LED out, power-cycle by hand.
@@ -168,12 +169,12 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state at close (2026-09-21, about 10:15):** the show is **running** in `--lights-only`
-  (PID 7995, started with the standard `setsid nohup` line) with the #37 files. Test mode off,
+- **Pi state at close (2026-09-21, about 10:45):** the show is **running** in `--lights-only`
+  (PID 11014, started with the standard `setsid nohup` line) with the #38 files. Test mode off,
   cap 40. Stop it with the anchored `pkill` line below; power off needs Garrett's
-  `ssh -t pi@water-jets "sudo poweroff"` (`sudo` wants a password over SSH). Nothing on the
-  pages saves to disk, so any restart puts the profile back to the config defaults. The run
-  before it had been left in test mode with the cap unlocked to 255; that did not carry over.
+  `ssh -t pi@water-jets "sudo poweroff"` until the sudoers rule from `README.md` Setup step 6
+  is installed, after which the page's Shut down Pi button does it. Nothing on the
+  pages saves to disk, so any restart puts the profile back to the config defaults.
 - **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while
   scrolling, and a tapped jet tile turns green. Garrett checked both on the real iPad.
 - **Loose files in the tree, not committed:** `bom/` holds ROM Raptors estimate spreadsheets
