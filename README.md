@@ -122,8 +122,8 @@ Run steps 1 to 4 and 6 on the Pi, over SSH.
    ```
 
    `visudo` sets the mode (0440) and checks the syntax. Nothing else gets passwordless sudo.
-   Check it with `sudo -n /usr/sbin/reboot --help`, which must print help and not ask for a
-   password.
+   Check it with `sudo -n -l /usr/sbin/reboot`, which only lists: it must print the path and
+   not "a password is required". Do not run the command itself to test it.
 
 ### Verifying it worked
 

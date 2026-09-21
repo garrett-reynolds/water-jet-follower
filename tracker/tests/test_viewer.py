@@ -217,6 +217,12 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn("confirm(POWER[action].ask)", page)
         self.assertIn("'/actions/'+action", page)
         self.assertIn("does not start again on its own", page)
+        # A refused command leaves the show halted, so the banner must follow
+        # /state's test_mode the way /test does, not only the success branch.
+        self.assertIn("showTestMode(liveFrame.test_mode)", page)
+        # Both buttons go dead before the request, so a double tap on the iPad
+        # cannot fire two power commands while the first one runs.
+        self.assertIn("$('reboot').disabled=$('shutdown').disabled=true;try{await api('/actions/'+action", page)
 
     def _post(self, path):
         request = Request(self.base + path, data=b"{}",

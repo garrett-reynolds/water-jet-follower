@@ -86,6 +86,38 @@ class TestShowLoopWhenTheSensorGoes(unittest.TestCase):
         flags = [f.get("lidar_ok", True) for f in frames]
         self.assertEqual(flags, [True, False, True], "dead frame set once, then live again")
 
+    def test_show_loop_returns_once_a_power_action_is_under_way(self):
+        # Reboot Pi sets control.stopping after the command is accepted. The loop
+        # must notice on the next scan and return, so the process leaves through
+        # dmx.safe_output's exit zero instead of an OS kill mid-frame.
+        cfg = Config(viewer_host="127.0.0.1", viewer_port=0)
+        seen = []
+
+        def source():
+            yield (1.0, _scan())
+            control.stopping.set()
+            control.stop_reason = "reboot"
+            for t in (2.0, 3.0, 4.0):
+                seen.append(t)
+                yield (t, _scan())
+
+        real_serve = run.viewer.serve
+        control = None
+
+        def capturing_serve(state, cfg, ctl=None):
+            nonlocal control
+            control = ctl
+            return real_serve(state, cfg, ctl)
+
+        args = SimpleNamespace(lights_only=False)
+        with mock.patch.object(run.viewer, "serve", capturing_serve),                 mock.patch.object(run.time, "sleep", lambda s: None):
+            result = run._show_loop(source(), cfg, None, "fake", args,
+                                    send_frame=lambda frame: True,
+                                    zero_output=lambda: True,
+                                    run_command=lambda command: None)
+        self.assertEqual(result, 0)
+        self.assertEqual(seen, [2.0], "one more scan is pulled, then the loop leaves")
+
     def test_dead_frame_makes_state_answer_503(self):
         state = State()
         state.set(run._dead_frame(5.0, "fake"))
