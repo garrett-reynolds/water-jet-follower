@@ -10,7 +10,7 @@ pointer and a cold-start summary, not a second source of truth. Decisions live i
 
 ## State
 
-Every decision that can be made in a conversation has been made. **15 of 22 issues are closed.**
+Every decision that can be made in a conversation has been made. **16 of 22 issues are closed.**
 The design is settled, every part is owned, and **the whole chain has now run end to end with
 water in the air.** The ten measured control points are verified with the first module. The
 current live build uses those ten jets. The settings layout gives every configured jet its own
@@ -35,11 +35,10 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 ## Open tickets
 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
-- **#37 — Active area rectangle on `/settings`.** Built and on the Pi 2026-09-21 (see
-  `DECISIONS.md`). The four `roi_*` numbers are live-editable; the map draws the rectangle with
-  corner handles; a path point outside is refused. Laptop replay and the Pi's tests pass. **Not
-  yet done:** a real corner drag on the iPad, and walking outside the rectangle to see no track.
-  Close the ticket after that check.
+- **#37 — Active area rectangle on `/settings`.** Done and closed 2026-09-21. The four
+  `roi_*` numbers are live-editable, the map draws the rectangle with corner handles, and a
+  path point outside is refused. iPad check passed: a corner drag moves the area, a walker
+  outside it raises no track.
 - **#38 — Shut down and reboot the Pi from `/settings`.** Ticketed 2026-09-21, not started.
   Needs a sudoers rule on the Pi; the ticket has the order of operations (ALL OFF first).
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
@@ -65,7 +64,8 @@ is step 3 below.
 
 ## Done since the last update
 
-- **2026-09-21:** #37 built and deployed (active area). #38 ticketed (Pi power control).
+- **2026-09-21:** #37 built, deployed, checked on the iPad, and closed (active area). #38
+  ticketed (Pi power control).
   Profile version is now 4; a saved JSON from before is refused by version.
 
 1. ~~Write the tracker.~~ Done. `tracker/` — LiDAR driver, background subtraction, clustering,
