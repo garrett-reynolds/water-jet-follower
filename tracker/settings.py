@@ -6,9 +6,10 @@ from tracker import dmx
 from tracker.config import Config
 
 
-PROFILE_VERSION = 3
+PROFILE_VERSION = 4
 EDITABLE = (
-    "strip_points", "jet_count", "height_min", "hill_peak", "height_max",
+    "strip_points", "roi_x_min", "roi_x_max", "roi_y_min", "roi_y_max",
+    "jet_count", "height_min", "hill_peak", "height_max",
     "hill_jets", "lead_seconds", "follow_response", "base_colour",
     "slow_colour", "fast_colour", "slow_speed", "fast_speed",
     "jet_enabled", "reverse_jets", "idle_water_animation",
@@ -78,6 +79,21 @@ def validate_profile(profile):
     )
     if len(clean["strip_points"]) != len(points):
         raise ValueError("each strip point must contain x and y")
+
+    # The active area. Scan points outside it are dropped before tracking, so it
+    # sets how far from the strip a person can put water up. Every jet point must
+    # sit inside it, or the person standing on that jet could never be seen.
+    for name in ("roi_x_min", "roi_x_max", "roi_y_min", "roi_y_max"):
+        clean[name] = float(_number(values[name], name, -20, 20))
+    if clean["roi_x_min"] >= clean["roi_x_max"]:
+        raise ValueError("active area: x min must be less than x max")
+    if clean["roi_y_min"] >= clean["roi_y_max"]:
+        raise ValueError("active area: y min must be less than y max")
+    for index, (x, y) in enumerate(clean["strip_points"]):
+        if not (clean["roi_x_min"] <= x <= clean["roi_x_max"]
+                and clean["roi_y_min"] <= y <= clean["roi_y_max"]):
+            raise ValueError(
+                f"path point {index + 1} at ({x:.2f}, {y:.2f}) is outside the active area")
 
     for name in ("base_colour", "slow_colour", "fast_colour", "idle_colour"):
         colour = values[name]

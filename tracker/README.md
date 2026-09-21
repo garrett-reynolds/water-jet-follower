@@ -350,7 +350,10 @@ things wait for **Apply profile** because they are big jumps: the hard maximum (
 **Load JSON**, and **Reset defaults**. Live-apply never touches the hard maximum. **Undo applied**
 steps back one edit burst, up to 50. Lights-only always forces the water channel to zero. **Save JSON** downloads the profile to
 the browser computer; **Load JSON** previews a saved profile before apply. The layout map draws
-the live LiDAR scan behind the editable path. Use the mouse wheel or the `−`, **Fit**, and `+`
+the live LiDAR scan behind the editable path. The dashed rectangle on the map is the **active
+area**: scan points outside it are dropped, so it sets how far away a person can put water up.
+Drag its corners, or use the four sliders in the Active area section. Every path point must stay
+inside it; a profile that puts one outside is refused and names the point. Use the mouse wheel or the `−`, **Fit**, and `+`
 buttons to zoom around the selected path point.
 
 **ALL OFF**, **Apply profile**, **Lights only**, and the status line sit in a bar that stays

@@ -16,3 +16,4 @@
 - **Scan plane**: the flat, level slice the LiDAR sweeps. Anything above or below it is invisible.
 - **Track**: the running guess at one walker's position and speed. One track per walker. A track starts when the walker is first seen and ends when they leave.
 - **Shadow**: the space a track cannot be seen in, because something nearer to the sensor blocks it.
+- **Active area**: the rectangle on the floor that the tracker looks at. Scan points outside it are dropped before tracking, so nobody outside it can put water up. Every jet point must be inside it. In the code it is `roi_x_min`, `roi_x_max`, `roi_y_min`, `roi_y_max`.

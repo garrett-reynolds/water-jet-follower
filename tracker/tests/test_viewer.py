@@ -32,6 +32,27 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn('id="zoom-fit"', page)
         self.assertIn("pollState()", page)
 
+    def test_settings_page_has_a_draggable_active_area(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        for name in ("roi_x_min", "roi_x_max", "roi_y_min", "roi_y_max"):
+            self.assertIn(f'id="{name}" type="range"', page)
+        self.assertIn("nearestCorner(", page)
+        self.assertIn("moveCorner(dragCorner", page)
+        self.assertIn("clampToArea(", page)
+        # The map's frame is padded past the defaults, so a shrunken area can be
+        # dragged back out again.
+        with urlopen(self.base + "/settings-data") as response:
+            data = json.loads(response.read())
+        self.assertEqual(data["roi"], {"xmin": -1.0, "xmax": 4.5, "ymin": -3.0, "ymax": 3.0})
+        self.assertEqual(data["profile"]["settings"]["roi_x_max"], 3.5)
+
+    def test_live_viewer_follows_the_active_area(self):
+        with urlopen(self.base + "/") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn("polls++ % 15 === 0", page)
+        self.assertIn("ctx.setLineDash([6, 4]);", page)
+
     def test_settings_page_draws_each_jet_on_the_control_path(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")

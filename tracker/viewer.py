@@ -13,6 +13,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from tracker import geometry
+from tracker.config import Config
 from tracker.settings import SettingsControl
 
 
@@ -61,7 +62,7 @@ PAGE = """<!doctype html>
 <nav><a href="/test">Test jets</a><a id="settings-link" href="/settings">Settings</a></nav>
 <canvas id="c"></canvas>
 <script>
-let CFG = null, FRAME = null;
+let CFG = null, FRAME = null, polls = 0;
 
 function fit() {
   const c = document.getElementById('c');
@@ -70,13 +71,15 @@ function fit() {
 window.addEventListener('resize', () => { fit(); draw(); });
 
 function transform(c) {
-  const w = CFG.roi_x_max - CFG.roi_x_min, h = CFG.roi_y_max - CFG.roi_y_min;
+  const pad = 0.25;   // a little room around the active area, so its edge is visible
+  const x0 = CFG.roi_x_min - pad, y0 = CFG.roi_y_min - pad;
+  const w = CFG.roi_x_max - CFG.roi_x_min + pad * 2, h = CFG.roi_y_max - CFG.roi_y_min + pad * 2;
   const scale = Math.min(c.width / w, c.height / h) * 0.92;
   // +x right, +y up
   return {
     scale: scale,
-    sx: (x) => (x - CFG.roi_x_min) * scale + (c.width - w * scale) / 2,
-    sy: (y) => c.height - ((y - CFG.roi_y_min) * scale + (c.height - h * scale) / 2)
+    sx: (x) => (x - x0) * scale + (c.width - w * scale) / 2,
+    sy: (y) => c.height - ((y - y0) * scale + (c.height - h * scale) / 2)
   };
 }
 
@@ -102,6 +105,12 @@ function draw() {
     ctx.beginPath(); ctx.moveTo(t.sx(CFG.roi_x_min), t.sy(y));
     ctx.lineTo(t.sx(CFG.roi_x_max), t.sy(y)); ctx.stroke();
   }
+  // the active area: nothing outside it can put water up
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
+  ctx.strokeRect(t.sx(CFG.roi_x_min), t.sy(CFG.roi_y_max),
+                 (CFG.roi_x_max - CFG.roi_x_min) * t.scale,
+                 (CFG.roi_y_max - CFG.roi_y_min) * t.scale);
+  ctx.setLineDash([]);
 
   // the strip and its jets
   const path = CFG.strip_points || [CFG.strip_start, CFG.strip_end];
@@ -186,7 +195,8 @@ function draw() {
 
 async function poll() {
   try {
-    if (!CFG) CFG = await (await fetch('/config')).json();
+    // Settings edits go live without a restart, so the config is re-read about once a second.
+    if (!CFG || polls++ % 15 === 0) CFG = await (await fetch('/config')).json();
     const r = await fetch('/state');
     if (!r.ok) throw Error((await r.json()).error || r.statusText);
     FRAME = await r.json();
@@ -337,6 +347,13 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
       <label class="slider"><span>Idle water height <output id="idle_height_out"></output></span><input id="idle_height" type="range" min="1" max="255" step="1"></label>
     </div></section>
     <section><h2>Jet enable</h2><div class="jets" id="jets"></div></section>
+    <section><h2>Active area</h2><p class="note">Only people inside this rectangle can put water up. Drag its corners on the map, or use the sliders. Every path point must stay inside it.</p>
+      <div class="grid">
+        <label class="slider"><span>Along the strip, x min <output id="roi_x_min_out"></output></span><input id="roi_x_min" type="range" min="-1" max="4.5" step="0.05"></label>
+        <label class="slider"><span>Along the strip, x max <output id="roi_x_max_out"></output></span><input id="roi_x_max" type="range" min="-1" max="4.5" step="0.05"></label>
+        <label class="slider"><span>Across the hallway, y min <output id="roi_y_min_out"></output></span><input id="roi_y_min" type="range" min="-3" max="3" step="0.05"></label>
+        <label class="slider"><span>Across the hallway, y max <output id="roi_y_max_out"></output></span><input id="roi_y_max" type="range" min="-3" max="3" step="0.05"></label>
+      </div></section>
     <section><h2>Profile</h2><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile.</p>
       <div class="actions"><button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
       <button id="save">Save JSON</button><label class="file">Load JSON<input id="load" type="file" accept="application/json" hidden></label></div>
@@ -351,10 +368,10 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
   </div>
 </main>
 <script>
-let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging=false, lightsOnly=false, colourMode='base_colour';
+let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging=false, dragCorner=null, lightsOnly=false, colourMode='base_colour';
 let zoom=1, viewCentre=null;
 const $=id=>document.getElementById(id);
-const fields=['jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed','idle_brightness','idle_seconds','idle_height'];
+const fields=['roi_x_min','roi_x_max','roi_y_min','roi_y_max','jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed','idle_brightness','idle_seconds','idle_height'];
 const heights=['height_min','hill_peak','height_max','idle_height'];
 function cm(dmx){return (dmx*0.762).toFixed(1)} // 0.762 cm per DMX unit, measured; see config.py
 function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
@@ -371,7 +388,7 @@ function setWheel(e){const c=$('colour_wheel'),b=c.getBoundingClientRect(),r=c.w
 function saveColour(){const rgb=hsvToRgb(wheelHue,wheelSat,Number($('colour_value').value)/255);profile.settings[colourMode]=[...rgb,Number($('white_level').value)];}
 function fillColour(){const c=profile.settings[colourMode],hsv=rgbToHsv(c);wheelHue=hsv[0];wheelSat=hsv[1];$('colour_mode').value=colourMode;$('colour_value').value=Math.round(hsv[2]*255);$('white_level').value=c[3];drawColourWheel();readouts();}
 function readForm(){const s=copy(profile.settings);saveColour();for(const n of fields)s[n]=Number($(n).value);s[colourMode]=profile.settings[colourMode];s.idle_water_animation=$('idle_water_animation').value;s.idle_colour_animation=$('idle_colour_animation').value;s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);profile.settings=s;return profile;}
-function readouts(){for(const n of fields){const o=$(n+'_out'),v=$(n).value;if(!o)continue;o.textContent=v;if(heights.includes(n))o.insertAdjacentHTML('beforeend',' <small>'+cm(v)+' cm</small>')}$('colour_value_out').textContent=$('colour_value').value;$('white_level_out').textContent=$('white_level').value;swatch();}
+function readouts(){for(const n of fields){const o=$(n+'_out'),v=$(n).value;if(!o)continue;o.textContent=v;if(heights.includes(n))o.insertAdjacentHTML('beforeend',' <small>'+cm(v)+' cm</small>');if(n.startsWith('roi_'))o.textContent=Number(v).toFixed(2)+' m'}$('colour_value_out').textContent=$('colour_value').value;$('white_level_out').textContent=$('white_level').value;swatch();}
 function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('height_min').max=s.height_max;$('hill_peak').min=s.height_min;$('hill_peak').max=s.height_max;fillColour();buildJets();markPending();draw();status('Edits apply as you make them.');}
 function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><input type="checkbox" '+(on?'checked':'')+'><span>Jet '+(i+1)+'</span></label></div>'));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
@@ -380,7 +397,15 @@ function xy(p){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pa
 function world(x,y){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [v.xmin+(x-pad)/w*(v.xmax-v.xmin),v.ymin+(pad+h-y)/h*(v.ymax-v.ymin)];}
 function scanDot(ctx,p,r,colour){const q=xy(p);ctx.fillStyle=colour;ctx.beginPath();ctx.arc(q[0],q[1],r,0,Math.PI*2);ctx.fill();}
 function jetPoints(points,count){if(count===points.length)return points;const lengths=points.slice(1).map((p,i)=>Math.hypot(p[0]-points[i][0],p[1]-points[i][1])),total=lengths.reduce((a,b)=>a+b,0);if(count<=1||!total)return [points[0]];let segment=0,before=0;return Array.from({length:count},(_,i)=>{const target=total*i/(count-1);while(segment<lengths.length-1&&before+lengths[segment]<target){before+=lengths[segment++]}const a=points[segment],b=points[segment+1],t=lengths[segment]?(target-before)/lengths[segment]:0;return [a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])]});}
-function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);const v=bounds();ctx.strokeStyle='#17474d';ctx.lineWidth=1;for(let x=Math.ceil(v.xmin*2)/2;x<=v.xmax;x+=.5){const a=xy([x,v.ymin]),b=xy([x,v.ymax]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}for(let y=Math.ceil(v.ymin*2)/2;y<=v.ymax;y+=.5){const a=xy([v.xmin,y]),b=xy([v.xmax,y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}if(liveFrame){for(const p of liveFrame.bg||[])scanDot(ctx,p,1.3,'#527277');for(const p of liveFrame.fg||[])scanDot(ctx,p,2.2,'#45dce7');for(const t of liveFrame.tracks||[])scanDot(ctx,[t.x,t.y],t.confirmed?7:5,t.confirmed?(t.seen?'#0f6':'#f44'):'#888')}scanDot(ctx,[0,0],6,'#fff06a');const pts=profile.settings.strip_points;ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();jetPoints(profile.settings.strip_points,profile.settings.jet_count).forEach((p,i)=>{const q=xy(p);ctx.fillStyle='#45dce7';ctx.beginPath();ctx.arc(...q,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(String(i+1),q[0]+6,q[1]-6)});pts.forEach((p,i)=>{const q=xy(p);ctx.strokeStyle=i===selected?'#f3b61f':'#e9fffa';ctx.lineWidth=2;ctx.strokeRect(q[0]-6,q[1]-6,12,12)});}
+function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);const v=bounds();ctx.strokeStyle='#17474d';ctx.lineWidth=1;for(let x=Math.ceil(v.xmin*2)/2;x<=v.xmax;x+=.5){const a=xy([x,v.ymin]),b=xy([x,v.ymax]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}for(let y=Math.ceil(v.ymin*2)/2;y<=v.ymax;y+=.5){const a=xy([v.xmin,y]),b=xy([v.xmax,y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}drawArea(ctx);if(liveFrame){for(const p of liveFrame.bg||[])scanDot(ctx,p,1.3,'#527277');for(const p of liveFrame.fg||[])scanDot(ctx,p,2.2,'#45dce7');for(const t of liveFrame.tracks||[])scanDot(ctx,[t.x,t.y],t.confirmed?7:5,t.confirmed?(t.seen?'#0f6':'#f44'):'#888')}scanDot(ctx,[0,0],6,'#fff06a');const pts=profile.settings.strip_points;ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();jetPoints(profile.settings.strip_points,profile.settings.jet_count).forEach((p,i)=>{const q=xy(p);ctx.fillStyle='#45dce7';ctx.beginPath();ctx.arc(...q,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(String(i+1),q[0]+6,q[1]-6)});pts.forEach((p,i)=>{const q=xy(p);ctx.strokeStyle=i===selected?'#f3b61f':'#e9fffa';ctx.lineWidth=2;ctx.strokeRect(q[0]-6,q[1]-6,12,12)});}
+function area(){const s=profile.settings;return {xmin:s.roi_x_min,xmax:s.roi_x_max,ymin:s.roi_y_min,ymax:s.roi_y_max};}
+function corners(){const a=area();return [[a.xmin,a.ymin],[a.xmax,a.ymin],[a.xmax,a.ymax],[a.xmin,a.ymax]];}
+// Outside the active area is ignored, so it is drawn dark. The corners are handles.
+function drawArea(ctx){const a=area(),c=$('path'),W=c.width/devicePixelRatio,H=c.height/devicePixelRatio,p=xy([a.xmin,a.ymax]),q=xy([a.xmax,a.ymin]);ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,W,p[1]);ctx.fillRect(0,q[1],W,H-q[1]);ctx.fillRect(0,p[1],p[0],q[1]-p[1]);ctx.fillRect(q[0],p[1],W-q[0],q[1]-p[1]);ctx.strokeStyle=dragCorner===null?'#e9fffa':'#f3b61f';ctx.lineWidth=2;ctx.setLineDash([8,6]);ctx.strokeRect(p[0],p[1],q[0]-p[0],q[1]-p[1]);ctx.setLineDash([]);corners().forEach((k,i)=>{const r=xy(k);ctx.fillStyle='#092f35';ctx.strokeStyle=i===dragCorner?'#f3b61f':'#e9fffa';ctx.beginPath();ctx.arc(r[0],r[1],7,0,Math.PI*2);ctx.fill();ctx.stroke()});ctx.fillStyle='#e9fffa';ctx.font='13px "Segoe UI",Arial,sans-serif';ctx.fillText('Active area '+(a.xmax-a.xmin).toFixed(2)+' m x '+(a.ymax-a.ymin).toFixed(2)+' m',p[0]+12,p[1]+18);}
+function nearestCorner(x,y){let best=null,dist=Infinity;corners().forEach((k,i)=>{const q=xy(k),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<400?best:null;}
+// A corner cannot cross a path point or its opposite edge; the server refuses both, and a refusal every 250 ms mid-drag would be noise.
+function moveCorner(i,w){const s=profile.settings,xs=s.strip_points.map(p=>p[0]),ys=s.strip_points.map(p=>p[1]),r=v=>Math.round(v*100)/100;if(i===0||i===3)s.roi_x_min=r(Math.min(w[0],...xs,s.roi_x_max-0.1));else s.roi_x_max=r(Math.max(w[0],...xs,s.roi_x_min+0.1));if(i===0||i===1)s.roi_y_min=r(Math.min(w[1],...ys,s.roi_y_max-0.1));else s.roi_y_max=r(Math.max(w[1],...ys,s.roi_y_min+0.1));for(const n of ['roi_x_min','roi_x_max','roi_y_min','roi_y_max'])$(n).value=s[n];}
+function clampToArea(p){const a=area();return [Math.min(a.xmax,Math.max(a.xmin,p[0])),Math.min(a.ymax,Math.max(a.ymin,p[1]))];}
 function nearest(x,y){let best=0,dist=Infinity;profile.settings.strip_points.forEach((p,i)=>{const q=xy(p),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<900?best:null;}
 let applyTimer=null,pending=false;
 function dirty(){readForm();readouts();draw();if(pending){status('Preview only. Press Apply profile to make it live.');return}clearTimeout(applyTimer);applyTimer=setTimeout(autoApply,250);}
@@ -411,9 +436,9 @@ $('resume-live').onclick=async()=>{try{const d=await api('/actions/test-mode',{e
 $('zoom-in').onclick=()=>setZoom(zoom*1.5);$('zoom-out').onclick=()=>setZoom(zoom/1.5);$('zoom-fit').onclick=()=>setZoom(1);
 $('add-point').onclick=()=>{readForm();const p=profile.settings.strip_points, a=p[Math.max(0,p.length-2)], b=p[p.length-1];p.splice(p.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);selected=p.length-2;dirty()};
 $('remove-point').onclick=()=>{readForm();if(profile.settings.strip_points.length<=2)return status('The path needs at least two points.',true);profile.settings.strip_points.splice(selected,1);selected=Math.max(0,selected-1);dirty()};
-const canvas=$('path');canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY<0?zoom*1.2:zoom/1.2)};canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();const n=nearest(e.clientX-r.left,e.clientY-r.top);if(n!==null){selected=n;if(zoom>1)viewCentre=profile.settings.strip_points[selected];dragging=true;canvas.setPointerCapture(e.pointerId);draw()}};
-canvas.onpointermove=e=>{if(!dragging)return;const r=canvas.getBoundingClientRect();profile.settings.strip_points[selected]=world(e.clientX-r.left,e.clientY-r.top);dirty()};
-canvas.onpointerup=()=>dragging=false;window.onresize=size;init();pollState();
+const canvas=$('path');canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY<0?zoom*1.2:zoom/1.2)};canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();const k=nearestCorner(e.clientX-r.left,e.clientY-r.top);if(k!==null){dragCorner=k;canvas.setPointerCapture(e.pointerId);draw();return}const n=nearest(e.clientX-r.left,e.clientY-r.top);if(n!==null){selected=n;if(zoom>1)viewCentre=profile.settings.strip_points[selected];dragging=true;canvas.setPointerCapture(e.pointerId);draw()}};
+canvas.onpointermove=e=>{const r=canvas.getBoundingClientRect();if(dragCorner!==null){moveCorner(dragCorner,world(e.clientX-r.left,e.clientY-r.top));dirty();return}if(!dragging)return;profile.settings.strip_points[selected]=clampToArea(world(e.clientX-r.left,e.clientY-r.top));dirty()};
+canvas.onpointerup=()=>{dragging=false;if(dragCorner!==null){dragCorner=null;draw()}};window.onresize=size;init();pollState();
 </script></body></html>"""
 
 TEST_PAGE = r"""<!doctype html>
@@ -492,6 +517,7 @@ enter();limits();showHeight();poll();
 
 
 def make_handler(state, cfg, control=None):
+    view = Config()
     control = control or SettingsControl(cfg)
 
     class Handler(BaseHTTPRequestHandler):
@@ -539,8 +565,11 @@ def make_handler(state, cfg, control=None):
                     "default_profile": control.defaults(),
                     "lights_only": control.lights_only,
                     "test_mode": control.test_mode,
-                    "roi": {"xmin": cfg.roi_x_min, "xmax": cfg.roi_x_max,
-                            "ymin": cfg.roi_y_min, "ymax": cfg.roi_y_max},
+                    # The map's view frame. Built from the defaults and padded,
+                    # not from the live area: a shrunken active area must still
+                    # leave room on the map to drag its corners back out.
+                    "roi": {"xmin": view.roi_x_min - 1, "xmax": view.roi_x_max + 1,
+                            "ymin": view.roi_y_min - 1, "ymax": view.roi_y_max + 1},
                 })
             elif self.path == "/settings":
                 self._send(SETTINGS_PAGE, "text/html; charset=utf-8")

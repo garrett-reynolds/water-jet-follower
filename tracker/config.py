@@ -29,6 +29,9 @@ class Config:
     mirror: bool = False                 # flip angle sign if the scan comes out mirrored
     range_min: float = 0.15              # A2 minimum range
     range_max: float = 6.0
+    # The active area. Scan points outside this rectangle are dropped before
+    # tracking, so it sets how far away a person can put water up. Editable on
+    # /settings; every jet point must stay inside it.
     # Nothing behind the sensor. Measured 2026-09-04: bench clutter beside the
     # LiDAR at x -0.35 to -0.05 held a false person for all 273 scans of a test
     # clip. Clipping at x >= 0 removed it. The cost is that the sensor is blind

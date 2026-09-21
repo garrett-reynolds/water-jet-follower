@@ -1,6 +1,6 @@
 # Next steps
 
-Last updated 2026-09-20.
+Last updated 2026-09-21.
 
 ## Where the plan actually lives
 
@@ -35,6 +35,13 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
 ## Open tickets
 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
+- **#37 — Active area rectangle on `/settings`.** Built and on the Pi 2026-09-21 (see
+  `DECISIONS.md`). The four `roi_*` numbers are live-editable; the map draws the rectangle with
+  corner handles; a path point outside is refused. Laptop replay and the Pi's tests pass. **Not
+  yet done:** a real corner drag on the iPad, and walking outside the rectangle to see no track.
+  Close the ticket after that check.
+- **#38 — Shut down and reboot the Pi from `/settings`.** Ticketed 2026-09-21, not started.
+  Needs a sudoers rule on the Pi; the ticket has the order of operations (ALL OFF first).
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
   `PRODUCT.md` are committed. #24 and the five `/settings` fixes #26 to #30 are done (unlock
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
@@ -57,6 +64,9 @@ still reads *"blocked: modules not connected"*. Item 7's absolute accuracy was n
 is step 3 below.
 
 ## Done since the last update
+
+- **2026-09-21:** #37 built and deployed (active area). #38 ticketed (Pi power control).
+  Profile version is now 4; a saved JSON from before is refused by version.
 
 1. ~~Write the tracker.~~ Done. `tracker/` — LiDAR driver, background subtraction, clustering,
    leg pairing, constant-velocity Kalman tracking, record and replay. 16 unit tests pass on the
@@ -154,12 +164,12 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state at close (2026-09-20, about 18:25):** the show was stopped clean (log: `ALL ZERO`)
-  and the Pi left for Garrett to power off with `ssh -t pi@water-jets "sudo poweroff"`; `sudo`
-  needs a password over SSH, so an agent cannot do it. The Pi has the #31 to #34 files. Nothing
-  on the pages saves to disk, so the next start puts the profile back to the config defaults. Test mode is off, the cap is 40, lights-only is on. Nothing
-  on the pages saves to disk, so any restart puts the profile back to the config defaults.
-  Garrett's own `/test` opens are what put it in test mode earlier in the day.
+- **Pi state at close (2026-09-21, about 10:15):** the show is **running** in `--lights-only`
+  (PID 7995, started with the standard `setsid nohup` line) with the #37 files. Test mode off,
+  cap 40. Stop it with the anchored `pkill` line below; power off needs Garrett's
+  `ssh -t pi@water-jets "sudo poweroff"` (`sudo` wants a password over SSH). Nothing on the
+  pages saves to disk, so any restart puts the profile back to the config defaults. The run
+  before it had been left in test mode with the cap unlocked to 255; that did not carry over.
 - **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while
   scrolling, and a tapped jet tile turns green. Garrett checked both on the real iPad.
 - **Loose files in the tree, not committed:** `bom/` holds ROM Raptors estimate spreadsheets
@@ -200,7 +210,8 @@ cap read 40 again, so the unlocked value did not survive the restart.
 Checked on the real iPad 2026-09-20: the bottom bar stays put while scrolling, and a tapped
 jet tile turns green.
 
-**Design tickets:** #32, #33, #34 are done. Next is **#35** (a way back into test mode after
+**Design tickets:** #32, #33, #34 are done; #37 (active area) is built and awaits the iPad
+drag check. Next is **#35** (a way back into test mode after
 Resume; the mode box is its obvious home, see the ticket comment), then #36 (readout typesetting;
 expect to update #34's test assertions when the spans change).
 

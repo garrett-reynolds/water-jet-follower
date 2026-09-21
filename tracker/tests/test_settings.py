@@ -6,6 +6,7 @@ validates, because a half-applied safety limit is worse than a rejected edit.
 
 import unittest
 
+from tracker import geometry
 from tracker.config import Config
 from tracker.settings import PROFILE_VERSION, UNDO_DEPTH, SettingsControl, profile_for
 
@@ -26,6 +27,47 @@ class TestProfiles(unittest.TestCase):
             self.control.apply(profile)
         self.assertEqual(self.cfg.hill_peak, 30)
         self.assertEqual(self.cfg.jet_count, 10)
+
+    def test_active_area_goes_live_on_the_shared_config(self):
+        # (2.0, 0.0) is inside the default area. Pull x max in front of it and the
+        # next scan must drop it, with no restart and no plumbing: to_world reads
+        # the same cfg the profile lands on.
+        scan = [(0.0, 2000.0)]           # straight ahead, 2 m
+        self.assertEqual(len(geometry.to_world(scan, self.cfg)[0]), 1)
+        profile = profile_for(self.cfg)
+        profile["settings"]["roi_x_max"] = 1.9
+        self.control.apply(profile)
+        self.assertEqual(self.cfg.roi_x_max, 1.9)
+        self.assertEqual(geometry.to_world(scan, self.cfg)[0], [])
+
+    def test_active_area_must_be_a_real_rectangle(self):
+        profile = profile_for(self.cfg)
+        profile["settings"]["roi_y_min"] = profile["settings"]["roi_y_max"]
+        with self.assertRaises(ValueError):
+            self.control.apply(profile)
+
+    def test_active_area_must_hold_every_path_point(self):
+        profile = profile_for(self.cfg)
+        profile["settings"]["roi_x_max"] = 1.7     # jet 1 sits at x 1.80
+        with self.assertRaises(ValueError) as caught:
+            self.control.apply(profile)
+        self.assertIn("path point 1", str(caught.exception))
+        self.assertEqual(self.cfg.roi_x_max, 3.5)
+
+        profile = profile_for(self.cfg)
+        points = list(profile["settings"]["strip_points"])
+        points[-1] = (1.54, 2.5)                       # past y max
+        profile["settings"]["strip_points"] = points
+        with self.assertRaises(ValueError):
+            self.control.apply(profile)
+        self.assertEqual(self.cfg.strip_points[-1], (1.54, 1.20))
+
+    def test_a_profile_from_before_the_active_area_is_refused_by_version(self):
+        profile = profile_for(self.cfg)
+        profile["version"] = 3
+        with self.assertRaises(ValueError) as caught:
+            self.control.apply(profile)
+        self.assertIn("version", str(caught.exception))
 
     def test_undo_stack_is_bounded_for_live_apply(self):
         profile = profile_for(self.cfg)

@@ -1035,3 +1035,28 @@ zeroes first, so a reload drops a held jet rather than resuming it.
 existing `.on` yellow box and the design system keeps its signal colours small; the words carry
 the state. (Logged at session close, not when decided.)
 
+## [2026-09-21] The active area is the existing ROI, made editable
+
+Garrett asked for an adjustable rectangle on `/settings` that sets how far away a person can
+activate the jets (#37). The tracker already had one: `roi_x_min` to `roi_y_max` in
+`config.py`, applied in `geometry.to_world` before clustering. It was fixed at start-up.
+
+**Decided:** the four `roi_*` numbers join the editable profile under their existing names.
+`SettingsControl.apply` lands the profile on the shared `cfg`, and `to_world` reads that same
+object on every scan, so the rectangle goes live with no new plumbing. The pages call it the
+"active area". Profile version 3 becomes 4, so a saved JSON from before is refused by version
+instead of by a confusing "complete settings set" message.
+
+**Decided:** every path point must be inside the rectangle, checked on the server as part of
+the whole-profile validation, whichever side moved. A jet point outside the area is a jet no
+walker could ever stand on. The browser also clamps a corner drag at the nearest path point and
+a path-point drag at the area's edge, so live-apply does not flash a refusal every 250 ms.
+
+**Decided:** the settings map's frame comes from the defaults padded by 1 m, not from the live
+area. A shrunken area must leave room on the map to drag its corners back out.
+
+**Ruled out:** a new `active_area` tuple in place of the four fields. It would have renamed
+through `geometry.py`, `/config`, the live viewer and the tests for no change in behaviour.
+
+**Ruled out:** number fields for the four edges. `DESIGN.md` is touch first and a test forbids
+`type="number"` on the settings page. The edges are sliders with metre readouts.
