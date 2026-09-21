@@ -299,7 +299,8 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 .bar.pending #apply { outline:3px solid #f3b61f; outline-offset:2px; }
 #test-banner { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 #test-banner[hidden] { display:none; }
-/* On a phone the page is for the sliders and the stop. The map is the laptop's job. */
+/* On a phone the page is for the sliders and the stop. The map, and with it the active
+   area's corner handles, is the laptop's or the iPad's job. */
 @media (max-width:850px) {
   main { grid-template-columns:1fr; }
   .map { position:relative; height:38vh; }

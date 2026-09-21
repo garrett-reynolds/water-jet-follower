@@ -190,8 +190,9 @@ forced to zero, so nothing gets wet. The third moves water. The last is the stop
 | `tracker/tracking.py` | Clustering, leg pairing, Kalman tracking. |
 | `tracker/wave.py` | Tracks in, one DMX frame out. |
 | `tracker/dmx.py` | DMX out through `olad`, and the stop path. |
-| `tracker/viewer.py` | The web page, served from the Pi. |
-| `tracker/tests/` | 133 tests. Synthetic walkers, so no hardware is needed. |
+| `tracker/viewer.py` | The web pages, served from the Pi: live viewer, settings, test, system. |
+| `tracker/system.py` | The Pi's health and the show's state, for the System page. |
+| `tracker/tests/` | 153 tests. Synthetic walkers, so no hardware is needed. |
 | `bench/` | Throwaway LiDAR probe scripts from the sensor bring-up. |
 | `data/` | Recorded scans and baselines. |
 | `docs/` | The signal chain diagram and the agent docs. |
