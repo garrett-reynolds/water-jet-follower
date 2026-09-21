@@ -34,11 +34,14 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn('id="zoom-fit"', page)
         self.assertIn("pollState()", page)
 
-    def test_settings_page_has_a_draggable_active_area(self):
+    def test_settings_page_has_a_draggable_active_area_and_no_sliders_for_it(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")
+        # The corner handles are the only control: the four sliders went in
+        # 2026-09-21 because the handles were enough. The map says so.
         for name in ("roi_x_min", "roi_x_max", "roi_y_min", "roi_y_max"):
-            self.assertIn(f'id="{name}" type="range"', page)
+            self.assertNotIn(f'id="{name}"', page)
+        self.assertIn('class="map-hint">Dashed box: the active area. Drag its corners.', page)
         self.assertIn("nearestCorner(", page)
         self.assertIn("moveCorner(dragCorner", page)
         self.assertIn("clampToArea(", page)
@@ -207,22 +210,46 @@ class TestSettingsMap(unittest.TestCase):
         self.assertEqual(frame["fg"], [[1.0, 0.5]])
         self.assertEqual(frame["bg"], [[1.2, 0.4]])
 
-    def test_settings_page_has_power_buttons_in_the_profile_box_not_the_bar(self):
+    def test_power_buttons_live_on_the_system_page_not_settings(self):
         with urlopen(self.base + "/settings") as response:
+            settings = response.read().decode("utf-8")
+        self.assertNotIn('id="reboot"', settings)
+        self.assertIn('href="/system"', settings)
+        # A show halted from another page must show Resume here too.
+        self.assertIn("showTestMode(liveFrame.test_mode)", settings)
+        with urlopen(self.base + "/system") as response:
             page = response.read().decode("utf-8")
-        profile = page[page.index("<h2>Profile</h2>"):page.index('<div class="bar"')]
-        self.assertIn('id="reboot"', profile)
-        self.assertIn('id="shutdown"', profile)
+        power = page[page.index("<h2>Power</h2>"):page.index('<div class="bar"')]
+        self.assertIn('id="reboot"', power)
+        self.assertIn('id="shutdown"', power)
         self.assertNotIn('id="reboot" class="danger"', page)   # only stops are red
+        self.assertIn('id="all-off" class="danger"', page)     # the stop never scrolls
         self.assertIn("confirm(POWER[action].ask)", page)
         self.assertIn("'/actions/'+action", page)
         self.assertIn("does not start again on its own", page)
-        # A refused command leaves the show halted, so the banner must follow
-        # /state's test_mode the way /test does, not only the success branch.
-        self.assertIn("showTestMode(liveFrame.test_mode)", page)
         # Both buttons go dead before the request, so a double tap on the iPad
         # cannot fire two power commands while the first one runs.
         self.assertIn("$('reboot').disabled=$('shutdown').disabled=true;try{await api('/actions/'+action", page)
+        # Dead looks dead: a failed poll mutes every readout.
+        self.assertIn("$('main').classList.add('dead')", page)
+
+    def test_every_page_links_to_the_system_page(self):
+        for path in ("/", "/settings", "/test"):
+            with urlopen(self.base + path) as response:
+                self.assertIn('href="/system"', response.read().decode("utf-8"), path)
+
+    def test_system_data_reports_the_pi_and_the_show(self):
+        with urlopen(self.base + "/system-data") as response:
+            data = json.load(response)
+        self.assertEqual(set(data), {"pi", "health", "show"})
+        self.assertTrue(data["pi"]["hostname"])
+        self.assertIn("used_gib", data["health"]["disk"])
+        self.assertEqual(data["show"]["scan_hz"], 16.0)
+        self.assertFalse(data["show"]["test_mode"])
+        self.assertFalse(data["show"]["power_available"], "no callbacks, no power")
+        # Readers for files the laptop does not have answer None, never raise.
+        for key in ("model", "uptime_seconds"):
+            self.assertIn(key, data["pi"])
 
     def _post(self, path):
         request = Request(self.base + path, data=b"{}",

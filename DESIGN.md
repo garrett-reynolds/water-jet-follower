@@ -238,6 +238,7 @@ Two column widths, one bar.
 
 - **Settings page:** a two-column grid, map on the left (`minmax(360px, 1.35fr)`), controls on the right (`minmax(340px, 1fr)`), filling the viewport below a 62 px header. The map is sticky at full remaining height. Under 850 px it stacks: map on top at 38 vh, controls below. On a phone the page is for the sliders and the stop; the map is the laptop's job.
 - **Test page:** one column, max 640 px, centred, 18 px padding, filling the viewport below the header so the bar sits at the bottom even when the page is short. Resume live show lives inside the yellow test-mode box at the top, never next to the stop.
+- **System page:** the test page's column. Readouts are a two-column definition list, label in Muted, value in Ink at 650; a value that reads as trouble (hot, under-voltage, LiDAR gone) is Bad Ink, never Danger. A reading the host lacks is a dash. Reboot and Shut down are plain buttons in their own box; the page ends in the settings bar (status, ALL OFF).
 - **Live viewer:** a full-bleed canvas with fixed overlays pinned to corners at 8 px (HUD top-left, readout top-right, nav bottom-right at 12 px). Under 600 px the HUD drops below the readout.
 - **Inside sections:** a two-column control grid (`repeat(2, minmax(0, 1fr))`, gap 10 px by 14 px). Sliders span both columns. Jet chips use `auto-fill, minmax(96px, 1fr)` at 6 px gaps.
 - **Rhythm:** 4 / 6 / 8 / 10 / 12 / 14 / 16 / 18 / 22 px. Section padding 16 px; sections stack at 14 px; controls stack at 18 px; header padding 12 px by 22 px.

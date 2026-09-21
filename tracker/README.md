@@ -352,8 +352,8 @@ steps back one edit burst, up to 50. Lights-only always forces the water channel
 the browser computer; **Load JSON** previews a saved profile before apply. The layout map draws
 the live LiDAR scan behind the editable path. The dashed rectangle on the map is the **active
 area**: scan points outside it are dropped, so it sets how far away a person can put water up.
-Drag its corners, or use the four sliders in the Active area section. Every path point must stay
-inside it; a profile that puts one outside is refused and names the point. Use the mouse wheel or the `−`, **Fit**, and `+`
+Drag its corners; there are no sliders for it, the handles are the control. Every path point
+must stay inside it; a profile that puts one outside is refused and names the point. Use the mouse wheel or the `−`, **Fit**, and `+`
 buttons to zoom around the selected path point.
 
 **ALL OFF**, **Apply profile**, **Lights only**, and the status line sit in a bar that stays
@@ -362,14 +362,24 @@ show*. Without the halt, the next scan put the hill straight back and the button
 The bar shows a banner while the show is halted; press **Resume live show** to continue. Every
 height slider shows its DMX value and the matching centimetres (0.762 cm per unit).
 
-**Reboot Pi** and **Shut down Pi** sit in the Profile box, plain, not red: only stops are red.
+### System page
+
+`http://water-jets:8080/system` shows what the Pi is doing, polled every two seconds from
+`/system-data` (`tracker/system.py`, `/proc` and `/sys` readers, standard library only):
+model, OS, addresses, clock, uptime; CPU temperature, the firmware's under-voltage and
+throttle flags (`vcgencmd get_throttled`), load, memory, disk; and the show's mode, LiDAR
+rate, `olad` state, PID, and how long it has run. A reading the host does not have (the laptop
+has no `/proc/device-tree`) shows as a dash. When the poll fails every readout goes grey.
+
+**Reboot Pi** and **Shut down Pi** are in its Power box, plain, not red: only stops are red.
 Each asks once. Then the server zeroes every slot and verifies it, halts the show, runs
 `sudo -n /usr/sbin/reboot` or `/usr/sbin/poweroff`, and lets the show loop exit through
 `dmx.safe_output`. If the zero cannot be verified the Pi stays up and the status says to cut
 the 24 V first. If the sudoers rule from the top-level README is missing the Pi refuses, the
-status shows sudo's message, and the show stays halted in test mode. A reboot brings back a Pi
-with **no show running**; start it by hand. Nothing on the page is saved, so the profile comes
-back at its defaults. `--dry-run` has no power buttons that work: they say so.
+status shows sudo's message, and the show stays halted in test mode with Resume on screen. A
+reboot brings back a Pi with **no show running**; start it by hand. Nothing on the pages is
+saved, so the profile comes back at its defaults. `--dry-run` has no power buttons that work:
+they say so. The page has the same **ALL OFF** bar as settings.
 
 ### Test page
 

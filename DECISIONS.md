@@ -1093,3 +1093,27 @@ step 6 is the fix, and Garrett has to install it because that needs the password
 
 **Ruled out:** a boot-time service so a reboot comes back running. Its own ticket; the
 message on the page says the show is not running after a reboot.
+
+## [2026-09-21] The area sliders go; the power buttons move to a System page
+
+Garrett, after the iPad check of #37: the corner handles on the map are enough, so the four
+Active area sliders come out of `/settings`. And the reboot and shutdown buttons (#38) belong
+on a page of their own that also shows the Pi's state.
+
+**Decided:** the sliders are removed. `moveCorner` writes `roi_*` straight into the profile
+and live-apply reads the profile, so nothing else changed. A hint on the map toolbar says what
+the dashed box is and that its corners drag, since the section that said so is gone.
+
+**Decided:** `/system` (`SYSTEM_PAGE`) with `/system-data` from a new `tracker/system.py`:
+model, OS, addresses, uptime, clock; CPU temperature, `vcgencmd get_throttled` flags, load,
+memory, disk; show mode, LiDAR rate, `olad` state, PID, run time. `/proc` and `/sys` readers,
+standard library only, each returning None where the host lacks the file so the page serves on
+the laptop under `--dry-run` without inventing a Pi. Checked on the real Pi: every field reads.
+
+**Decided:** the power buttons live in the System page's Power box; `/settings` loses them and
+links across. The System page keeps the ALL OFF bar and the test-mode banner, because the Stop
+Never Scrolls Rule applies to every paper page, and a page that can halt the show (a refused
+power command does) must be able to resume it.
+
+**Ruled out:** a boot-time service, again. The page still says the show is not running after
+a reboot.

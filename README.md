@@ -35,6 +35,8 @@ walker who stops keeps their hill, because their track is still there.
 - **Two walkers.** One hill each, and they pass through each other cleanly.
 - **Colour by speed.** Slow is blue, fast is white, over a dim base colour.
 - **Attract.** A slow half-height hill rolls end to end when nobody is there. Off by default.
+- **System page.** `/system` shows the Pi's health and the show's state, and reboots or shuts
+  the Pi down from the iPad.
 
 ## 🔩 Hardware
 
@@ -112,8 +114,8 @@ Run steps 1 to 4 and 6 on the Pi, over SSH.
    scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets:~/
    ```
 
-6. **Let the settings page reboot and shut down the Pi.** The **Reboot Pi** and **Shut down
-   Pi** buttons on `/settings` run `sudo -n /usr/sbin/reboot` and `sudo -n /usr/sbin/poweroff`.
+6. **Let the System page reboot and shut down the Pi.** The **Reboot Pi** and **Shut down
+   Pi** buttons on `/system` run `sudo -n /usr/sbin/reboot` and `sudo -n /usr/sbin/poweroff`.
    Without this rule they are refused with "a password is required". Run
    `sudo visudo -f /etc/sudoers.d/water-jets` and make the file exactly this:
 

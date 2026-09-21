@@ -12,7 +12,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from tracker import geometry
+from tracker import geometry, system
 from tracker.config import Config
 from tracker.settings import SettingsControl
 
@@ -59,7 +59,7 @@ PAGE = """<!doctype html>
 </style></head><body>
 <div id="hud">connecting...</div>
 <div id="position">x=--\ny=--\njet=--</div>
-<nav><a href="/test">Test jets</a><a id="settings-link" href="/settings">Settings</a></nav>
+<nav><a href="/test">Test jets</a><a id="settings-link" href="/settings">Settings</a><a href="/system">System</a></nav>
 <canvas id="c"></canvas>
 <script>
 let CFG = null, FRAME = null, polls = 0;
@@ -270,6 +270,8 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 .map { position:sticky; top:0; height:calc(100vh - 62px); background:#092f35; }
 #path { width:100%; height:100%; display:block; touch-action:none; }
 .map-tools { position:absolute; left:16px; bottom:16px; display:flex; gap:8px; flex-wrap:wrap; }
+.map-hint { align-self:center; padding:6px 8px; border:1px solid #3e686c; border-radius:5px;
+  background:#08272ccc; color:#d7efeb; font-size:13px; }
 .map-view { position:absolute; right:16px; top:16px; display:flex; gap:6px; align-items:center;
   padding:6px; border:1px solid #3e686c; border-radius:5px; background:#08272ccc; color:#d7efeb; }
 .map-view button { min-width:38px; background:#123f45; border-color:#47777b; color:white; }
@@ -306,13 +308,14 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
   .colour-sliders { width:100%; }
 }
 </style></head><body>
-<header><h1>Water and light control</h1><nav><a href="/test">Test jets</a><a href="/">Live viewer</a></nav></header>
+<header><h1>Water and light control</h1><nav><a href="/test">Test jets</a><a href="/system">System</a><a href="/">Live viewer</a></nav></header>
 <main>
   <div class="map"><canvas id="path"></canvas><div class="map-view">
     <span id="live-state">LiDAR waiting</span><button id="zoom-out" aria-label="Zoom out">−</button>
     <button id="zoom-fit">Fit</button><button id="zoom-in" aria-label="Zoom in">+</button>
   </div><div class="map-tools">
     <button id="add-point">Add point</button><button id="remove-point">Remove point</button>
+    <span class="map-hint">Dashed box: the active area. Drag its corners. Only people inside it put water up.</span>
   </div></div>
   <div class="controls">
     <section><h2>Water shape</h2><div class="grid">
@@ -347,18 +350,9 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
       <label class="slider"><span>Idle water height <output id="idle_height_out"></output></span><input id="idle_height" type="range" min="1" max="255" step="1"></label>
     </div></section>
     <section><h2>Jet enable</h2><div class="jets" id="jets"></div></section>
-    <section><h2>Active area</h2><p class="note">Only people inside this rectangle can put water up. Drag its corners on the map, or use the sliders. Every path point must stay inside it.</p>
-      <div class="grid">
-        <label class="slider"><span>Along the strip, x min <output id="roi_x_min_out"></output></span><input id="roi_x_min" type="range" min="-1" max="4.5" step="0.05"></label>
-        <label class="slider"><span>Along the strip, x max <output id="roi_x_max_out"></output></span><input id="roi_x_max" type="range" min="-1" max="4.5" step="0.05"></label>
-        <label class="slider"><span>Across the hallway, y min <output id="roi_y_min_out"></output></span><input id="roi_y_min" type="range" min="-3" max="3" step="0.05"></label>
-        <label class="slider"><span>Across the hallway, y max <output id="roi_y_max_out"></output></span><input id="roi_y_max" type="range" min="-3" max="3" step="0.05"></label>
-      </div></section>
-    <section><h2>Profile</h2><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile.</p>
+    <section><h2>Profile</h2><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile. Reboot and shut down are on the <a href="/system">System</a> page.</p>
       <div class="actions"><button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
       <button id="save">Save JSON</button><label class="file">Load JSON<input id="load" type="file" accept="application/json" hidden></label></div>
-      <p class="note">Power. Both zero every slot first and refuse if that cannot be verified. Nothing on this page is saved, so the profile comes back at its defaults. After a reboot the show does not start on its own.</p>
-      <div class="actions" id="power"><button id="reboot">Reboot Pi</button><button id="shutdown">Shut down Pi</button></div>
     </section>
     <div class="bar" id="bar">
       <div id="test-banner" class="warn" hidden>Test mode is on. The live show is not sending. <button id="resume-live">Resume live show</button></div>
@@ -373,7 +367,7 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging=false, dragCorner=null, lightsOnly=false, colourMode='base_colour';
 let zoom=1, viewCentre=null;
 const $=id=>document.getElementById(id);
-const fields=['roi_x_min','roi_x_max','roi_y_min','roi_y_max','jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed','idle_brightness','idle_seconds','idle_height'];
+const fields=['jet_count','height_min','hill_peak','height_max','hill_jets','lead_seconds','follow_response','slow_speed','fast_speed','idle_brightness','idle_seconds','idle_height'];
 const heights=['height_min','hill_peak','height_max','idle_height'];
 function cm(dmx){return (dmx*0.762).toFixed(1)} // 0.762 cm per DMX unit, measured; see config.py
 function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
@@ -390,7 +384,7 @@ function setWheel(e){const c=$('colour_wheel'),b=c.getBoundingClientRect(),r=c.w
 function saveColour(){const rgb=hsvToRgb(wheelHue,wheelSat,Number($('colour_value').value)/255);profile.settings[colourMode]=[...rgb,Number($('white_level').value)];}
 function fillColour(){const c=profile.settings[colourMode],hsv=rgbToHsv(c);wheelHue=hsv[0];wheelSat=hsv[1];$('colour_mode').value=colourMode;$('colour_value').value=Math.round(hsv[2]*255);$('white_level').value=c[3];drawColourWheel();readouts();}
 function readForm(){const s=copy(profile.settings);saveColour();for(const n of fields)s[n]=Number($(n).value);s[colourMode]=profile.settings[colourMode];s.idle_water_animation=$('idle_water_animation').value;s.idle_colour_animation=$('idle_colour_animation').value;s.reverse_jets=$('reverse_jets').checked;s.jet_enabled=[...document.querySelectorAll('.jet input')].map(x=>x.checked);profile.settings=s;return profile;}
-function readouts(){for(const n of fields){const o=$(n+'_out'),v=$(n).value;if(!o)continue;o.textContent=v;if(heights.includes(n))o.insertAdjacentHTML('beforeend',' <small>'+cm(v)+' cm</small>');if(n.startsWith('roi_'))o.textContent=Number(v).toFixed(2)+' m'}$('colour_value_out').textContent=$('colour_value').value;$('white_level_out').textContent=$('white_level').value;swatch();}
+function readouts(){for(const n of fields){const o=$(n+'_out'),v=$(n).value;if(!o)continue;o.textContent=v;if(heights.includes(n))o.insertAdjacentHTML('beforeend',' <small>'+cm(v)+' cm</small>');}$('colour_value_out').textContent=$('colour_value').value;$('white_level_out').textContent=$('white_level').value;swatch();}
 function fill(){const s=profile.settings;for(const n of fields)$(n).value=s[n];$('idle_water_animation').value=s.idle_water_animation;$('idle_colour_animation').value=s.idle_colour_animation;$('reverse_jets').checked=s.reverse_jets;$('height_max').disabled=!$('unlock').checked;$('idle_height').min=s.height_min;$('idle_height').max=s.height_max;$('height_min').max=s.height_max;$('hill_peak').min=s.height_min;$('hill_peak').max=s.height_max;fillColour();buildJets();markPending();draw();status('Edits apply as you make them.');}
 function buildJets(){const count=Number($('jet_count').value)||profile.settings.jet_count;let e=profile.settings.jet_enabled||[];while(e.length<count)e.push(true);e=e.slice(0,count);profile.settings.jet_enabled=e;const box=$('jets');box.innerHTML='';e.forEach((on,i)=>box.insertAdjacentHTML('beforeend','<div class="jet"><label><input type="checkbox" '+(on?'checked':'')+'><span>Jet '+(i+1)+'</span></label></div>'));}
 function size(){const c=$('path'),r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;draw();}
@@ -406,7 +400,7 @@ function corners(){const a=area();return [[a.xmin,a.ymin],[a.xmax,a.ymin],[a.xma
 function drawArea(ctx){const a=area(),c=$('path'),W=c.width/devicePixelRatio,H=c.height/devicePixelRatio,p=xy([a.xmin,a.ymax]),q=xy([a.xmax,a.ymin]);ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillRect(0,0,W,p[1]);ctx.fillRect(0,q[1],W,H-q[1]);ctx.fillRect(0,p[1],p[0],q[1]-p[1]);ctx.fillRect(q[0],p[1],W-q[0],q[1]-p[1]);ctx.strokeStyle=dragCorner===null?'#e9fffa':'#f3b61f';ctx.lineWidth=2;ctx.setLineDash([8,6]);ctx.strokeRect(p[0],p[1],q[0]-p[0],q[1]-p[1]);ctx.setLineDash([]);corners().forEach((k,i)=>{const r=xy(k);ctx.fillStyle='#092f35';ctx.strokeStyle=i===dragCorner?'#f3b61f':'#e9fffa';ctx.beginPath();ctx.arc(r[0],r[1],7,0,Math.PI*2);ctx.fill();ctx.stroke()});ctx.fillStyle='#e9fffa';ctx.font='13px "Segoe UI",Arial,sans-serif';ctx.fillText('Active area '+(a.xmax-a.xmin).toFixed(2)+' m x '+(a.ymax-a.ymin).toFixed(2)+' m',p[0]+12,p[1]+18);}
 function nearestCorner(x,y){let best=null,dist=Infinity;corners().forEach((k,i)=>{const q=xy(k),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<400?best:null;}
 // A corner cannot cross a path point or its opposite edge; the server refuses both, and a refusal every 250 ms mid-drag would be noise.
-function moveCorner(i,w){const s=profile.settings,xs=s.strip_points.map(p=>p[0]),ys=s.strip_points.map(p=>p[1]),r=v=>Math.round(v*100)/100;if(i===0||i===3)s.roi_x_min=r(Math.min(w[0],...xs,s.roi_x_max-0.1));else s.roi_x_max=r(Math.max(w[0],...xs,s.roi_x_min+0.1));if(i===0||i===1)s.roi_y_min=r(Math.min(w[1],...ys,s.roi_y_max-0.1));else s.roi_y_max=r(Math.max(w[1],...ys,s.roi_y_min+0.1));for(const n of ['roi_x_min','roi_x_max','roi_y_min','roi_y_max'])$(n).value=s[n];}
+function moveCorner(i,w){const s=profile.settings,xs=s.strip_points.map(p=>p[0]),ys=s.strip_points.map(p=>p[1]),r=v=>Math.round(v*100)/100;if(i===0||i===3)s.roi_x_min=r(Math.min(w[0],...xs,s.roi_x_max-0.1));else s.roi_x_max=r(Math.max(w[0],...xs,s.roi_x_min+0.1));if(i===0||i===1)s.roi_y_min=r(Math.min(w[1],...ys,s.roi_y_max-0.1));else s.roi_y_max=r(Math.max(w[1],...ys,s.roi_y_min+0.1));}
 function clampToArea(p){const a=area();return [Math.min(a.xmax,Math.max(a.xmin,p[0])),Math.min(a.ymax,Math.max(a.ymin,p[1]))];}
 function nearest(x,y){let best=0,dist=Infinity;profile.settings.strip_points.forEach((p,i)=>{const q=xy(p),d=(q[0]-x)**2+(q[1]-y)**2;if(d<dist){dist=d;best=i}});return dist<900?best:null;}
 let applyTimer=null,pending=false;
@@ -415,15 +409,9 @@ async function autoApply(){const p=copy(readForm());p.settings.height_max=origin
 async function apply(){clearTimeout(applyTimer);try{readForm();profile=await api('/settings/apply',{profile,unlock_height_max:$('unlock').checked});original=copy(profile);$('unlock').checked=false;pending=false;fill();status('Profile applied.');}catch(e){status(e.message,true)}}
 function showTestMode(on){$('test-banner').hidden=!on;}
 async function init(){try{const data=await api('/settings-data');profile=data.profile;original=copy(profile);defaultProfile=data.default_profile;roi=data.roi;lightsOnly=data.lights_only;fill();$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');showTestMode(data.test_mode);size();}catch(e){status(e.message,true)}}
-let linkDown=false, powering=null;
+let linkDown=false;
 // Dead looks dead: when the poll fails the scan and the tracks are wiped, not left painted under a small pill.
-// After Reboot or Shut down the drop is expected, so the power message stays instead of "LiDAR not available".
-async function pollState(){if(powering)return;try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';if(linkDown){linkDown=false;status('LiDAR is back.')}if(typeof liveFrame.test_mode==='boolean')showTestMode(liveFrame.test_mode);draw()}catch(e){$('live-state').textContent='LiDAR not available';if(!linkDown){linkDown=true;liveFrame=null;draw();status('LiDAR not available.',true)}}setTimeout(pollState,100)}
-// Power: ask once, then the server zeroes and verifies before it runs anything. A refusal comes back as a red status.
-const POWER={reboot:{ask:'Reboot the Pi? The show stops, and it does not start again on its own.',done:'Rebooting. Reload this page in about a minute. The show is not running until it is started again.'},
-             shutdown:{ask:'Shut down the Pi? The show stops. Cut the power once the green LED is out.',done:'Shutting down. Wait for the green LED to go out, then cut the power.'}};
-async function power(action){if(!confirm(POWER[action].ask))return;$('reboot').disabled=$('shutdown').disabled=true;try{await api('/actions/'+action,{});powering=action;showTestMode(true);linkDown=true;liveFrame=null;draw();$('live-state').textContent='Pi '+(action==='reboot'?'rebooting':'shutting down');status(POWER[action].done)}catch(e){$('reboot').disabled=$('shutdown').disabled=false;status(e.message,true)}}
-$('reboot').onclick=()=>power('reboot');$('shutdown').onclick=()=>power('shutdown');
+async function pollState(){try{liveFrame=await api('/state');const count=(liveFrame.fg||[]).length+(liveFrame.bg||[]).length;$('live-state').textContent='LiDAR live · '+count+' points';if(linkDown){linkDown=false;status('LiDAR is back.')}if(typeof liveFrame.test_mode==='boolean')showTestMode(liveFrame.test_mode);draw()}catch(e){$('live-state').textContent='LiDAR not available';if(!linkDown){linkDown=true;liveFrame=null;draw();status('LiDAR not available.',true)}}setTimeout(pollState,100)}
 function setZoom(value){zoom=Math.max(1,Math.min(8,value));if(zoom===1)viewCentre=null;else if(profile)viewCentre=profile.settings.strip_points[selected];draw()}
 $('unlock').onchange=()=>{$('height_max').disabled=!$('unlock').checked};
 $('jet_count').oninput=()=>{const count=Number($('jet_count').value);profile.settings.strip_points=jetPoints(profile.settings.strip_points,count);selected=Math.min(selected,count-1);readForm();buildJets();dirty()};
@@ -473,7 +461,7 @@ button { padding:12px 14px; min-height:48px; }
 #seen { font-size:22px; font-weight:650; }
 .warn { margin:0 0 12px; }
 </style></head><body>
-<header><h1>Water jet test</h1><nav><a href="/settings">Settings</a><a href="/">Live viewer</a></nav></header>
+<header><h1>Water jet test</h1><nav><a href="/settings">Settings</a><a href="/system">System</a><a href="/">Live viewer</a></nav></header>
 <main>
   <div id="mode" class="off"><span id="mode-text" class="text">Entering test mode.</span><button id="resume" hidden>Resume live show</button></div>
   <section><h2>Where the tracker sees you</h2>
@@ -520,6 +508,72 @@ $('jet').oninput=()=>$('jet_out').textContent=$('jet').value;$('height').oninput
 async function limits(){try{const s=(await api('/settings-data')).profile.settings;$('jet').max=s.jet_count;$('height').min=s.height_min;$('height').max=s.height_max;if(Number($('height').value)<s.height_min)$('height').value=s.height_min;showHeight()}catch(e){}}
 $('start').onclick=start;$('stop').onclick=stop;$('resume').onclick=resume;
 enter();limits();showHeight();poll();
+</script></body></html>
+"""
+
+
+SYSTEM_PAGE = r"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Water jet system</title>
+<style>""" + SHARED_CSS + r"""
+main { max-width:640px; margin:0 auto; padding:18px 18px 0; min-height:calc(100vh - 62px);
+  display:flex; flex-direction:column; }
+button { padding:12px 14px; min-height:48px; }
+/* Readouts: label on the left in Muted, value on the right in Ink, one row each. */
+dl { display:grid; grid-template-columns:minmax(120px,auto) 1fr; gap:6px 14px; margin:0; }
+dt { color:var(--muted); }
+dd { margin:0; font-weight:650; overflow-wrap:anywhere; }
+dd.bad { color:var(--bad-ink); }
+main.dead dd { color:var(--muted); font-weight:400; }
+.bar { position:sticky; bottom:0; margin-top:auto; padding:10px 0 14px; display:flex; gap:8px;
+  align-items:center; flex-wrap:wrap; background:var(--paper); border-top:1px solid var(--line); }
+.bar .status { flex:1 1 120px; min-width:0; }
+.bar button { flex:0 0 auto; }
+.warn { margin:0 0 12px; }
+</style></head><body>
+<header><h1>Water jet system</h1><nav><a href="/settings">Settings</a><a href="/test">Test jets</a><a href="/">Live viewer</a></nav></header>
+<main id="main">
+  <div id="test-banner" class="warn" hidden>Test mode is on. The live show is not sending. <button id="resume-live">Resume live show</button></div>
+  <section><h2>Raspberry Pi</h2><dl id="pi"></dl></section>
+  <section><h2>Health</h2><dl id="health"></dl></section>
+  <section><h2>Show</h2><dl id="show"></dl></section>
+  <section><h2>Power</h2>
+    <p class="note">Both zero every slot first and refuse if that cannot be verified. Nothing on the pages is saved, so the profile comes back at its defaults. After a reboot the show does not start on its own.</p>
+    <div class="actions"><button id="reboot">Reboot Pi</button><button id="shutdown">Shut down Pi</button></div>
+  </section>
+  <div class="bar" id="bar">
+    <div id="status" class="status" aria-live="polite">Loading.</div>
+    <button id="all-off" class="danger">ALL OFF</button>
+  </div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function status(text,bad=false){$('status').textContent=text;$('status').className=bad?'status bad':'status';}
+async function api(path,body){const r=await fetch(path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const data=await r.json();if(!r.ok)throw Error(data.error||r.statusText);return data;}
+function showTestMode(on){$('test-banner').hidden=!on;}
+function span(s){if(s==null)return '—';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+' d ':'')+(d||h?h+' h ':'')+m+' min';}
+// Each row is [label, value, bad?]. A null value reads as a dash: the laptop has no /proc/device-tree.
+function rows(id,list){$(id).innerHTML=list.map(([k,v,bad])=>'<dt>'+k+'</dt><dd'+(bad?' class="bad"':'')+'>'+(v==null?'—':v)+'</dd>').join('');}
+function render(d){const p=d.pi,h=d.health,s=d.show,t=h.throttled,mem=h.memory,disk=h.disk;
+  rows('pi',[['Hostname',p.hostname],['Model',p.model],['OS',p.os+' · '+p.kernel],['Addresses',p.addresses.join(', ')||null],['Clock',p.clock],['Up for',span(p.uptime_seconds)]]);
+  rows('health',[['CPU temperature',h.cpu_temp_c==null?null:h.cpu_temp_c+' °C',h.cpu_temp_c>=80],
+    ['Power supply',t==null?null:t.under_voltage_now?'UNDER-VOLTAGE NOW':t.under_voltage_ever?'ok now, under-voltage since boot':'ok',t&&(t.under_voltage_now||t.under_voltage_ever)],
+    ['Throttling',t==null?null:t.throttled_now?'THROTTLED NOW':t.throttled_ever?'ok now, throttled since boot':'none',t&&(t.throttled_now||t.throttled_ever)],
+    ['Load (1, 5, 15 min)',h.load?h.load.map(v=>v.toFixed(2)).join('  '):null,h.load&&h.load[0]>3],
+    ['Memory',mem?mem.used_mib+' of '+mem.total_mib+' MiB used':null],
+    ['Disk',disk?disk.used_gib+' of '+disk.total_gib+' GiB used':null,disk&&disk.total_gib-disk.used_gib<1]]);
+  rows('show',[['Mode',s.test_mode?'TEST MODE, not sending':s.lights_only?'Live, lights only':'LIVE, water can move'],['LiDAR',s.lidar_ok?'ok, '+s.scan_hz+' Hz':'NOT AVAILABLE',!s.lidar_ok],['OLA (olad)',s.olad_active==null?null:s.olad_active?'running':'NOT RUNNING',s.olad_active===false],['Source',s.source],['Show running for',span(s.running_seconds)],['Process',s.pid+' · Python '+s.python],['Power control',s.power_available?'available':'not in this run mode']]);
+  showTestMode(s.test_mode);}
+let linkDown=false, powering=null;
+// Dead looks dead: when the poll fails every readout goes Muted, and the last numbers do not pass for live ones.
+async function poll(){if(powering)return;try{render(await api('/system-data'));$('main').classList.remove('dead');if(linkDown){linkDown=false;status('Pi is back.')}}catch(e){$('main').classList.add('dead');if(!linkDown){linkDown=true;status('Pi not reachable.',true)}}setTimeout(poll,2000)}
+const POWER={reboot:{ask:'Reboot the Pi? The show stops, and it does not start again on its own.',done:'Rebooting. Reload this page in about a minute. The show is not running until it is started again.'},
+             shutdown:{ask:'Shut down the Pi? The show stops. Cut the power once the green LED is out.',done:'Shutting down. Wait for the green LED to go out, then cut the power.'}};
+async function power(action){if(!confirm(POWER[action].ask))return;$('reboot').disabled=$('shutdown').disabled=true;try{await api('/actions/'+action,{});powering=action;showTestMode(true);$('main').classList.add('dead');status(POWER[action].done)}catch(e){$('reboot').disabled=$('shutdown').disabled=false;status(e.message,true)}}
+$('reboot').onclick=()=>power('reboot');$('shutdown').onclick=()=>power('shutdown');
+$('all-off').onclick=async()=>{try{const d=await api('/actions/all-off',{});showTestMode(true);status(d.all_zero?'ALL OFF verified. All 512 slots are zero. The live show is halted; press Resume live show to continue.':'ALL OFF could not be verified. Cut the 24 V.',!d.all_zero)}catch(e){status(e.message,true)}};
+$('resume-live').onclick=async()=>{try{const d=await api('/actions/test-mode',{enabled:false});showTestMode(false);status(d.all_zero===false?'Zero could not be verified. Cut the 24 V.':'Live show resumed.',d.all_zero===false)}catch(e){status(e.message,true)}};
+poll();
 </script></body></html>
 """
 
@@ -583,6 +637,10 @@ def make_handler(state, cfg, control=None):
                 self._send(SETTINGS_PAGE, "text/html; charset=utf-8")
             elif self.path == "/test":
                 self._send(TEST_PAGE, "text/html; charset=utf-8")
+            elif self.path == "/system":
+                self._send(SYSTEM_PAGE, "text/html; charset=utf-8")
+            elif self.path == "/system-data":
+                self._json(system.snapshot(state, control))
             elif self.path in ("/", "/index.html"):
                 self._send(PAGE, "text/html; charset=utf-8")
             else:
