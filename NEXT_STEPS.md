@@ -44,7 +44,8 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   Pi's health and the show's state. `/actions/reboot` and `/actions/shutdown`,
   zero-and-verify first, refuse otherwise. A refused command shows Resume. The four Active
   area sliders came off `/settings` the same day; the map's corner handles are the control.
-  153 tests pass on the laptop and the Pi.
+  153 tests pass on the laptop and the Pi. Garrett checked the System page on the iPad
+  2026-09-21: every value fills in.
   **Not yet done:** Garrett must install the sudoers rule (`README.md` Setup step 6; it needs
   the Pi password), then the bench check in the ticket: Reboot from the iPad, log ends in
   `ALL ZERO`, Pi comes back on SSH; Shut down, green LED out, power-cycle by hand.
