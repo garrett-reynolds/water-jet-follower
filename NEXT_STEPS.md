@@ -46,9 +46,9 @@ Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is 
   area sliders came off `/settings` the same day; the map's corner handles are the control.
   153 tests pass on the laptop and the Pi. Garrett checked the System page on the iPad
   2026-09-21: every value fills in.
-  **Not yet done:** Garrett must install the sudoers rule (`README.md` Setup step 6; it needs
-  the Pi password), then the bench check in the ticket: Reboot from the iPad, log ends in
-  `ALL ZERO`, Pi comes back on SSH; Shut down, green LED out, power-cycle by hand.
+  Garrett installed the sudoers rule 2026-09-21 (`sudo -n -l /usr/sbin/poweroff` lists it)
+  and Shut down Pi from the iPad powered the Pi off; SSH stopped answering. Closed. The
+  Reboot button has not been pressed yet; it uses the same rule, so it is expected to work.
 - **#25 — Design system for the control pages.** `DESIGN.md` ("The Bench Instrument") and
   `PRODUCT.md` are committed. #24 and the five `/settings` fixes #26 to #30 are done (unlock
   target, amber on Apply, dead map on link drop, phone room for sliders, bar on one row). The
@@ -73,7 +73,8 @@ is step 3 below.
 ## Done since the last update
 
 - **2026-09-21:** #37 built, deployed, checked on the iPad, and closed (active area). #38
-  built (Pi power control); waits on the sudoers rule and the bench check.
+  built (Pi power control), sudoers rule installed, Shut down checked from the iPad, closed.
+  #39 (folding boxes, profile kept across restarts) built, deployed, checked, closed.
   Profile version is now 4; a saved JSON from before is refused by version.
 
 1. ~~Write the tracker.~~ Done. `tracker/` — LiDAR driver, background subtraction, clustering,
@@ -172,16 +173,15 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state at close (2026-09-21, about 11:00):** the show is **running** in `--lights-only`
-  (PID 12397, started with the standard `setsid nohup` line) with the #38 and System page files. Test mode off,
-  cap 40. Stop it with the anchored `pkill` line below; power off needs Garrett's
-  `ssh -t pi@water-jets "sudo poweroff"` until the sudoers rule from `README.md` Setup step 6
-  is installed, after which the page's Shut down Pi button does it. Since 2026-09-21 every
+- **Pi state at close (2026-09-21, afternoon):** the Pi is **powered off**; Garrett shut it
+  down from the iPad's Shut down Pi button after installing the sudoers rule. On power-up
+  **no show runs** (no boot service yet); start it with the `setsid nohup` line below. Before
+  the shutdown it ran LIVE at cap 40 with the #39 files. Since 2026-09-21 every
   applied profile is written to `~/data/profile.json` and read back on start, so a restart
   keeps the settings. Deployed 2026-09-21; the pre-restart profile was re-applied so
   `~/data/profile.json` exists (cap 40). Checked on the Pi the same day: after a restart
   `~/show.log` reads `show: settings restored from data/profile.json` and the page loads.
-  Left running: PID 17505, LIVE, cap 40, started with the `setsid nohup` line below.
+  That run (PID 17505) ended with the shutdown.
 - **Settings boxes fold (2026-09-21):** each `/settings` box collapses from its title row and
   the browser remembers which are closed (`localStorage`). Garrett checked the folding on the
   iPad; the remembered state on the iPad is not yet eyeballed.
