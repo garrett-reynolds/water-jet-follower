@@ -166,13 +166,13 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   iPad 2026-09-20: stepping out of view turns the entry grey with (lost), then it vanishes.
 - **Next in the design work:** fix #35 and #36, critique `/`, then move the shared CSS to one
   served file, then `/impeccable document`.
-- **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` a red
-  "ALL OFF" in the same slot, both calling `/actions/all-off`. Renaming a safety button is not
-  a refinement.
+- **Not ticketed, Garrett's call:** `/test` has a red "Stop test" and `/settings` and
+  `/system` each a red "ALL OFF" in the same slot, all three calling `/actions/all-off`. The
+  System page made it three (2026-09-21). Renaming a safety button is not a refinement.
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state at close (2026-09-21, about 10:50):** the show is **running** in `--lights-only`
+- **Pi state at close (2026-09-21, about 11:00):** the show is **running** in `--lights-only`
   (PID 12397, started with the standard `setsid nohup` line) with the #38 and System page files. Test mode off,
   cap 40. Stop it with the anchored `pkill` line below; power off needs Garrett's
   `ssh -t pi@water-jets "sudo poweroff"` until the sudoers rule from `README.md` Setup step 6
@@ -182,7 +182,8 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   scrolling, and a tapped jet tile turns green. Garrett checked both on the real iPad.
 - **Loose files in the tree, not committed:** `bom/` holds ROM Raptors estimate spreadsheets
   that look like they belong to another project; `AGENTS.md` is the Codex copy; `.claude/` is
-  local tooling. Decide whether `bom/` moves out or gets a `.gitignore` rule.
+  local tooling. Decide whether `bom/` moves out or gets a `.gitignore` rule (asked twice on
+  2026-09-21, not yet answered).
 - **Git prints "failed to delete .git/worktrees/agent-…: Permission denied" on commit.** Stale
   agent worktrees with a locked folder. Harmless so far; `git worktree prune` from a shell
   with no agent running should clear it.
