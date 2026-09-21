@@ -289,6 +289,15 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
 .jet label { display:flex; align-items:center; gap:4px; min-height:44px; padding:9px 10px;
   border:1px solid var(--line); border-radius:4px; color:var(--ink); font-size:14px; cursor:pointer; }
 .jet label:has(input:checked) { background:var(--light); border-color:var(--water); }
+/* Each settings box folds shut from its title row. The row is a 40 px touch target with
+   its own fold mark, so a wet thumb can close what it is not using. */
+details > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; margin:-4px 0; cursor:pointer; }
+details > summary::-webkit-details-marker { display:none; }
+details > summary h2 { margin:0; }
+details > summary::after { content:"−"; flex:0 0 auto; width:28px; text-align:center; color:var(--muted); font-size:20px; font-weight:400; }
+details:not([open]) > summary::after { content:"+"; }
+details[open] > summary { margin-bottom:4px; } /* 40 px row, 23 px title: 8.5 px slack + 4 = the 12 px below every title */
+summary:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; border-radius:4px; }
 /* The stop button and the apply button never leave the screen. A stop you have
    to scroll to is not a stop. */
 .bar { position:sticky; bottom:0; margin-top:auto; padding:10px 0 14px; display:grid; gap:8px;
@@ -319,7 +328,7 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
     <span class="map-hint">Dashed box: the active area. Drag its corners. Only people inside it put water up.</span>
   </div></div>
   <div class="controls">
-    <section><h2>Water shape</h2><div class="grid">
+    <section><details open><summary><h2>Water shape</h2></summary><div class="grid">
       <label class="slider"><span>Jet count <output id="jet_count_out"></output></span><input id="jet_count" type="range" min="1" max="20" step="1"></label>
       <label class="slider"><span>Minimum active height <output id="height_min_out"></output></span><input id="height_min" type="range" min="1" max="255" step="1"></label>
       <label class="slider"><span>Normal hill height <output id="hill_peak_out"></output></span><input id="hill_peak" type="range" min="1" max="255" step="1"></label>
@@ -329,8 +338,8 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
       <label class="slider"><span>Lead time in seconds <output id="lead_seconds_out"></output></span><input id="lead_seconds" type="range" min="0" max="2" step="0.01"></label>
       <label class="slider"><span>Follow response in seconds <output id="follow_response_out"></output></span><input id="follow_response" type="range" min="0" max="5" step="0.01"></label>
       <label><span><input id="reverse_jets" type="checkbox"> Reverse jet order</span></label>
-    </div></section>
-    <section><h2>Colours</h2>
+    </div></details></section>
+    <section><details open><summary><h2>Colours</h2></summary>
       <label>Set colour for<select id="colour_mode"><option value="base_colour">Base</option><option value="slow_colour">Slow person</option><option value="fast_colour">Fast person</option><option value="idle_colour">Idle animation</option></select></label>
       <div class="colour-control"><canvas id="colour_wheel" width="180" height="180" aria-label="Colour wheel"></canvas>
         <div class="colour-sliders">
@@ -342,19 +351,19 @@ main { display:grid; grid-template-columns:minmax(360px,1.35fr) minmax(340px,1fr
       <div class="grid" style="margin-top:10px">
         <label class="slider"><span>Slow speed in m/s <output id="slow_speed_out"></output></span><input id="slow_speed" type="range" min="0" max="4" step="0.05"></label>
         <label class="slider"><span>Fast speed in m/s <output id="fast_speed_out"></output></span><input id="fast_speed" type="range" min="0" max="4" step="0.05"></label>
-      </div></section>
-    <section><h2>Idle animations</h2><div class="grid">
+      </div></details></section>
+    <section><details open><summary><h2>Idle animations</h2></summary><div class="grid">
       <label>Water<select id="idle_water_animation"><option value="off">Off</option><option value="roll">Roll</option><option value="ripple">Ripple</option><option value="pulse">Pulse</option></select></label>
       <label>Colour<select id="idle_colour_animation"><option value="off">Off</option><option value="chase">Chase</option><option value="fade">Fade</option><option value="breathe">Breathe</option></select></label>
       <label class="slider"><span>Idle brightness <output id="idle_brightness_out"></output></span><input id="idle_brightness" type="range" min="0" max="255" step="1"></label>
       <label class="slider"><span>Cycle time in seconds <output id="idle_seconds_out"></output></span><input id="idle_seconds" type="range" min="0.5" max="120" step="0.5"></label>
       <label class="slider"><span>Idle water height <output id="idle_height_out"></output></span><input id="idle_height" type="range" min="1" max="255" step="1"></label>
-    </div></section>
-    <section><h2>Jet enable</h2><div class="jets" id="jets"></div></section>
-    <section><h2>Profile</h2><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile. Reboot and shut down are on the <a href="/system">System</a> page.</p>
+    </div></details></section>
+    <section><details open><summary><h2>Jet enable</h2></summary><div class="jets" id="jets"></div></details></section>
+    <section><details open><summary><h2>Profile</h2></summary><p class="note">Edits go live as you make them. The hard maximum, Load JSON, and Reset defaults wait for Apply profile. Reboot and shut down are on the <a href="/system">System</a> page.</p>
       <div class="actions"><button id="undo">Undo applied</button><button id="reset">Reset defaults</button>
       <button id="save">Save JSON</button><label class="file">Load JSON<input id="load" type="file" accept="application/json" hidden></label></div>
-    </section>
+    </details></section>
     <div class="bar" id="bar">
       <div id="test-banner" class="warn" hidden>Test mode is on. The live show is not sending. <button id="resume-live">Resume live show</button></div>
       <div class="row"><div id="status" class="status" aria-live="polite">Loading settings.</div>
@@ -435,7 +444,10 @@ $('add-point').onclick=()=>{readForm();const p=profile.settings.strip_points, a=
 $('remove-point').onclick=()=>{readForm();if(profile.settings.strip_points.length<=2)return status('The path needs at least two points.',true);profile.settings.strip_points.splice(selected,1);selected=Math.max(0,selected-1);dirty()};
 const canvas=$('path');canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY<0?zoom*1.2:zoom/1.2)};canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();const k=nearestCorner(e.clientX-r.left,e.clientY-r.top);if(k!==null){dragCorner=k;canvas.setPointerCapture(e.pointerId);draw();return}const n=nearest(e.clientX-r.left,e.clientY-r.top);if(n!==null){selected=n;if(zoom>1)viewCentre=profile.settings.strip_points[selected];dragging=true;canvas.setPointerCapture(e.pointerId);draw()}};
 canvas.onpointermove=e=>{const r=canvas.getBoundingClientRect();if(dragCorner!==null){moveCorner(dragCorner,world(e.clientX-r.left,e.clientY-r.top));dirty();return}if(!dragging)return;profile.settings.strip_points[selected]=clampToArea(world(e.clientX-r.left,e.clientY-r.top));dirty()};
-canvas.onpointerup=()=>{dragging=false;if(dragCorner!==null){dragCorner=null;draw()}};window.onresize=size;init();pollState();
+canvas.onpointerup=()=>{dragging=false;if(dragCorner!==null){dragCorner=null;draw()}};window.onresize=size;
+// Each box remembers whether it was open, per browser, so the iPad keeps the layout you chose.
+for(const d of document.querySelectorAll('details')){const key='fold:'+d.querySelector('h2').textContent;try{if(localStorage.getItem(key)==='closed')d.open=false}catch(e){}d.ontoggle=()=>{try{localStorage.setItem(key,d.open?'open':'closed')}catch(e){}}}
+init();pollState();
 </script></body></html>"""
 
 TEST_PAGE = r"""<!doctype html>

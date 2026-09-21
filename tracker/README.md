@@ -349,7 +349,17 @@ about a quarter of a second after the last change, as one complete versioned pro
 things wait for **Apply profile** because they are big jumps: the hard maximum (unlock it first),
 **Load JSON**, and **Reset defaults**. Live-apply never touches the hard maximum. **Undo applied**
 steps back one edit burst, up to 50. Lights-only always forces the water channel to zero. **Save JSON** downloads the profile to
-the browser computer; **Load JSON** previews a saved profile before apply. The layout map draws
+the browser computer; **Load JSON** previews a saved profile before apply.
+
+Every applied profile is also written to `data/profile.json` under the show's working
+directory (`~/data/profile.json` on the Pi), and `show` reads it back on start, so a restart
+or a reboot keeps the settings, hard maximum included. The write is whole-file, so a power cut
+mid-write leaves the previous file. A file that will not parse or validate is reported on the
+console and skipped. `--profile PATH` moves the file; `--profile ''` starts from the code
+defaults without reading or writing one. `--height-max` still overrides whatever was saved.
+**Reset defaults** means the code defaults, not the saved file. Lights-only and test mode
+are not part of the profile; they always come back off and live. `live` and `replay` serve
+the same pages but keep nothing: edits made there are gone when they exit. The layout map draws
 the live LiDAR scan behind the editable path. The dashed rectangle on the map is the **active
 area**: scan points outside it are dropped, so it sets how far away a person can put water up.
 Drag its corners; there are no sliders for it, the handles are the control. Every path point
@@ -377,9 +387,9 @@ Each asks once. Then the server zeroes every slot and verifies it, halts the sho
 `dmx.safe_output`. If the zero cannot be verified the Pi stays up and the status says to cut
 the 24 V first. If the sudoers rule from the top-level README is missing the Pi refuses, the
 status shows sudo's message, and the show stays halted in test mode with Resume on screen. A
-reboot brings back a Pi with **no show running**; start it by hand. Nothing on the pages is
-saved, so the profile comes back at its defaults. `--dry-run` has no power buttons that work:
-they say so. The page has the same **ALL OFF** bar as settings.
+reboot brings back a Pi with **no show running**; start it by hand. The last applied profile
+is in `data/profile.json` (see below), so the show comes back with the same settings.
+`--dry-run` has no power buttons that work: they say so. The page has the same **ALL OFF** bar as settings.
 
 ### Test page
 

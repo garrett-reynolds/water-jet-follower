@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-from tracker import geometry, scanfile, viewer
+from tracker import geometry, scanfile, settings, viewer
 from tracker.config import Config
 from tracker.tracking import Tracker
 
@@ -268,7 +268,8 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
 
     state = viewer.State()
     control = SettingsControl(cfg, send_frame=send_frame, zero_output=zero_output,
-                              run_command=run_command)
+                              run_command=run_command,
+                              profile_path=getattr(args, "profile", None))
     control.set_lights_only(args.lights_only)
     server = viewer.serve(state, cfg, control)
     tracker = Tracker(cfg)
@@ -375,6 +376,10 @@ def cmd_show(args):
     from tracker import dmx
 
     cfg = _load_config(args)
+    # The last profile applied from the settings page comes back after a restart.
+    # A --height-max on the command line still wins, so a cautious start is one flag.
+    if args.profile and settings.load_profile(cfg, args.profile):
+        print(f"show: settings restored from {args.profile}")
     if args.height_max is not None:
         cfg.height_max = args.height_max
     if args.attract:
@@ -530,6 +535,9 @@ def build_parser():
     show.add_argument("--lights-only", action="store_true", dest="lights_only",
                       help="real DMX, but every fountain channel forced to 0 - "
                            "watch the pixels chase somebody with nothing wet")
+    show.add_argument("--profile", default=settings.PROFILE_FILE,
+                      help="where the settings page's last applied profile is kept "
+                           "and read back on start; '' to start from the defaults")
     show.add_argument("--height-max", type=int, dest="height_max",
                       help="override the safety cap. 1 DMX unit is 7.62 mm, so "
                            "the default 40 is about 30 cm")

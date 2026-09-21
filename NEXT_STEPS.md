@@ -176,8 +176,15 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
   (PID 12397, started with the standard `setsid nohup` line) with the #38 and System page files. Test mode off,
   cap 40. Stop it with the anchored `pkill` line below; power off needs Garrett's
   `ssh -t pi@water-jets "sudo poweroff"` until the sudoers rule from `README.md` Setup step 6
-  is installed, after which the page's Shut down Pi button does it. Nothing on the
-  pages saves to disk, so any restart puts the profile back to the config defaults.
+  is installed, after which the page's Shut down Pi button does it. Since 2026-09-21 every
+  applied profile is written to `~/data/profile.json` and read back on start, so a restart
+  keeps the settings. Deployed 2026-09-21; the pre-restart profile was re-applied so
+  `~/data/profile.json` exists (cap 40). Checked on the Pi the same day: after a restart
+  `~/show.log` reads `show: settings restored from data/profile.json` and the page loads.
+  Left running: PID 17505, LIVE, cap 40, started with the `setsid nohup` line below.
+- **Settings boxes fold (2026-09-21):** each `/settings` box collapses from its title row and
+  the browser remembers which are closed (`localStorage`). Garrett checked the folding on the
+  iPad; the remembered state on the iPad is not yet eyeballed.
 - **Both iPad eyeball checks passed 2026-09-20:** the bottom bar stays on screen while
   scrolling, and a tapped jet tile turns green. Garrett checked both on the real iPad.
 - **Loose files in the tree, not committed:** `bom/` holds ROM Raptors estimate spreadsheets
@@ -446,8 +453,9 @@ Once the calibration lands, the show is real and #10 unblocks.
 
 The Pi is reachable as `pi@water-jets`. The settings page is at
 `http://water-jets.local:8080/settings` while the show runs. The 20-point layout was confirmed
-in the browser on 2026-09-19. Profiles still live in the browser as JSON files; a Pi restart
-loads the default 10-jet profile until the operator loads and applies a saved profile.
+in the browser on 2026-09-19. Since 2026-09-21 the last applied profile is kept in
+`~/data/profile.json` on the Pi and comes back on restart; Save JSON and Load JSON remain for
+copies.
 The Water jet tester selects one jet and height, holds that test, and uses **Stop water test** to
 send and verify all zero. Live first-module follow passed with a 0.50 s lead and the DMX 40 cap.
 

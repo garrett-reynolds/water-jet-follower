@@ -280,6 +280,7 @@ Small, even corners. Buttons, selects, chips, inputs, status boxes, and banners 
 
 ### Sections
 - **Corner:** 6 px. **Fill:** Panel. **Border:** 1 px Line. **Padding:** 16 px. Stack at 14 px. Title is 17 px, 650, with 12 px below.
+- **Folding (settings page only):** each box is a native `<details open>` with the title inside its `<summary>`. The title row is a 40 px touch target, pointer cursor, no browser marker; a Muted 20 px `−` (open) or `+` (closed) sits at the right edge. The title text is centred in the row, and the row has 4 px below it when open, so the title still sits 12 px above the first control; closed boxes show the title row alone. The Amber focus ring applies. Each box remembers whether it was open in the browser's `localStorage` (`fold:<title>`); a new browser starts with all boxes open.
 
 ### Status box
 - **Style:** Status Wash fill, 4 px corners, 10 px padding, 40 px min-height, `aria-live="polite"`.

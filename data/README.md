@@ -4,7 +4,9 @@ Scan recordings and the baselines built from them.
 
 `*.jsonl` recordings are **not** in git — they are megabytes each and they live on
 the Pi under `~/data/`. `*.json` baselines are small and are kept, because they are
-what the tracker needs to tell a person from a wall.
+what the tracker needs to tell a person from a wall. The exception is `profile.json`:
+the show writes the last applied settings there and reads them back on start. It is
+machine state, the Pi's copy is the real one, and it is ignored by git.
 
 ## Rebuild a baseline
 

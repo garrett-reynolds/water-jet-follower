@@ -5,3 +5,6 @@ __pycache__/
 # Scan recordings are bench artifacts. They live on the Pi and are megabytes each.
 # The baselines built from them (data/*.json) are small and are kept.
 data/*.jsonl
+
+# The last applied settings profile. Machine state, written by the show; the Pi's copy is the real one.
+data/profile.json

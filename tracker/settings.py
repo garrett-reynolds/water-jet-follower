@@ -1,5 +1,8 @@
 """Validated, atomic settings changes for the browser control screen."""
 
+import json
+import os
+import sys
 import threading
 from copy import deepcopy
 
@@ -129,14 +132,60 @@ def validate_profile(profile):
 
 UNDO_DEPTH = 50
 
+# Where the show keeps the last applied profile so a restart or a reboot comes back
+# with the same settings. Relative to the working directory, like --baseline.
+PROFILE_FILE = "data/profile.json"
+
+
+def _set_profile(cfg, clean):
+    """Put a validated profile on `cfg`. strip_start/strip_end follow strip_points."""
+    clean["strip_start"] = clean["strip_points"][0]
+    clean["strip_end"] = clean["strip_points"][-1]
+    cfg.__dict__.update(clean)
+
+
+def load_profile(cfg, path):
+    """Apply the saved profile at `path` to `cfg`. Missing file: nothing happens.
+
+    A file that will not parse or validate is reported and skipped, so a bad or
+    half-written file can never stop the show from starting.
+    """
+    try:
+        with open(path) as f:
+            profile = json.load(f)
+    except FileNotFoundError:
+        return False
+    except (OSError, ValueError) as exc:
+        print(f"settings: ignoring {path}: {exc}", file=sys.stderr)
+        return False
+    try:
+        _set_profile(cfg, validate_profile(profile))
+    except ValueError as exc:
+        print(f"settings: ignoring {path}: {exc}", file=sys.stderr)
+        return False
+    return True
+
+
+def save_profile(profile, path):
+    """Write `profile` to `path` whole: a power cut mid-write leaves the old file."""
+    tmp = f"{path}.tmp"
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(tmp, "w") as f:
+        json.dump(profile, f, indent=2)
+    os.replace(tmp, path)
+
 
 class SettingsControl:
     """Own settings history and hardware actions for one viewer process."""
 
-    def __init__(self, cfg, send_frame=None, zero_output=None, run_command=None):
+    def __init__(self, cfg, send_frame=None, zero_output=None, run_command=None,
+                 profile_path=None):
         self.cfg = cfg
         self.send_frame = send_frame
         self.zero_output = zero_output
+        # Every applied profile is written here. Only the show sets it; the tests
+        # and a bare viewer never touch the disk.
+        self.profile_path = profile_path
         # Runs one of POWER_COMMANDS. Only the real show wires this; the tests,
         # --dry-run and the laptop never get a callable that could reboot the host.
         self.run_command = run_command
@@ -168,23 +217,29 @@ class SettingsControl:
         if clean["height_max"] != self.cfg.height_max and not unlock_height_max:
             raise PermissionError("unlock the hard maximum before changing it")
         previous = self.profile()
-        clean["strip_start"] = clean["strip_points"][0]
-        clean["strip_end"] = clean["strip_points"][-1]
-        self.cfg.__dict__.update(clean)
+        _set_profile(self.cfg, clean)
         self._undo.append(previous)
         # Live-apply sends a profile per edit burst, so the stack is bounded.
         del self._undo[:-UNDO_DEPTH]
-        return self.profile()
+        return self._persist()
 
     def undo(self):
         if not self._undo:
             raise ValueError("nothing to undo")
-        profile = self._undo.pop()
-        clean = validate_profile(profile)
-        clean["strip_start"] = clean["strip_points"][0]
-        clean["strip_end"] = clean["strip_points"][-1]
-        self.cfg.__dict__.update(clean)
-        return self.profile()
+        _set_profile(self.cfg, validate_profile(self._undo.pop()))
+        return self._persist()
+
+    def _persist(self):
+        profile = self.profile()
+        if self.profile_path:
+            try:
+                save_profile(profile, self.profile_path)
+            except OSError as exc:
+                # The change is live either way; the page must not report a failure
+                # for a full disk. Say so on the console instead.
+                print(f"settings: could not write {self.profile_path}: {exc}",
+                      file=sys.stderr)
+        return profile
 
     def reset(self):
         return self.apply(deepcopy(self._reset), unlock_height_max=True)

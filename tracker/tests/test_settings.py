@@ -4,12 +4,18 @@ The browser sends a complete profile.  Nothing changes until the whole profile
 validates, because a half-applied safety limit is worse than a rejected edit.
 """
 
+import contextlib
+import io
+import json
+import os
+import tempfile
 import unittest
 
 from tracker import geometry
 from tracker.config import Config
 from tracker.settings import (POWER_COMMANDS, PROFILE_VERSION, UNDO_DEPTH,
-                              SettingsControl, profile_for)
+                              SettingsControl, load_profile, profile_for,
+                              save_profile)
 
 
 class TestProfiles(unittest.TestCase):
@@ -327,3 +333,73 @@ class TestPower(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestProfileFile(unittest.TestCase):
+    """The last applied profile outlives the process (NEXT_STEPS: the unlocked cap
+    read 40 again after a restart)."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.dir.name, "data", "profile.json")
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_apply_writes_the_file_and_a_new_process_reads_it_back(self):
+        control = SettingsControl(Config(), profile_path=self.path)
+        profile = profile_for(control.cfg)
+        profile["settings"]["hill_peak"] = 22
+        profile["settings"]["height_max"] = 156
+        control.apply(profile, unlock_height_max=True)
+        fresh = Config()
+        self.assertTrue(load_profile(fresh, self.path))
+        self.assertEqual(fresh.hill_peak, 22)
+        self.assertEqual(fresh.height_max, 156)
+        self.assertEqual(fresh.strip_start, fresh.strip_points[0])
+
+    def test_undo_and_reset_write_too(self):
+        control = SettingsControl(Config(), profile_path=self.path)
+        profile = profile_for(control.cfg)
+        profile["settings"]["hill_peak"] = 22
+        control.apply(profile)
+        control.undo()
+        fresh = Config()
+        load_profile(fresh, self.path)
+        self.assertEqual(fresh.hill_peak, 30)
+        control.apply(profile)
+        control.reset()
+        load_profile(fresh, self.path)
+        self.assertEqual(fresh.hill_peak, 30)
+
+    def test_no_path_means_no_file(self):
+        control = SettingsControl(Config())
+        profile = profile_for(control.cfg)
+        profile["settings"]["hill_peak"] = 22
+        control.apply(profile)
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_missing_file_is_silent(self):
+        cfg = Config()
+        self.assertFalse(load_profile(cfg, self.path))
+        self.assertEqual(cfg.hill_peak, 30)
+
+    def test_bad_file_is_skipped_not_fatal(self):
+        os.makedirs(os.path.dirname(self.path))
+        for text in ['{"version": 4, "settings"', '{"version": 1, "settings": {}}',
+                     json.dumps({"version": PROFILE_VERSION,
+                                 "settings": dict(profile_for(Config())["settings"], jet_count=99)})]:
+            with open(self.path, "w") as f:
+                f.write(text)
+            cfg = Config()
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertFalse(load_profile(cfg, self.path))
+            self.assertIn("ignoring", err.getvalue())
+            self.assertEqual(cfg.jet_count, 10)
+
+    def test_write_is_whole_or_nothing(self):
+        save_profile(profile_for(Config()), self.path)
+        self.assertFalse(os.path.exists(self.path + ".tmp"))
+        with open(self.path) as f:
+            self.assertEqual(json.load(f)["version"], PROFILE_VERSION)
+

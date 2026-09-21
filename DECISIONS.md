@@ -1117,3 +1117,50 @@ power command does) must be able to resume it.
 
 **Ruled out:** a boot-time service, again. The page still says the show is not running after
 a reboot.
+
+## [2026-09-21] The settings boxes fold shut
+
+Garrett asked for each section of the settings page to collapse. On the iPad the five boxes
+stack past the fold, and the one you are tuning is rarely the one at the top.
+
+**Decided:** native `<details>`/`<summary>` with the `<h2>` inside the summary. No script, so
+keyboard and screen-reader behaviour come free, and the `<h2>` strings the tests slice on stay
+intact. The title row is a 40 px target with a `−`/`+` mark and the Amber focus ring, per
+DESIGN.md. Every box starts open on each load. The colour wheel draws at its fixed 180 px
+attribute size and only measures its box on a pointer event, so a closed box does no harm.
+
+**Ruled out, then reversed the same day:** remembering which boxes were closed. Garrett
+asked for it after the first iPad check. Each box's state is in the browser's `localStorage`
+under `fold:<title>`, set on `toggle` and read before `init`. It is per browser, not per Pi,
+because the layout you fold is about the screen you are holding. `localStorage` calls are
+wrapped, so a browser that refuses storage still gets the page with every box open.
+
+## [2026-09-21] The applied profile survives a restart
+
+Garrett, after the folding boxes: make sure the settings are saved. `NEXT_STEPS.md` had already
+recorded the symptom: the hard maximum was unlocked to 156, the show restarted, and the cap
+read 40 again. `SettingsControl.apply` only updated the `Config` in memory; Save JSON was a
+browser download.
+
+**Decided:** every successful apply, undo, and reset writes the profile to `data/profile.json`
+(relative to the working directory, the same convention as `--baseline`, so `~/data/` on the
+Pi), and `show` reads it back into the `Config` before `SettingsControl` is built. It is the
+same versioned profile JSON that Save JSON produces and `validate_profile` checks, not
+`Config.save`, which would carry host-specific fields like the serial port. The write is
+temp-file-and-`os.replace`, because the Pi gets power-cut and a half-written file must not
+stop the show. A file that fails to parse or validate is reported and skipped. Only the show
+passes `profile_path`; the tests and a bare viewer never touch the disk, the same rule as
+`run_command`. `--height-max` on the command line still wins over the saved value, so a
+cautious start after a long shutdown is one flag. `--profile ''` turns the file off.
+Checked on the laptop: apply 22/156 in one process, kill, restart, the page reads 22/156.
+
+**Noted:** a reboot now brings the jets back at the last saved hard maximum, not the
+conservative 40. That is the point, but it is the opposite of the first-power-up rule; Garrett
+knows and can use `--height-max` when the water has been off for a while.
+
+**Ruled out:** the file for `live` and `replay`. They serve the same pages through
+`viewer.serve`'s fallback `SettingsControl`, so edits made there apply in memory and are
+gone when they exit. They are tracking checks with no DMX; the show is the only command that
+drives water, so it is the only one that keeps settings. `check`, `record`, and `baseline`
+have no settings page at all.
+
