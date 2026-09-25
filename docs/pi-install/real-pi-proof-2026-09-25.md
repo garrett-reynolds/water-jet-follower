@@ -1,7 +1,7 @@
 # Real Pi boot and recovery proof
 
 Date: 2026-09-25. All times below are UTC.
-Scope: the automated part of [issue 46](https://github.com/garrett-reynolds/water-jet-follower/issues/46).
+Scope: the automated checks and the later user-observed offline boot check for [issue 46](https://github.com/garrett-reynolds/water-jet-follower/issues/46).
 Issue 46 remains open.
 
 The user confirmed that the 24 V module power switch was off.
@@ -20,10 +20,10 @@ No Ethernet setting changed.
 | Manual recovery | Pass. One `reset-failed` and one manual start restored the show with Lights only and verified zero. |
 | Private Wi-Fi restart | Pass for Pi-side services. AP address, DHCP and DNS returned. Wired SSH, OLA and show stayed up. No client access test ran. |
 | Normal reboot | Pass. A new boot ID, safe show start, AP, DHCP, DNS, LiDAR and port 8080 were observed. One OLA readiness failure recovered through the normal retry. |
-| Cold power boot and isolated iPad use | Not tested. |
+| Cold power boot and isolated iPad use | Pass. The user shut the Pi down, removed Ethernet, removed and restored Pi power, joined `water-jets` from the iPad, and opened `http://10.42.0.1:8080/`. |
 
-These checks prove software state and OLA readback.
-They do not prove physical water off or operation without Ethernet.
+These checks prove software state, OLA readback and offline page access from the iPad after a cold power boot.
+They do not prove physical water off.
 
 ## Before the tests
 
@@ -195,12 +195,24 @@ The task stopped further Pi tests under its root-access stop rule.
 The show, OLA and private Wi-Fi were already restored.
 No test fault or runtime mask remained.
 
+## User-observed cold power boot and isolated iPad use
+
+After the automated checks, the user followed the final offline test steps.
+The user kept the 24 V module power switch off.
+The user shut the Pi down cleanly.
+The user unplugged Ethernet.
+The user removed and restored Pi power.
+The user joined the `water-jets` network from the iPad with the private local Wi-Fi record.
+The iPad used the private network without the site network.
+Its successful join and page access prove that the client got a usable DHCP network setup.
+The user opened `http://10.42.0.1:8080/` and reported, "that works great".
+
+This proves a user-observed cold power boot, isolated iPad access and page service without Ethernet.
+It does not prove the Lights only UI state, physical water-off state, output-channel state, private Wi-Fi SSH, mDNS, LiDAR reconnect, local-console rescue, rollback or password rotation.
+
 ## Physical proof still needed
 
-- Remove Ethernet and prove the page has no site-network or internet dependency.
-- Join the actual iPad to `water-jets` and open `http://10.42.0.1:8080/`.
 - Prove private Wi-Fi SSH and check the optional `.local` address separately.
-- Perform a real cold power boot with the full rig.
 - Unplug and reconnect the LiDAR.
 - Log in through micro-HDMI and a USB keyboard for local-console rescue.
 - Check the actual output channels and physical water-off state after faults.
