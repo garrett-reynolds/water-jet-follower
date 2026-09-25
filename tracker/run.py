@@ -271,18 +271,20 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
     state = viewer.State()
     output_lock = threading.Lock()
 
-    def send_and_preview(frame):
+    def send_and_preview(frame, routing=None):
+        routing = routing or control.output_routing()
         with output_lock:
             sent = send_frame(frame)
             if sent is not False:
-                state.set_output(frame, cfg)
+                state.set_output(frame, routing)
             return sent
 
     def zero_and_preview():
+        routing = (cfg.jet_count, cfg.reverse_jets)
         with output_lock:
             verified = zero_output()
             if verified:
-                state.set_output(dmx.blank_frame(), cfg)
+                state.set_output(dmx.blank_frame(), routing)
             return verified
 
     control = SettingsControl(cfg, send_frame=send_and_preview,
@@ -343,14 +345,17 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
                 # re-sending the held test frame (or zeros) on the resend cadence.
                 heights = [0] * len(heights)
                 if now - last_sent >= cfg.resend_seconds:
-                    _send_with_heartbeat(send_and_preview, control.output_frame(None),
+                    routing = control.output_routing()
+                    _send_with_heartbeat(lambda output: send_and_preview(output, routing),
+                                         control.output_frame(None),
                                          heartbeat)
                     last_sent = now
             # Re-send on a change or on the heartbeat, whichever comes first.
             elif now - last_sent >= cfg.resend_seconds or any(heights):
+                routing = (cfg.jet_count, cfg.reverse_jets)
                 live_frame = wave.frame(frame, timestamp,
                                         lights_only=control.lights_only)
-                _send_with_heartbeat(send_and_preview,
+                _send_with_heartbeat(lambda output: send_and_preview(output, routing),
                                      control.output_frame(live_frame),
                                      heartbeat)
                 last_sent = now

@@ -21,7 +21,7 @@ class TestOutputState(unittest.TestCase):
         frame[0:5] = array.array("B", [1, 2, 3, 4, 5])
         frame[5:10] = array.array("B", [10, 20, 30, 40, 50])
 
-        state.set_output(frame, cfg)
+        state.set_output(frame, (cfg.jet_count, cfg.reverse_jets))
         frame[5:10] = array.array("B", [0, 0, 0, 0, 0])
 
         self.assertEqual(state.get()["pixel_colours"],
@@ -30,6 +30,65 @@ class TestOutputState(unittest.TestCase):
 
 
 class TestShowOutputPreview(unittest.TestCase):
+    def test_held_test_resend_keeps_its_original_logical_jet_after_routing_edit(self):
+        cfg = Config(jet_count=3, reverse_jets=True, resend_seconds=0)
+        views = []
+        control = None
+        state = None
+
+        class Server:
+            def shutdown(self):
+                pass
+
+        def serve(live_state, _cfg, live_control):
+            nonlocal control, state
+            control, state = live_control, live_state
+            return Server()
+
+        def source():
+            control.set_test_mode(True)
+            control.test_jet(0, 20)
+            views.append(state.get())
+            cfg.reverse_jets = False
+            yield 1.0, []
+            views.append(state.get())
+
+        with mock.patch.object(run.viewer, "serve", serve):
+            run._show_loop(source(), cfg, None, "test",
+                           SimpleNamespace(lights_only=False),
+                           lambda _frame: True, lambda: True)
+
+        self.assertEqual(views[0]["heights"], [20, 0, 0])
+        self.assertEqual(views[1]["heights"], [20, 0, 0])
+        self.assertEqual(views[1]["pixel_colours"][0], list(cfg.slow_colour))
+
+    def test_preview_keeps_routing_used_to_build_frame_when_profile_changes_during_send(self):
+        cfg = Config(jet_count=2, reverse_jets=True,
+                     jet_enabled=(True, False), base_colour=(12, 34, 56, 78))
+        state = None
+
+        class Server:
+            def shutdown(self):
+                pass
+
+        def serve(live_state, _cfg, _control):
+            nonlocal state
+            state = live_state
+            return Server()
+
+        def send(_frame):
+            cfg.reverse_jets = False
+            cfg.jet_count = 3
+            return True
+
+        with mock.patch.object(run.viewer, "serve", serve):
+            run._show_loop(iter([(1.0, [])]), cfg, None, "test",
+                           SimpleNamespace(lights_only=False), send, lambda: True)
+
+        self.assertEqual(state.get()["pixel_colours"],
+                         [[12, 34, 56, 78], [0, 0, 0, 0]])
+        self.assertEqual(state.get()["heights"], [0, 0])
+
     def test_show_modes_held_test_and_verified_zero_follow_sent_output(self):
         cfg = Config(viewer_host="127.0.0.1", viewer_port=0,
                      idle_water_animation="pulse", idle_seconds=2,
@@ -96,9 +155,9 @@ class TestLiveBrowserPreview(unittest.TestCase):
         page_script = PAGE.split("<script>", 1)[1].split("</script>", 1)[0]
         browser_script = """
 const vm=require('node:vm');
-const arcs=[],outlines=[];
+const arcs=[],outlines=[],requests=[],clears=[];
 const ctx={fillStyle:'',strokeStyle:'',lineWidth:1,
-  fillRect(){},beginPath(){this.arcPending=false},moveTo(){},lineTo(){},
+  fillRect(){clears.push(this.fillStyle)},beginPath(){this.arcPending=false},moveTo(){},lineTo(){},
   stroke(){if(this.arcPending)outlines.push({colour:this.strokeStyle,radius:this.lastRadius})},
   strokeRect(){},setLineDash(){},fillText(){},
   arc(x,y,r){this.lastRadius=r;this.arcPending=true},
@@ -108,7 +167,11 @@ const hud={textContent:''},position={className:'',textContent:''};
 const nodes={c:canvas,hud,position};
 const context=vm.createContext({document:{getElementById:id=>nodes[id]},
   window:{innerWidth:800,innerHeight:600,addEventListener(){}},
-  setTimeout(){},fetch:async()=>{throw Error('offline')}});
+  setTimeout(){},fetch:async path=>{requests.push(path);
+    if(path==='/config')return {json:async()=>({roi_x_min:0,roi_x_max:2,
+      roi_y_min:0,roi_y_max:2,strip_points:[[0.5,0.5],[1.5,0.5]],
+      jet_count:2,height_max:40})};
+    throw Error('state offline')}});
 vm.runInContext(process.argv[2].replace(/fit\\(\\); poll\\(\\);\\s*$/, ''),context);
 vm.runInContext(`CFG={roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2,
   strip_points:[[0.5,0.5],[1.5,0.5]],jet_count:2,height_max:40};
@@ -116,8 +179,9 @@ vm.runInContext(`CFG={roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2,
   fg:[],bg:[],legs:[],tracks:[],clusters:[],detections:[],hz:16};draw();`,context);
 const before=arcs.slice();
 vm.runInContext('poll()',context).then(()=>{
-  console.log(JSON.stringify({before,outlines,frame:vm.runInContext('FRAME',context),
-    position:position.className,arcs:arcs.length}));
+  console.log(JSON.stringify({before,outlines,requests,clears,
+    frame:vm.runInContext('FRAME',context),position:position.className,
+    arcs:arcs.length}));
 });
 """
         run_result = subprocess.run(["node", "-", page_script], input=browser_script,
@@ -129,6 +193,8 @@ vm.runInContext('poll()',context).then(()=>{
                                                 "radius": 11.5})
         self.assertEqual(result["before"][2]["colour"], "#ff0")
         self.assertEqual(result["outlines"][0], {"colour": "#bbc", "radius": 2.5})
+        self.assertEqual(result["requests"], ["/config", "/state"])
+        self.assertEqual(result["clears"], ["#111", "#111"])
         self.assertIsNone(result["frame"])
         self.assertEqual(result["position"], "stale")
 
