@@ -208,6 +208,59 @@ class TestSettingsMap(unittest.TestCase):
         self.assertNotIn('<option value="idle_colour">', page)
         self.assertEqual(page.count('id="colour_wheel"'), 1)
 
+    def test_wheel_lifts_only_zero_colour_level_and_slider_can_clear_it(self):
+        if not shutil.which("node"):
+            self.skipTest("Node.js is needed to run the settings page script")
+        with urlopen(self.base + "/settings") as response:
+            lines = response.read().decode("utf-8").splitlines()
+
+        def page_line(start):
+            return next(line for line in lines if line.startswith(start))
+
+        script = "\n".join((
+            "let profile={settings:{idle_start_colour:[0,0,0,0],idle_end_colour:[64,0,0,0]}};",
+            "let colourMode='idle_start_colour',pending=true,applyTimer=null;",
+            "const fields=[],heights=[];",
+            "const nodes={colour_mode:{},colour_value:{},white_level:{},",
+            "colour_wheel:{width:180,height:180,getBoundingClientRect:()=>({left:0,top:0,width:180,height:180}),setPointerCapture(){}},",
+            "idle_water_animation:{value:'off'},idle_colour_animation:{value:'off'},reverse_jets:{checked:false}};",
+            "const $=id=>nodes[id];",
+            "const document={querySelectorAll:()=>[]};",
+            "function drawColourWheel(){} function readouts(){} function draw(){} function status(){}",
+            "function clearTimeout(){} function setTimeout(){return 1} function autoApply(){}",
+            page_line("function copy("),
+            page_line("let wheelHue="),
+            page_line("function hsvToRgb("),
+            page_line("function rgbToHsv("),
+            page_line("function setWheel("),
+            page_line("function saveColour("),
+            page_line("function fillColour("),
+            page_line("function readForm("),
+            page_line("function dirty("),
+            page_line("$('colour_value').oninput="),
+            page_line("const wheel=$('colour_wheel');"),
+            "const snap=()=>({level:Number(nodes.colour_value.value),rgb:profile.settings[colourMode],hue:wheelHue,sat:wheelSat});",
+            "fillColour();const before=snap();",
+            "wheel.onpointerdown({clientX:0,clientY:90,pointerId:1});const chosen=snap();",
+            "const saved=JSON.stringify(profile);profile=JSON.parse(saved);fillColour();const reloaded=snap();",
+            "colourMode='idle_end_colour';fillColour();wheel.onpointerdown({clientX:0,clientY:90,pointerId:2});const dimmed=snap();",
+            "nodes.colour_value.value=0;nodes.colour_value.oninput();const cleared=snap();",
+            "console.log(JSON.stringify({before,chosen,reloaded,dimmed,cleared}));",
+        ))
+        run = subprocess.run(["node", "-e", script], capture_output=True,
+                             text=True, check=True)
+        state = json.loads(run.stdout)
+        self.assertEqual(state["before"]["level"], 0)
+        self.assertEqual(state["chosen"]["level"], 255)
+        self.assertEqual(state["chosen"]["rgb"], [0, 255, 255, 0])
+        self.assertEqual(state["reloaded"]["rgb"], [0, 255, 255, 0])
+        self.assertEqual(state["reloaded"]["hue"], 0.5)
+        self.assertEqual(state["reloaded"]["sat"], 1)
+        self.assertEqual(state["dimmed"]["level"], 64)
+        self.assertEqual(state["dimmed"]["rgb"], [0, 64, 64, 0])
+        self.assertEqual(state["cleared"]["level"], 0)
+        self.assertEqual(state["cleared"]["rgb"], [0, 0, 0, 0])
+
     def _load_old_profile_with_idle_colour_selected(self, colour_mode):
         if not shutil.which("node"):
             self.skipTest("Node.js is needed to run the settings page script")

@@ -1,5 +1,12 @@
 # Decisions
 
+## [2026-09-25] Raise a zero colour level when the wheel is used
+
+When an operator picks a wheel colour at Colour level 0, set the level to 255
+before the page saves the RGB value. Keep a non-zero level as set. The Colour
+level slider can still set 0 to turn RGB off. This lets a black idle start
+take a new wheel colour on the first click, while a saved dim colour stays dim.
+
 ## [2026-09-25] Serialize settings profile changes and saves
 
 The threaded settings server can run two complete profile requests at once.
