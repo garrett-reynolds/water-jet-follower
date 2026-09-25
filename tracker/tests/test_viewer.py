@@ -1,6 +1,8 @@
 """HTTP checks for the browser viewer and settings map."""
 
 import json
+import shutil
+import subprocess
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -205,6 +207,44 @@ class TestSettingsMap(unittest.TestCase):
         self.assertIn('<option value="idle_end_colour">Idle end</option>', page)
         self.assertNotIn('<option value="idle_colour">', page)
         self.assertEqual(page.count('id="colour_wheel"'), 1)
+
+    def _load_old_profile_with_idle_colour_selected(self, colour_mode):
+        if not shutil.which("node"):
+            self.skipTest("Node.js is needed to run the settings page script")
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        lines = page.splitlines()
+        script = "\n".join((
+            "const old={version:4,settings:{idle_colour:[0,0,255,0]}};",
+            "const before={version:5,settings:{idle_start_colour:[0,0,0,0],idle_end_colour:[0,0,255,0]}};",
+            "const defaultProfile=before;",
+            "let profile=JSON.parse(JSON.stringify(before)),pending=false,colourMode=process.argv[1];",
+            "const nodes={load:{},colour_mode:{},colour_value:{},white_level:{}};",
+            "const $=id=>nodes[id];",
+            "function drawColourWheel(){} function readouts(){}",
+            "function status(message,bad=false){globalThis.notice={message,bad};}",
+            "function fill(){fillColour();}",
+            next(line for line in lines if line.startswith("function rgbToHsv(")),
+            next(line for line in lines if line.startswith("function fillColour(")),
+            next(line for line in lines if line.startswith("$('load').onchange=")),
+            "(async()=>{await nodes.load.onchange({target:{files:[{text:async()=>JSON.stringify(old)}]}});"
+            "console.log(JSON.stringify({profile,pending,notice:globalThis.notice}));})()",
+        ))
+        run = subprocess.run(["node", "-e", script, colour_mode],
+                             capture_output=True, text=True, check=True)
+        state = json.loads(run.stdout)
+        self.assertEqual(state["profile"], {
+            "version": 5, "settings": {"idle_start_colour": [0, 0, 0, 0],
+                                       "idle_end_colour": [0, 0, 255, 0]}})
+        self.assertFalse(state["pending"])
+        self.assertTrue(state["notice"]["bad"])
+        self.assertIn("version 5", state["notice"]["message"])
+
+    def test_old_profile_load_keeps_page_state_with_idle_start_selected(self):
+        self._load_old_profile_with_idle_colour_selected("idle_start_colour")
+
+    def test_old_profile_load_keeps_page_state_with_idle_end_selected(self):
+        self._load_old_profile_with_idle_colour_selected("idle_end_colour")
 
     def test_idle_height_follows_the_editable_hard_maximum(self):
         with urlopen(self.base + "/settings") as response:

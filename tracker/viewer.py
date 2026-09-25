@@ -433,7 +433,7 @@ document.querySelector('.controls').addEventListener('change',e=>{if(e.target.ma
 $('idle_water_animation').onchange=dirty;$('idle_colour_animation').onchange=dirty;
 $('apply').onclick=apply;
 $('save').onclick=()=>{readForm();const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(profile,null,2)],{type:'application/json'}));a.download='water-jet-profile.json';a.click();URL.revokeObjectURL(a.href)};
-$('load').onchange=async e=>{try{profile=JSON.parse(await e.target.files[0].text());pending=true;fill();status('Loaded profile previewed. Press Apply profile to make it live.')}catch(err){status('Could not read that JSON file.',true)}};
+$('load').onchange=async e=>{try{const loaded=JSON.parse(await e.target.files[0].text());if(!loaded||loaded.version!==defaultProfile.version){status('This page needs profile version '+defaultProfile.version+'.',true);return}profile=loaded;pending=true;fill();status('Loaded profile previewed. Press Apply profile to make it live.')}catch(err){status('Could not read that JSON file.',true)}};
 $('undo').onclick=async()=>{clearTimeout(applyTimer);try{profile=await api('/settings/undo',{});original=copy(profile);pending=false;fill();status('Last applied profile restored.')}catch(e){status(e.message,true)}};
 $('reset').onclick=()=>{profile=copy(defaultProfile);pending=true;fill();status('Default profile previewed. Press Apply profile to make it live.');};
 $('lights').onclick=async()=>{try{const d=await api('/actions/lights-only',{enabled:!lightsOnly});lightsOnly=d.enabled;$('lights').textContent='Lights only: '+(lightsOnly?'on':'off');}catch(e){status(e.message,true)}};
