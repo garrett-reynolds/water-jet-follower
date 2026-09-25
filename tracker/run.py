@@ -280,12 +280,12 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
             return sent
 
     def zero_and_preview():
-        routing = (cfg.jet_count, cfg.reverse_jets)
-        with output_lock:
-            verified = zero_output()
-            if verified:
-                state.set_output(dmx.blank_frame(), routing)
-            return verified
+        with control.output_settings() as routing:
+            with output_lock:
+                verified = zero_output()
+                if verified:
+                    state.set_output(dmx.blank_frame(), routing)
+                return verified
 
     control = SettingsControl(cfg, send_frame=send_and_preview,
                               zero_output=zero_and_preview,
@@ -345,19 +345,20 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
                 # re-sending the held test frame (or zeros) on the resend cadence.
                 heights = [0] * len(heights)
                 if now - last_sent >= cfg.resend_seconds:
-                    routing = control.output_routing()
-                    _send_with_heartbeat(lambda output: send_and_preview(output, routing),
-                                         control.output_frame(None),
-                                         heartbeat)
+                    with control.output_settings():
+                        routing = control.output_routing()
+                        _send_with_heartbeat(
+                            lambda output: send_and_preview(output, routing),
+                            control.output_frame(None), heartbeat)
                     last_sent = now
             # Re-send on a change or on the heartbeat, whichever comes first.
             elif now - last_sent >= cfg.resend_seconds or any(heights):
-                routing = (cfg.jet_count, cfg.reverse_jets)
-                live_frame = wave.frame(frame, timestamp,
-                                        lights_only=control.lights_only)
-                _send_with_heartbeat(lambda output: send_and_preview(output, routing),
-                                     control.output_frame(live_frame),
-                                     heartbeat)
+                with control.output_settings() as routing:
+                    live_frame = wave.frame(frame, timestamp,
+                                            lights_only=control.lights_only)
+                    _send_with_heartbeat(
+                        lambda output: send_and_preview(output, routing),
+                        control.output_frame(live_frame), heartbeat)
                 last_sent = now
             peak_height = max(peak_height, max(heights) if heights else 0)
 

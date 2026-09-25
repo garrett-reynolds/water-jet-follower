@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import threading
+from contextlib import contextmanager
 from copy import deepcopy
 
 from tracker import dmx
@@ -217,6 +218,12 @@ class SettingsControl:
         with self._profile_lock:
             return deepcopy(self._reset)
 
+    @contextmanager
+    def output_settings(self):
+        """Keep one applied profile in place while an output frame is built."""
+        with self._profile_lock:
+            yield (self.cfg.jet_count, self.cfg.reverse_jets)
+
     def apply(self, profile, unlock_height_max=False):
         with self._profile_lock:
             clean = validate_profile(profile)
@@ -317,6 +324,10 @@ class SettingsControl:
         return {"action": action, "all_zero": True}
 
     def test_jet(self, jet, height=None):
+        with self.output_settings() as routing:
+            return self._test_jet(jet, height, routing)
+
+    def _test_jet(self, jet, height, routing):
         if self.send_frame is None:
             raise RuntimeError("jet test is not available in this run mode")
         if self.lights_only:
@@ -333,7 +344,6 @@ class SettingsControl:
         if not self.cfg.height_min <= height <= self.cfg.height_max:
             raise ValueError(
                 f"test height must be from {self.cfg.height_min} to {self.cfg.height_max}")
-        routing = (self.cfg.jet_count, self.cfg.reverse_jets)
         output = routing[0] - 1 - jet if routing[1] else jet
         module = output // dmx.NOZZLES_PER_HD_MODULE + 1
         nozzle = output % dmx.NOZZLES_PER_HD_MODULE + 1
@@ -350,7 +360,8 @@ class SettingsControl:
 
     def output_routing(self):
         """The routing used to build a held test, or the current show routing."""
-        return self._manual_routing or (self.cfg.jet_count, self.cfg.reverse_jets)
+        with self.output_settings() as routing:
+            return self._manual_routing or routing
 
     def output_frame(self, normal_frame):
         """Return a held jet-test frame, a blank frame in test mode, or the normal

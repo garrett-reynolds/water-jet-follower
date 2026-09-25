@@ -4,11 +4,12 @@ import array
 import json
 import shutil
 import subprocess
+import threading
 import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from tracker import dmx, run
+from tracker import dmx, run, wave
 from tracker.config import Config
 from tracker.viewer import PAGE, State
 
@@ -30,6 +31,134 @@ class TestOutputState(unittest.TestCase):
 
 
 class TestShowOutputPreview(unittest.TestCase):
+    def test_profile_edit_during_held_test_build_keeps_one_settings_set(self):
+        cfg = Config(jet_count=2, reverse_jets=True)
+        building = threading.Event()
+        edit_attempted = threading.Event()
+        applied = threading.Event()
+        pause_blank = threading.Event()
+        errors = []
+        state = None
+        control = None
+        editor = None
+
+        class Server:
+            def shutdown(self):
+                pass
+
+        def serve(live_state, _cfg, live_control):
+            nonlocal state, control
+            state, control = live_state, live_control
+            return Server()
+
+        def source():
+            nonlocal editor
+            control.set_test_mode(True)
+            profile = control.profile()
+            profile["settings"]["reverse_jets"] = False
+            profile["settings"]["slow_colour"] = [10, 20, 30, 40]
+
+            def edit_profile():
+                try:
+                    if not building.wait(2):
+                        raise TimeoutError("held frame build did not start")
+                    edit_attempted.set()
+                    control.apply(profile)
+                    applied.set()
+                except Exception as exc:
+                    errors.append(exc)
+
+            editor = threading.Thread(target=edit_profile)
+            editor.start()
+            pause_blank.set()
+            control.test_jet(0, 20)
+            yield 1.0, []
+
+        real_blank = dmx.blank_frame
+
+        def paused_blank():
+            if pause_blank.is_set() and not building.is_set():
+                building.set()
+                if not edit_attempted.wait(2):
+                    raise TimeoutError("profile edit did not start")
+                applied.wait(0.2)
+            return real_blank()
+
+        try:
+            with mock.patch.object(run.viewer, "serve", serve), \
+                    mock.patch.object(dmx, "blank_frame", paused_blank):
+                run._show_loop(source(), cfg, None, "test",
+                               SimpleNamespace(lights_only=False),
+                               lambda _frame: True, lambda: True)
+        finally:
+            if editor is not None:
+                editor.join(2)
+
+        self.assertFalse(editor.is_alive())
+        self.assertEqual(errors, [])
+        self.assertTrue(applied.is_set())
+        self.assertEqual(state.get()["pixel_colours"][0], [0, 0, 255, 0])
+        self.assertEqual(state.get()["heights"], [20, 0])
+
+    def test_profile_edit_during_frame_build_keeps_preview_in_logical_order(self):
+        cfg = Config(jet_count=2, reverse_jets=True,
+                     jet_enabled=(True, False), base_colour=(12, 34, 56, 78))
+        building = threading.Event()
+        edit_attempted = threading.Event()
+        applied = threading.Event()
+        errors = []
+        state = None
+        editor = None
+
+        class Server:
+            def shutdown(self):
+                pass
+
+        def serve(live_state, _cfg, control):
+            nonlocal state, editor
+            state = live_state
+            profile = control.profile()
+            profile["settings"]["reverse_jets"] = False
+
+            def edit_profile():
+                try:
+                    if not building.wait(2):
+                        raise TimeoutError("frame build did not start")
+                    edit_attempted.set()
+                    control.apply(profile)
+                    applied.set()
+                except Exception as exc:
+                    errors.append(exc)
+
+            editor = threading.Thread(target=edit_profile)
+            editor.start()
+            return Server()
+
+        real_frame = wave.Wave.frame
+
+        def paused_frame(self, tracker_frame, now, lights_only=False):
+            building.set()
+            if not edit_attempted.wait(2):
+                raise TimeoutError("profile edit did not start")
+            applied.wait(0.2)
+            return real_frame(self, tracker_frame, now, lights_only)
+
+        try:
+            with mock.patch.object(run.viewer, "serve", serve), \
+                    mock.patch.object(wave.Wave, "frame", paused_frame):
+                run._show_loop(iter([(1.0, [])]), cfg, None, "test",
+                               SimpleNamespace(lights_only=False),
+                               lambda _frame: True, lambda: True)
+        finally:
+            if editor is not None:
+                editor.join(2)
+
+        self.assertFalse(editor.is_alive())
+        self.assertEqual(errors, [])
+        self.assertTrue(applied.is_set())
+        self.assertEqual(state.get()["pixel_colours"],
+                         [[12, 34, 56, 78], [0, 0, 0, 0]])
+
     def test_held_test_resend_keeps_its_original_logical_jet_after_routing_edit(self):
         cfg = Config(jet_count=3, reverse_jets=True, resend_seconds=0)
         views = []
