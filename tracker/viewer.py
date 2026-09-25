@@ -50,6 +50,13 @@ class State:
             self._output = {"pixel_colours": colours, "heights": heights}
 
 
+PIXEL_MAP_JS = """
+function pixelScreenColour(pixel) {
+  return 'rgb(' + [0, 1, 2].map(i => Math.min(255, pixel[i] + pixel[3])).join(', ') + ')';
+}
+"""
+
+
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>water-jet tracker</title>
@@ -78,6 +85,7 @@ PAGE = """<!doctype html>
 <nav><a href="/test">Test jets</a><a id="settings-link" href="/settings">Settings</a><a href="/system">System</a></nav>
 <canvas id="c"></canvas>
 <script>
+""" + PIXEL_MAP_JS + """
 let CFG = null, FRAME = null, polls = 0;
 
 function fit() {
@@ -146,9 +154,7 @@ function draw() {
     const h = H[j] || 0;
     const up = CFG.height_max > 0 ? Math.min(1, h / CFG.height_max) : 0;
     const pixel = pixels[j];
-    const colour = pixel
-      ? 'rgb(' + [0, 1, 2].map(i => Math.min(255, pixel[i] + pixel[3])).join(', ') + ')'
-      : (up > 0 ? '#4cf' : '#2a6');
+    const colour = pixel ? pixelScreenColour(pixel) : (up > 0 ? '#4cf' : '#2a6');
     dot(ctx, t, x, y, 2.5 + 9 * up, colour);
     ctx.strokeStyle = '#bbc'; ctx.lineWidth = 1; ctx.stroke();
     if (h > 0) {
@@ -398,6 +404,7 @@ summary:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; border-ra
   </div>
 </main>
 <script>
+""" + PIXEL_MAP_JS + r"""
 let profile, original, defaultProfile, roi, liveFrame=null, selected=0, dragging=false, dragCorner=null, lightsOnly=false, colourMode='base_colour';
 let zoom=1, viewCentre=null;
 const $=id=>document.getElementById(id);
@@ -427,7 +434,40 @@ function xy(p){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pa
 function world(x,y){const c=$('path'),v=bounds(),pad=45,w=c.width/devicePixelRatio-pad*2,h=c.height/devicePixelRatio-pad*2;return [v.xmin+(x-pad)/w*(v.xmax-v.xmin),v.ymin+(pad+h-y)/h*(v.ymax-v.ymin)];}
 function scanDot(ctx,p,r,colour){const q=xy(p);ctx.fillStyle=colour;ctx.beginPath();ctx.arc(q[0],q[1],r,0,Math.PI*2);ctx.fill();}
 function jetPoints(points,count){if(count===points.length)return points;const lengths=points.slice(1).map((p,i)=>Math.hypot(p[0]-points[i][0],p[1]-points[i][1])),total=lengths.reduce((a,b)=>a+b,0);if(count<=1||!total)return [points[0]];let segment=0,before=0;return Array.from({length:count},(_,i)=>{const target=total*i/(count-1);while(segment<lengths.length-1&&before+lengths[segment]<target){before+=lengths[segment++]}const a=points[segment],b=points[segment+1],t=lengths[segment]?(target-before)/lengths[segment]:0;return [a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])]});}
-function draw(){if(!profile||!roi)return;const c=$('path'),ctx=c.getContext('2d');ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);const v=bounds();ctx.strokeStyle='#17474d';ctx.lineWidth=1;for(let x=Math.ceil(v.xmin*2)/2;x<=v.xmax;x+=.5){const a=xy([x,v.ymin]),b=xy([x,v.ymax]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}for(let y=Math.ceil(v.ymin*2)/2;y<=v.ymax;y+=.5){const a=xy([v.xmin,y]),b=xy([v.xmax,y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}drawArea(ctx);if(liveFrame){for(const p of liveFrame.bg||[])scanDot(ctx,p,1.3,'#527277');for(const p of liveFrame.fg||[])scanDot(ctx,p,2.2,'#45dce7');for(const t of liveFrame.tracks||[])scanDot(ctx,[t.x,t.y],t.confirmed?7:5,t.confirmed?(t.seen?'#0f6':'#f44'):'#888')}scanDot(ctx,[0,0],6,'#fff06a');const pts=profile.settings.strip_points;ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();jetPoints(profile.settings.strip_points,profile.settings.jet_count).forEach((p,i)=>{const q=xy(p);ctx.fillStyle='#45dce7';ctx.beginPath();ctx.arc(...q,4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(String(i+1),q[0]+6,q[1]-6)});pts.forEach((p,i)=>{const q=xy(p);ctx.strokeStyle=i===selected?'#f3b61f':'#e9fffa';ctx.lineWidth=2;ctx.strokeRect(q[0]-6,q[1]-6,12,12)});}
+function draw(){
+  if(!profile||!roi)return;
+  const c=$('path'),ctx=c.getContext('2d');
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  ctx.fillStyle='#092f35';ctx.fillRect(0,0,c.width,c.height);
+  const v=bounds();ctx.strokeStyle='#17474d';ctx.lineWidth=1;
+  for(let x=Math.ceil(v.xmin*2)/2;x<=v.xmax;x+=.5){const a=xy([x,v.ymin]),b=xy([x,v.ymax]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}
+  for(let y=Math.ceil(v.ymin*2)/2;y<=v.ymax;y+=.5){const a=xy([v.xmin,y]),b=xy([v.xmax,y]);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.stroke()}
+  drawArea(ctx);
+  if(liveFrame){
+    for(const p of liveFrame.bg||[])scanDot(ctx,p,1.3,'#527277');
+    for(const p of liveFrame.fg||[])scanDot(ctx,p,2.2,'#45dce7');
+  }
+  scanDot(ctx,[0,0],6,'#fff06a');
+  const pts=profile.settings.strip_points;
+  ctx.strokeStyle='#54d6c1';ctx.lineWidth=3;ctx.beginPath();
+  pts.forEach((p,i)=>{const q=xy(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.stroke();
+  jetPoints(pts,profile.settings.jet_count).forEach((p,i)=>{
+    const q=xy(p),h=(liveFrame?.heights||[])[i]||0;
+    const up=profile.settings.height_max>0?Math.min(1,h/profile.settings.height_max):0;
+    const pixel=(liveFrame?.pixel_colours||[])[i];
+    const radius=4+9*up;
+    ctx.fillStyle=pixel?pixelScreenColour(pixel):'#45dce7';
+    ctx.beginPath();ctx.arc(...q,radius,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#092f35';ctx.lineWidth=3;ctx.stroke();
+    ctx.strokeStyle='#e9fffa';ctx.lineWidth=1;ctx.stroke();
+    const label=String(i+1),x=q[0]+radius+2,y=q[1]-radius-2;
+    ctx.font='12px monospace';ctx.lineWidth=3;ctx.strokeStyle='#092f35';
+    ctx.strokeText(label,x,y);
+    ctx.fillStyle='#fff';ctx.fillText(label,x,y);
+  });
+  if(liveFrame){for(const t of liveFrame.tracks||[])scanDot(ctx,[t.x,t.y],t.confirmed?7:5,t.confirmed?(t.seen?'#0f6':'#f44'):'#888')}
+  pts.forEach((p,i)=>{const q=xy(p);ctx.strokeStyle=i===selected?'#f3b61f':'#e9fffa';ctx.lineWidth=2;ctx.strokeRect(q[0]-6,q[1]-6,12,12)});
+}
 function area(){const s=profile.settings;return {xmin:s.roi_x_min,xmax:s.roi_x_max,ymin:s.roi_y_min,ymax:s.roi_y_max};}
 function corners(){const a=area();return [[a.xmin,a.ymin],[a.xmax,a.ymin],[a.xmax,a.ymax],[a.xmin,a.ymax]];}
 // Outside the active area is ignored, so it is drawn dark. The corners are handles.
