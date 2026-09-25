@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import threading
 import unittest
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest import mock
 
@@ -31,6 +32,129 @@ class TestOutputState(unittest.TestCase):
 
 
 class TestShowOutputPreview(unittest.TestCase):
+    def test_mode_change_before_output_lock_keeps_held_jet_in_logical_order(self):
+        cfg = Config(jet_count=2, reverse_jets=True, resend_seconds=0,
+                     slow_colour=(12, 34, 56, 78))
+        show_thread = threading.current_thread()
+        pause_output = threading.Event()
+        selecting_output = threading.Event()
+        changed = threading.Event()
+        errors = []
+        sent = []
+        state = None
+        control = None
+
+        class Server:
+            def shutdown(self):
+                pass
+
+        def serve(live_state, _cfg, live_control):
+            nonlocal state, control
+            state, control = live_state, live_control
+            return Server()
+
+        def start_held_test():
+            try:
+                if not selecting_output.wait(2):
+                    raise TimeoutError("show did not reach the output lock")
+                control.set_test_mode(True)
+                control.test_jet(0, 20)
+                profile = control.profile()
+                profile["settings"]["reverse_jets"] = False
+                control.apply(profile)
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                changed.set()
+
+        real_output_settings = run.settings.SettingsControl.output_settings
+
+        @contextmanager
+        def paused_output_settings(self):
+            if threading.current_thread() is show_thread and pause_output.is_set():
+                pause_output.clear()
+                selecting_output.set()
+                if not changed.wait(2):
+                    raise TimeoutError("held test did not start")
+            with real_output_settings(self) as routing:
+                yield routing
+
+        def source():
+            pause_output.set()
+            yield 1.0, []
+
+        editor = threading.Thread(target=start_held_test)
+        editor.start()
+        try:
+            with mock.patch.object(run.viewer, "serve", serve), \
+                    mock.patch.object(run.settings.SettingsControl, "output_settings",
+                                      paused_output_settings):
+                run._show_loop(source(), cfg, None, "test",
+                               SimpleNamespace(lights_only=False),
+                               lambda output: sent.append(list(output)), lambda: True)
+        finally:
+            editor.join(2)
+
+        self.assertFalse(editor.is_alive())
+        self.assertEqual(errors, [])
+        self.assertTrue(changed.is_set())
+        self.assertEqual(sent[-1][:10], [0, 0, 0, 0, 0, 12, 34, 56, 78, 20])
+        self.assertEqual(state.get()["heights"], [20, 0])
+        self.assertEqual(state.get()["pixel_colours"],
+                         [[12, 34, 56, 78], [0, 0, 0, 0]])
+
+    def _held_preview_after_count_edit(self, old_count, new_count, held_jet):
+        cfg = Config(jet_count=old_count, reverse_jets=True, resend_seconds=0,
+                     slow_colour=(12, 34, 56, 78))
+        state = None
+        control = None
+        sent = []
+
+        class Server:
+            def shutdown(self):
+                pass
+
+        def serve(live_state, _cfg, live_control):
+            nonlocal state, control
+            state, control = live_state, live_control
+            return Server()
+
+        def source():
+            control.set_test_mode(True)
+            control.test_jet(held_jet, 20)
+            profile = control.profile()
+            profile["settings"]["jet_count"] = new_count
+            profile["settings"]["jet_enabled"] = [True] * new_count
+            control.apply(profile)
+            yield 1.0, []
+
+        with mock.patch.object(run.viewer, "serve", serve):
+            run._show_loop(source(), cfg, None, "test",
+                           SimpleNamespace(lights_only=False),
+                           lambda output: sent.append(list(output)), lambda: True)
+
+        self.assertEqual(cfg.jet_count, new_count)
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(sent[1], sent[0])
+        return state.get()
+
+    def test_held_test_count_increase_pads_preview_with_zero(self):
+        preview = self._held_preview_after_count_edit(2, 3, 0)
+        self.assertEqual(preview["heights"], [20, 0, 0])
+        self.assertEqual(preview["pixel_colours"],
+                         [[12, 34, 56, 78], [0, 0, 0, 0], [0, 0, 0, 0]])
+
+    def test_held_test_count_decrease_keeps_original_routing(self):
+        preview = self._held_preview_after_count_edit(3, 2, 0)
+        self.assertEqual(preview["heights"], [20, 0])
+        self.assertEqual(preview["pixel_colours"],
+                         [[12, 34, 56, 78], [0, 0, 0, 0]])
+
+    def test_held_test_count_decrease_drops_out_of_range_jet(self):
+        preview = self._held_preview_after_count_edit(3, 2, 2)
+        self.assertEqual(preview["heights"], [0, 0])
+        self.assertEqual(preview["pixel_colours"], [[0, 0, 0, 0], [0, 0, 0, 0]])
+
     def test_profile_edit_during_held_test_build_keeps_one_settings_set(self):
         cfg = Config(jet_count=2, reverse_jets=True)
         building = threading.Event()

@@ -1,5 +1,13 @@
 # Decisions
 
+## [2026-09-25] Keep held output routing separate from the current preview count
+
+Check the show mode under the profile lock before choosing a frame and its
+routing. Decode held frames with the routing saved when the test began.
+Use the current profile count for the preview lists. Fill added Jet positions
+with zero and omit positions outside a lower count. This keeps the map in
+logical Jet order after a mode or profile change without changing held DMX.
+
 ## [2026-09-25] Preview the last accepted output on the Live map
 
 Save each accepted 512-slot show or test command at the send boundary.

@@ -34,15 +34,21 @@ class State:
         with self._lock:
             return dict(self._frame, **self._output) if self._output else self._frame
 
-    def set_output(self, frame, routing):
-        """Save the last accepted command in logical Jet order for the Live map."""
+    def set_output(self, frame, routing, jet_count=None):
+        """Decode saved routing into logical Jets, sized for the current profile."""
         if len(frame) != dmx.UNIVERSE_SIZE:
             raise ValueError("output preview needs a full 512-slot frame")
-        jet_count, reverse_jets = routing
+        routed_count, reverse_jets = routing
+        if jet_count is None:
+            jet_count = routed_count
         colours = []
         heights = []
         for jet in range(jet_count):
-            output = jet_count - 1 - jet if reverse_jets else jet
+            if jet >= routed_count:
+                colours.append([0, 0, 0, 0])
+                heights.append(0)
+                continue
+            output = routed_count - 1 - jet if reverse_jets else jet
             base = output * dmx.CHANNELS_PER_NOZZLE
             colours.append(list(frame[base:base + 4]))
             heights.append(frame[base + dmx.HEIGHT])

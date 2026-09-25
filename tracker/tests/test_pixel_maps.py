@@ -22,6 +22,7 @@ const frame=(colours)=>({pixel_colours:colours,heights:[0,40],
   fg:[[0.8,0.8]],bg:[[0.9,0.9]],tracks:[{id:1,x:1,y:1,vx:0,vy:0,
     speed:0,s:0,jet:1,times_seen:1,dist_travelled:0,confirmed:true,seen:true}],
   legs:[],clusters:[],detections:[],hz:16});
+const pureColours=[[[255,0,0,0],[0,255,0,0]],[[0,0,255,0],[0,0,0,128]]];
 function browser(script){
   const fills=[],outlines=[],labels=[],timers=[],rects=[],strokes=[];
   const ctx={fillStyle:'',strokeStyle:'',lineWidth:1,
@@ -39,7 +40,7 @@ function browser(script){
     style:{},hidden:false,textContent:'',value:'',getBoundingClientRect(){return {width:180,height:180}}});
     return nodes.get(id)};
   const states=[frame([[0,0,0,0],[250,10,20,20]]),
-    frame([[20,40,60,10],[0,0,0,0]])];
+    frame([[20,40,60,10],[0,0,0,0]]),...pureColours.map(frame)];
   const context=vm.createContext({devicePixelRatio:1,
     document:{getElementById:getNode,querySelector(){return {addEventListener(){}}},
       querySelectorAll(){return []}},
@@ -56,6 +57,11 @@ vm.runInContext(`CFG={roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2,
   strip_points:[[0.5,0.5],[1.5,0.5]],jet_count:2,height_max:40};
   FRAME=(${JSON.stringify(frame([[0,0,0,0],[250,10,20,20]]))});draw()`,live.context);
 const liveJets=live.fills.filter(x=>x.radius===2.5||x.radius===11.5);
+const livePure=pureColours.map(colours=>{
+  live.fills.length=0;
+  vm.runInContext(`FRAME=(${JSON.stringify(frame(colours))});draw()`,live.context);
+  return live.fills.filter(x=>x.radius===2.5||x.radius===11.5);
+});
 const settings=browser(settingsScript);
 vm.runInContext(`profile={settings:{roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2,
   strip_points:[[0.5,0.5],[1.5,0.5]],jet_count:2,height_max:40}};
@@ -70,11 +76,17 @@ vm.runInContext(`profile={settings:{roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_ma
   settings.fills.length=0;
   await vm.runInContext('pollState()',settings.context);
   const edited=settings.fills.filter(x=>x.radius===4||x.radius===13);
+  const settingsPure=[];
+  for(const colours of pureColours){
+    settings.fills.length=0;
+    await vm.runInContext('pollState()',settings.context);
+    settingsPure.push(settings.fills.filter(x=>x.radius===4||x.radius===13));
+  }
   settings.fills.length=0;
   await vm.runInContext('pollState()',settings.context);
   const lost=settings.fills.filter(x=>x.radius===4||x.radius===13);
   console.log(JSON.stringify({liveJets,first,firstColours,firstOutlines,firstLabels,
-    firstRects,firstStrokes,edited,lost,
+    firstRects,firstStrokes,edited,livePure,settingsPure,lost,
     frame:vm.runInContext('liveFrame',settings.context),timers:settings.timers,
   }));
 })().catch(e=>{console.error(e);process.exitCode=1});
@@ -105,12 +117,18 @@ vm.runInContext(`profile={settings:{roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_ma
             {"colour": "rgb(30, 50, 70)", "radius": 4},
             {"colour": "rgb(0, 0, 0)", "radius": 13},
         ])
+        for page in ("livePure", "settingsPure"):
+            with self.subTest(page=page):
+                self.assertEqual(
+                    [[jet["colour"] for jet in pair] for pair in seen[page]],
+                    [["rgb(255, 0, 0)", "rgb(0, 255, 0)"],
+                     ["rgb(0, 0, 255)", "rgb(128, 128, 128)"]])
         self.assertEqual(seen["lost"], [
             {"colour": "#45dce7", "radius": 4},
             {"colour": "#45dce7", "radius": 4},
         ])
         self.assertIsNone(seen["frame"])
-        self.assertEqual(seen["timers"], [100, 100, 100])
+        self.assertEqual(seen["timers"], [100, 100, 100, 100, 100])
 
 
 if __name__ == "__main__":
