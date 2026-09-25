@@ -1,209 +1,210 @@
 # water-jet-follower
 
 A strip of water jets that follows people along a hallway. One LiDAR finds walkers by their
-legs, and a hill of water rises under each one. It runs on a Raspberry Pi 5 in plain Python.
+legs. A hill of water rises under each walker. The control app runs on a Raspberry Pi 5 in
+plain Python.
 
 **Prototype. The final build uses all 20 jets. Jets 0 through 9 use a measured person-to-jet
-path and are verified with light and water. Jets 10 through 19 are not calibrated yet.**
+path and are verified with light and water. Jets 10 through 19 are not calibrated yet. The
+offline Pi boot and iPad page are proved. The full rig safety checks are not complete.**
 
 [Decisions](DECISIONS.md) · [Next steps](NEXT_STEPS.md) · [Glossary](CONTEXT.md) · [Tracker notes](tracker/README.md)
 
 ![The signal chain, from a walker in the hallway to water in the air](docs/water-jet-follower.png)
 
-## ⚙️ How It Works
+## How it works
 
-1. **The LiDAR sweeps a level slice.** It sits at one end of the strip at shin height. Boost
-   mode gives 8,000 samples a second at about 16 Hz.
-2. **The tracker removes the room.** A baseline holds the nearest thing on each bearing. Points
-   nearer than the baseline are people.
-3. **The tracker follows each walker.** It clusters the moving points, pairs them into legs, and
-   runs a constant-velocity Kalman filter. One track per person.
-4. **The wave builds a hill.** Each confirmed walker gets a hill five jets wide, centred a
-   little ahead of them. Two hills that overlap combine with max, never sum.
-5. **The frame goes out as DMX.** Every frame carries all 512 slots. A hard cap limits every
-   fountain channel as the last step before sending.
-6. **The modules raise the jets.** `olad` drives the Enttec, which drives the modules over DMX.
-   Each nozzle takes five channels: red, green, blue, white, height.
+1. The LiDAR sweeps a level slice at shin height.
+2. The tracker removes the fixed room points.
+3. The tracker clusters moving points and follows each walker.
+4. The wave makes one five-jet hill for each confirmed walker.
+5. OLA sends a full DMX frame through the Enttec interface.
+6. Each nozzle uses red, green, blue, white, and height channels.
 
-The pixel beside each jet takes its colour from the walker's speed, slow blue to fast white. A
-walker who stops keeps their hill, because their track is still there.
+The light colour changes with walking speed. A stopped walker keeps a hill while the tracker
+still holds that person.
 
-## ✨ Features
+NetworkManager owns the private Pi Wi-Fi. The `water-jet-show.service` systemd service owns
+the show process. The web page and show start at boot. Every service start includes
+`--lights-only`, so all fountain-height channels start at zero.
 
-- **Follow.** A hill of water tracks each walker along the strip.
-- **Hold.** The hill stays put when a walker stops.
-- **Two walkers.** One hill each, and they pass through each other cleanly.
-- **Colour by speed.** Slow is blue, fast is white, over a dim base colour.
-- **Attract.** A slow half-height hill rolls end to end when nobody is there. Off by default.
-- **System page.** `/system` shows the Pi's health and the show's state, and reboots or shuts
-  the Pi down from the iPad.
+If the show process fails, systemd waits five seconds and starts it again. It allows five
+starts in five minutes. It then leaves the service failed until a person fixes the cause and
+resets it. The private Wi-Fi stays up while the show is stopped.
 
-## 🔩 Hardware
+## Features
+
+- A water hill follows each walker.
+- A hill stays with a walker who stops.
+- Two walkers can have separate hills.
+- Light colour changes from blue to white with speed.
+- The settings, test, and system pages work on an iPad.
+- The Pi serves its own private Wi-Fi without a site network.
+- The system page shows Pi and show state.
+- The system page can request a safe reboot or shutdown.
+
+The attract mode is off by default. Keep it off until the hardware watchdog and contactor pass
+their real fault tests.
+
+## Hardware
 
 | Part | Choice |
 |---|---|
 | Sensor | Slamtec RPLIDAR A2M8, one unit, Boost mode |
-| Controller | Raspberry Pi 5, Raspberry Pi OS Lite 64-bit, headless |
+| Controller | Raspberry Pi 5, Raspberry Pi OS Lite 64-bit, Debian 13 Trixie |
 | DMX interface | Enttec DMX USB Pro Mk2 |
 | Water | 2 x HB-Laser 3D HydroMatrix HD modules, 10 jets each; first module verified |
 | USB hub | Powered hub, Genesys Logic USB2.1/3.1 |
 | Module supply | 24 V DC, 3.2 A per module |
 
-- **The powered hub is not optional.** The Pi 5 limits its USB ports to 600 mA on a 65 W supply.
-  The LiDAR browned out the bus every time its motor started.
-- **The modules latch.** They hold their last commanded value forever when DMX stops. A switch
-  on the 24 V mains lead is the only real stop.
-- **Boost mode is mandatory.** Standard mode gives 2.6 degrees at this scan rate. That is nearly
-  three jet pitches of error at 3 m.
+The powered hub is required. The LiDAR reset when its motor started from a Pi USB port.
 
-## 🔌 Wiring
+Boost mode is required. The lower sample modes do not give enough position detail at the set
+scan rate.
+
+The modules hold their last height when DMX stops. A software stop cannot clear a held value
+after OLA, the Enttec, the Pi, or module communication fails. The physical switch on the 24 V
+module supply is the only proved stop for those faults.
+
+The watchdog and contactor are a design only. They are not built or proved. See
+[the watchdog design](hardware/watchdog-contactor.md) and [its BOM](hardware/bom.md).
+
+## Wiring
 
 | From | To | Cable | Notes |
 |---|---|---|---|
-| RPLIDAR A2M8 | Powered USB hub | USB | Appears as `/dev/ttyLIDAR`. Never plug it straight into the Pi. |
-| Enttec Pro Mk2 | Powered USB hub | USB | Appears as `/dev/ttyENTTEC`. Serial `EN329670`. |
-| Powered USB hub | Raspberry Pi 5 | USB | The hub carries its own supply. |
-| Enttec breakout | Module 1 input | 5-pin XLR | Enttec output is female. The module input is male. |
-| Module 1 | Module 2 | HB-Laser link | Final build uses both modules. Current bench config drives module 1 only. |
-| 24 V supply | Module 1 | HB-Laser feed | Put a switch on the mains lead. Keep it in reach. |
+| RPLIDAR A2M8 | Powered USB hub | USB | The udev rule makes `/dev/ttyLIDAR` from its USB vendor and product IDs. |
+| Enttec Pro Mk2 | Powered USB hub | USB | The serial-matched udev rule makes `/dev/ttyENTTEC`. Its serial is `EN329670`. |
+| Powered USB hub | Raspberry Pi 5 | USB | The hub uses its own power supply. |
+| Enttec breakout | Module 1 input | 5-pin XLR | The Enttec output is female. The module input is male. |
+| Module 1 | Module 2 | HB-Laser link | The final build uses both modules. The checked bench setup uses module 1 only. |
+| 24 V supply | Module 1 | HB-Laser feed | Keep the physical power switch in reach. |
 
-## 🧰 Setup
+## Pi setup
 
-### Requirements
+There is no `SETUP.md` in this repo. The Pi now has the install files and the checked runtime
+state below.
 
-| Item | Version |
+| Item | Installed choice |
 |---|---|
-| Raspberry Pi OS Lite | 64-bit, Debian 13 Trixie |
-| OLA | `ola` and `ola-python`, from apt |
-| Python | System Python 3, plus a venv at `~/wj-venv` |
-| pyrplidar | 0.10.9 |
+| Python | System Python 3.13.5 and `/home/pi/wj-venv` |
+| `pyrplidar` | 0.1.2 |
+| OLA | `ola` and `ola-python` 0.10.9 from apt |
+| Wi-Fi profile | NetworkManager profile `water-jets-ap` |
+| Private Wi-Fi | SSID `water-jets`, fixed Pi address `10.42.0.1/24` |
+| Show service | `water-jet-show.service`, enabled at boot |
+| Show command | `tracker.run show` with fixed data paths and `--lights-only` |
+| Failure recovery | Restart after 5 seconds, with a limit of five starts in five minutes |
+| OLA lock cleanup | Root systemd service before OLA starts |
+| Logs | systemd journal |
 
-### Steps
+The OLA cleanup service checks matching lock files before it removes a stale lock. Do not
+delete `/var/lock/LCK..ttyUSB*` by hand.
 
-Run steps 1 to 4 and 6 on the Pi, over SSH.
+Read these files before a new install or repair:
 
-1. **Install OLA and the LiDAR driver.**
+- [Current Pi state before this install](docs/pi-install/current-state-2026-09-25.md)
+- [Service and recovery design](docs/pi-install/service-and-recovery-design.md)
+- [Operator access and rescue](docs/pi-install/operator-access-and-rescue.md)
+- [Install build record](docs/pi-install/build-record-2026-09-25.md)
+- [Real Pi boot and recovery proof](docs/pi-install/real-pi-proof-2026-09-25.md)
 
-   ```
-   sudo apt update
-   sudo apt install -y ola ola-python
-   python3 -m venv ~/wj-venv
-   ~/wj-venv/bin/pip install pyrplidar
-   ```
+## Quickstart
 
-2. **Let the venv see the system OLA package.** `ola-python` installs outside the venv. Edit
-   `~/wj-venv/pyvenv.cfg` and set:
+Keep the 24 V module power off until the live-water safety check starts.
 
-   ```
-   include-system-site-packages = true
-   ```
+1. Join the `water-jets` Wi-Fi on the iPad.
+2. Get the password from the private local record.
+3. Open `http://10.42.0.1:8080/`.
+4. Check that **Lights only** is on.
 
-3. **Give the two USB devices fixed names.** Plugging the LiDAR in can move the Enttec from
-   `ttyUSB0` to `ttyUSB1`. That breaks the show at random. Create
-   `/etc/udev/rules.d/99-water-jets.rules` with one rule per device, matched on **serial
-   number**, making `/dev/ttyLIDAR` and `/dev/ttyENTTEC`. Match on serial, not on chip ID.
-   Another device with the same FTDI chip will otherwise steal the name.
+The private password record is outside this repo. Do not copy it into Git, an issue, or a log.
 
-4. **Restrict OLA to the Enttec.** Edit `/etc/ola/ola-usbserial.conf` and set a single
-   `device_prefix = ttyENTTEC`. Then set `enabled = false` in every other `/etc/ola/*.conf`.
-   OLA's StageProfi plugin otherwise grabs the LiDAR's port every few seconds.
+The fixed URL is the main operator address. The offline iPad test passed with no Ethernet and
+no site network. Do not depend on the optional `.local` name until it passes a separate offline
+test.
 
-5. **Copy the code from the laptop.** Run this in Git Bash on the laptop.
+## Operator recovery
 
-   ```
-   scp -r "C:/Users/garrett.reynolds/Projects/Personal/Electronics/water-jet-follower/tracker" pi@water-jets:~/
-   ```
+Use wired Ethernet for network rescue when a known LAN is present. The address
+`10.0.10.204` was checked on the current LAN. It can change on another LAN.
 
-6. **Let the System page reboot and shut down the Pi.** The **Reboot Pi** and **Shut down
-   Pi** buttons on `/system` run `sudo -n /usr/sbin/reboot` and `sudo -n /usr/sbin/poweroff`.
-   Without this rule they are refused with "a password is required". Run
-   `sudo visudo -f /etc/sudoers.d/water-jets` and make the file exactly this:
+Use a micro-HDMI display and a USB keyboard when no network path works.
 
-   ```
-   pi ALL=(root) NOPASSWD: /usr/sbin/reboot, /usr/sbin/poweroff
-   ```
+Private Wi-Fi SSH has not passed its real client test. Use the checked wired address on the
+current LAN for rescue from Windows PowerShell:
 
-   `visudo` sets the mode (0440) and checks the syntax. Nothing else gets passwordless sudo.
-   Check it with `sudo -n -l /usr/sbin/reboot`, which only lists: it must print the path and
-   not "a password is required". Do not run the command itself to test it.
-
-### Verifying it worked
-
-```
-ssh pi@water-jets
-cd ~ && ~/wj-venv/bin/python -m tracker.run check
+```powershell
+ssh pi@10.0.10.204
 ```
 
-Expect about 16 Hz and about 500 samples per scan. Under 400 samples per scan means the LiDAR is
-not in Boost mode. Then run `~/wj-venv/bin/python -m tracker.run zero` and expect
-`slots_held=512 ALL ZERO`.
+Then run these read-only commands in the Pi Bash shell:
 
-### Gotchas
-
-- **The software stop only works while the whole chain is alive.** Killing the tracker zeroes the
-  jets. Killing `olad`, unplugging the interface or crashing the Pi does not. The modules hold
-  their last value. Cut the 24 V.
-- **OLA leaves stale lock files.** `/var/lock/LCK..ttyUSB*` holds a PID and survives a restart.
-  When a recycled PID matches, `olad` refuses to open the port. Clear these at boot.
-- **`pyrplidar` does not drain its serial buffer on stop.** It throws
-  `PyRPlidarProtocolError: sync bytes are mismatched` on reconnect. The driver retries and
-  flushes for this reason.
-- **The control path uses ten measured points.** `strip_points` maps real person positions to
-  jets 0 through 9. The tracker interpolates between adjacent points.
-- **One DMX unit is 7.62 mm of jet height.** DMX 255 is about 1.94 m. Raise the cap in small
-  steps and never as a guess.
-
-## ⚡ Quickstart
-
-```
-ssh pi@water-jets
-cd ~ && ~/wj-venv/bin/python -m tracker.run show --replay ~/data/crossing.jsonl --baseline ~/data/baseline.json --dry-run
-cd ~ && ~/wj-venv/bin/python -m tracker.run show --baseline ~/data/baseline.json --lights-only
-cd ~ && ~/wj-venv/bin/python -m tracker.run show --baseline ~/data/baseline.json
-cd ~ && ~/wj-venv/bin/python -m tracker.run zero
+```bash
+systemctl status water-jet-show.service olad.service water-jet-ola-lock-cleanup.service NetworkManager.service --no-pager --lines=20
+systemctl show water-jet-show.service -p ActiveState -p SubState -p Result -p NRestarts -p ExecMainStatus
+journalctl -b -u water-jet-show.service -u olad.service -u water-jet-ola-lock-cleanup.service --no-pager -n 200
+nmcli -f DEVICE,TYPE,STATE,CONNECTION device status
+ip -4 -br addr
 ```
 
-The first line needs no hardware but the Pi. The second drives real DMX with every fountain
-forced to zero, so nothing gets wet. The third moves water. The last is the stop.
+Keep the 24 V module power off when the output state is not known. Fix the cause before you
+reset a failed start limit. See the [operator access and rescue guide](docs/pi-install/operator-access-and-rescue.md)
+for the full checks and the [service design](docs/pi-install/service-and-recovery-design.md)
+for recovery rules.
 
-## 🚨 Troubleshooting
+## Development workflow
 
-| Symptom | Fix |
-|---|---|
-| Jets stay up after the software stops | Cut the 24 V. The modules latch and no software can clear them. |
-| `zero` says `olad returned NO DATA` | The interface is unplugged. Check `ola_dev_info`, then cut the 24 V if anything is up. |
-| `olad` will not open the port | Delete the stale `/var/lock/LCK..ttyUSB*` file and restart `olad`. |
-| `PyRPlidarProtocolError: sync bytes are mismatched` | Unplug and replug the LiDAR. The driver flushes and retries on connect. |
-| LiDAR resets when the motor starts | Move it onto the powered hub. The Pi's own ports cannot supply it. |
-| Under 400 samples per scan | The LiDAR is not in Boost mode. Check `require_boost` in `config.py`. |
-| `ModuleNotFoundError: No module named 'ola'` | Set `include-system-site-packages = true` in `~/wj-venv/pyvenv.cfg`. |
-| Hills appear at the wrong jet | `strip_start` and `strip_end` are not calibrated. See step 1 of `NEXT_STEPS.md`. |
+The installed service is the normal operator path. Stop it before you start a second show by
+hand. Use the tracker guide for a manual Pi run.
 
-## 📁 Project structure
+List the development commands from Windows PowerShell:
+
+```powershell
+python -m tracker.run --help
+```
+
+Run the tests from Windows PowerShell:
+
+```powershell
+python -m pytest tracker/tests -q
+```
+
+The tests use fake scans and temporary files. They do not prove the real hardware state.
+
+The tracker command also supports recording, baseline creation, replay, DMX checks, manual
+jogging, zero output, and the live show. See [tracker/README.md](tracker/README.md) for those
+development and bench commands.
+
+## Project structure
 
 | Path | Holds |
 |---|---|
-| `tracker/` | Everything that runs. Import as a package. |
-| `tracker/run.py` | The command line. `check`, `record`, `baseline`, `show`, `jog`, `zero`. |
-| `tracker/config.py` | Every tunable number, with the measurement behind it. |
-| `tracker/lidar.py` | The A2M8 driver. Connect with retry, flush, force Boost. |
-| `tracker/tracking.py` | Clustering, leg pairing, Kalman tracking. |
-| `tracker/wave.py` | Tracks in, one DMX frame out. |
-| `tracker/dmx.py` | DMX out through `olad`, and the stop path. |
-| `tracker/viewer.py` | The web pages, served from the Pi: live viewer, settings, test, system. |
-| `tracker/system.py` | The Pi's health and the show's state, for the System page. |
-| `tracker/tests/` | 153 tests. Synthetic walkers, so no hardware is needed. |
-| `bench/` | Throwaway LiDAR probe scripts from the sensor bring-up. |
-| `data/` | Recorded scans and baselines. |
-| `docs/` | The signal chain diagram and the agent docs. |
+| `tracker/` | Tracker, wave, DMX, web pages, system status, and tests |
+| `tracker/run.py` | Command line entry point |
+| `deploy/pi/` | Pi install script and checked OLA lock cleanup code |
+| `deploy/systemd/` | Show, cleanup, and OLA systemd files |
+| `data/` | Recorded scans, baselines, and local run data |
+| `hardware/` | Hardware stop design and BOM |
+| `docs/pi-install/` | Pi state, access, install, and proof records |
+| `docs/` | Build notes, diagrams, and agent guides |
 
-## 📚 Documentation
+## Safety and proof limits
 
-- [DECISIONS.md](DECISIONS.md) — every choice made, and why.
-- [NEXT_STEPS.md](NEXT_STEPS.md) — the true state of play, and what to do next.
-- [CONTEXT.md](CONTEXT.md) — the glossary. Read this before the code.
-- [docs/BUILD_SPEC.md](docs/BUILD_SPEC.md) — the final 20-jet build specification.
-- [tracker/README.md](tracker/README.md) — running the tracker, the show, and the first power-up.
-- [docs/water-jet-follower.html](docs/water-jet-follower.html) — the signal chain, interactive.
+The Pi passed the show crash, restart, five-start limit, manual recovery, private Wi-Fi restart,
+normal reboot, and isolated iPad page checks. Each checked service start used Lights only.
+
+These checks do not prove physical water off. They also do not prove the full rig cold boot,
+private Wi-Fi SSH, offline `.local` name, LiDAR reconnect, local-console rescue, rollback, or
+password rotation. Do not call the full rig install-ready until the open physical checks pass.
+
+## Documentation
+
+- [DECISIONS.md](DECISIONS.md) records locked choices and their reasons.
+- [NEXT_STEPS.md](NEXT_STEPS.md) records the wider project state.
+- [CONTEXT.md](CONTEXT.md) defines the project words.
+- [docs/BUILD_SPEC.md](docs/BUILD_SPEC.md) gives the 20-jet build specification.
+- [tracker/README.md](tracker/README.md) gives tracker and bench details.
+- [docs/water-jet-follower.html](docs/water-jet-follower.html) shows the interactive signal chain.
 
 <!-- create-readme v0.2.4 -->
