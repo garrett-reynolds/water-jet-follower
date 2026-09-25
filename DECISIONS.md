@@ -1,5 +1,19 @@
 # Decisions
 
+## [2026-09-25] Hold water off after sensor loss and protect private Wi-Fi
+
+Final review found that LiDAR reconnect could restore live water or a held jet test.
+Turn Lights only on at sensor loss and clear any held test before reconnect.
+Keep tracking and the page alive; require a new operator action to permit water.
+Two tests reproduced nonzero water output after reconnect before the fix.
+The fixed source passes both tests. This change is not yet on the Pi.
+
+Save all competing wlan0 Wi-Fi autoconnect states before changing NetworkManager.
+Disable those profiles' autoconnect and let the AP retry without a limit.
+Priority alone can let an old profile take the radio after AP failure.
+Keep Ethernet unchanged and restore the saved Wi-Fi states on rollback.
+The installer source is updated; the real Pi still needs this hardening.
+
 ## [2026-09-25] Fix operator access and keep local rescue
 
 Use NetworkManager profile `water-jets-ap` for Wi-Fi network `water-jets`.

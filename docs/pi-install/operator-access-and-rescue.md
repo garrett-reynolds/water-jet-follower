@@ -19,6 +19,14 @@ No Pi or Windows setting changed.
 | Friendly URL | `http://water-jets.local:8080/` |
 
 NetworkManager owns the Wi-Fi profile.
+The AP uses `connection.autoconnect-retries=0` for unlimited start retries.
+Before changing any NetworkManager target, the installer saves each competing
+`wlan0` Wi-Fi profile's autoconnect state by UUID in the root-only backup.
+Unbound Wi-Fi profiles also count because they can claim `wlan0`.
+The installer then disables their autoconnect setting.
+It leaves profiles bound to other interfaces and Ethernet unchanged.
+Priority alone does not stop an old Wi-Fi profile from taking the radio after AP failure.
+These final-review changes are source-only until the real Pi is updated.
 The show service must not control that profile.
 Use the fixed URL first.
 Use the friendly URL only as a secondary address after the real iPad proves offline mDNS name resolution.

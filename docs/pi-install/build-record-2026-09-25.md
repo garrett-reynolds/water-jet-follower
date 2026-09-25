@@ -9,6 +9,13 @@ This is software evidence. It does not prove physical water off.
 
 ## Installed state
 
+Final review found two changes still needed on the real Pi.
+The source now holds Lights only on and clears a held water test after LiDAR loss.
+The source installer now saves and disables competing Wi-Fi autoconnect states.
+It also sets AP autoconnect retries to `0` (unlimited).
+None of these final-review changes was applied to the Pi in this fix wave.
+The installed-state table below records the earlier install only.
+
 | Item | Checked result |
 |---|---|
 | Host and wired rescue | `water-jets`, `eth0` at `10.0.10.204/24`, profile `netplan-eth0` |
@@ -129,6 +136,7 @@ sudo systemctl disable --now water-jet-show.service
 sudo systemctl stop olad.service
 sudo nmcli connection down water-jets-ap
 sudo nmcli connection delete water-jets-ap
+sudo nmcli connection modify netplan-wlan0-wM connection.autoconnect yes
 sudo nmcli connection up netplan-wlan0-wM
 sudo rm -- /etc/systemd/system/olad.service.d/water-jet-lock-cleanup.conf
 sudo systemctl daemon-reload
@@ -144,6 +152,29 @@ Do not restart the show during rollback.
 The backup and private Windows record remain for recovery.
 Do not remove the private record while the AP still needs its password.
 Rollback commands are documented but have not been run.
+
+## Source installer repeat and failure rules
+
+The updated installer refuses to run if the AP profile already exists or a show runs.
+Do not rerun it on this installed Pi to apply the final-review fixes.
+Before an update, save `/home/pi/tracker/run.py` and all affected Wi-Fi autoconnect settings.
+Deploy the reviewed `tracker/run.py`, disable competing Wi-Fi autoconnect, and set
+`water-jets-ap` autoconnect retries to `0` through a separate checked update.
+That update and its real-Pi checks remain open.
+
+For a fresh install, the new root-only backup contains `wifi-autoconnect-before.json`.
+It records all competing profile UUIDs and their original `yes` or `no` states.
+The installer writes and flushes the full file before changing any profile.
+An error stops the installer without automatic rollback.
+Some profiles or service files can already be changed when it stops.
+Keep 24 V power off and use Ethernet or the local console to restore the saved states.
+Do not delete the backup or repeat the install until the partial state is checked.
+The saved file must not be overwritten by a retry.
+
+For this recorded install, `netplan-wlan0-wM` originally had autoconnect `yes`.
+The exact rollback above restores that value even after the pending update.
+For a later fresh install, restore every UUID and value from its own backup instead.
+The earlier backup does not contain the new JSON file.
 
 ## Proof still needed
 

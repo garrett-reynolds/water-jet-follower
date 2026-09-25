@@ -33,6 +33,11 @@ The show and control page start at boot with Lights only forced on. Open
 `http://10.42.0.1:8080/` and use `ssh pi@10.42.0.1` on that network. Ethernet remains a
 rescue path when a known LAN is present.
 
+Final review fixes are tested in the source but are not yet on the Pi.
+They keep water off after LiDAR reconnect and stop old Wi-Fi profiles taking `wlan0`.
+Deploy those fixes and repeat the checks before calling the final build complete.
+See the [install record](docs/pi-install/build-record-2026-09-25.md).
+
 ## Open tickets
 
 - **#17 to #22 — Hardware stop, response tuning, long-run tracking, and idle animations.**
@@ -251,8 +256,8 @@ expect to update #34's test assertions when the spans change).
 Recover the show from the laptop, in PowerShell, only after the cause is fixed:
 
 ```
-ssh pi@10.42.0.1 "sudo systemctl reset-failed water-jet-show.service"
-ssh pi@10.42.0.1 "sudo systemctl start water-jet-show.service"
+ssh -t pi@10.42.0.1 "sudo systemctl reset-failed water-jet-show.service"
+ssh -t pi@10.42.0.1 "sudo systemctl start water-jet-show.service"
 ```
 
 Every service start forces Lights only on. Keep 24 V power off while the output state is

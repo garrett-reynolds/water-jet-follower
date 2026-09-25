@@ -12,7 +12,8 @@ from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-from tracker import run
+from tracker import dmx, run
+from tracker.tests import synthetic
 from tracker.config import Config
 from tracker.viewer import State, serve
 
@@ -64,6 +65,64 @@ def _scan():
 
 
 class TestShowLoopWhenTheSensorGoes(unittest.TestCase):
+    def _check_reconnect_keeps_water_off(self, held_test):
+        # Losing the safe-state latch must fail this test on actual DMX output.
+        cfg = Config(viewer_host="127.0.0.1", viewer_port=0,
+                     strip_start=(0.1, 0.6), strip_end=(2.0, 0.6),
+                     strip_points=(), resend_seconds=0)
+        points = synthetic.scan(synthetic.legs_for_person(1.0, 0.6))
+        sent = {"before": [], "returned": [], "enabled": []}
+        phase = "before"
+        control = None
+        real_serve = run.viewer.serve
+
+        def capturing_serve(state, config, ctl=None):
+            nonlocal control
+            control = ctl
+            return real_serve(state, config, ctl)
+
+        def source():
+            nonlocal phase
+            if held_test:
+                control.set_test_mode(True)
+                control.test_jet(0, 30)
+            for i in range(12):
+                yield i / 10, points
+            yield 2.0, None
+            phase = "returned"
+            for i in range(12):
+                yield 3.0 + i / 10, points
+            self.assertTrue(sent["returned"])
+            self.assertTrue(all(not any(frame) for frame in sent["returned"]),
+                            "reconnect must not restore water")
+            self.assertTrue(control.lights_only)
+            self.assertIsNone(control.held)
+            # A fresh operator action can permit water again.
+            phase = "enabled"
+            control.set_lights_only(False)
+            if held_test:
+                control.test_jet(0, 30)
+            for i in range(12):
+                yield 5.0 + i / 10, points
+
+        def send(frame):
+            sent[phase].append([frame[c - 1] for c in dmx.height_channels(cfg.jet_count)])
+            return True
+
+        with mock.patch.object(run.viewer, "serve", capturing_serve):
+            run._show_loop(source(), cfg, None, "fake", SimpleNamespace(lights_only=False),
+                           send_frame=send, zero_output=lambda: True)
+        self.assertTrue(any(any(frame) for frame in sent["before"]))
+        self.assertTrue(sent["returned"], "the page and show keep running after reconnect")
+        self.assertTrue(all(not any(frame) for frame in sent["returned"]))
+        self.assertTrue(any(any(frame) for frame in sent["enabled"]))
+
+    def test_reconnect_keeps_live_follow_water_off_until_operator_action(self):
+        self._check_reconnect_keeps_water_off(held_test=False)
+
+    def test_reconnect_clears_held_water_test_until_operator_action(self):
+        self._check_reconnect_keeps_water_off(held_test=True)
+
     def test_zeroes_once_marks_the_frame_dead_and_recovers(self):
         cfg = Config(viewer_host="127.0.0.1", viewer_port=0)
         zeroes = []

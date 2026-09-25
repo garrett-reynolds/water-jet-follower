@@ -299,7 +299,9 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
                 # shows the loss instead of the last walker.
                 if lidar_ok:
                     lidar_ok = False
-                    zero_output()
+                    # Reconnect must not re-arm live water or a held jet test.
+                    control.set_lights_only(True)
+                    control.set_test_mode(control.test_mode)
                     state.set(_dead_frame(timestamp, label))
                     print("\nshow: LiDAR lost. Water zeroed; waiting for the sensor",
                           file=sys.stderr)

@@ -385,11 +385,26 @@ has no `/proc/device-tree`) shows as a dash. When the poll fails every readout g
 Each asks once. Then the server zeroes every slot and verifies it, halts the show, runs
 `sudo -n /usr/sbin/reboot` or `/usr/sbin/poweroff`, and lets the show loop exit through
 `dmx.safe_output`. If the zero cannot be verified the Pi stays up and the status says to cut
-the 24 V first. If the sudoers rule from the top-level README is missing the Pi refuses, the
+the 24 V first. If the sudoers rule below is missing the Pi refuses, the
 status shows sudo's message, and the show stays halted in test mode with Resume on screen. A
-reboot brings back a Pi with **no show running**; start it by hand. The last applied profile
+reboot starts `water-jet-show.service` with Lights only on. The last applied profile
 is in `data/profile.json` (see below), so the show comes back with the same settings.
 `--dry-run` has no power buttons that work: they say so. The page has the same **ALL OFF** bar as settings.
+
+The power buttons need `/etc/sudoers.d/water-jets` with exactly this rule:
+
+```sudoers
+pi ALL=(root) NOPASSWD: /usr/sbin/reboot, /usr/sbin/poweroff
+```
+
+On the Pi, use `sudo visudo -f /etc/sudoers.d/water-jets` to check or edit it.
+Keep mode `0440`. Check access with `sudo -n -l /usr/sbin/reboot`.
+This lists access; it does not reboot the Pi.
+For offline service recovery from PowerShell, use:
+
+```powershell
+ssh -t pi@10.42.0.1 'sudo systemctl reset-failed water-jet-show.service && sudo systemctl start water-jet-show.service'
+```
 
 ### Test page
 
@@ -441,7 +456,11 @@ covers those is the switch on the 24 V supply. Keep a hand on it.
 
 **If the LiDAR USB comes out, `show` keeps running.** It zeroes the water once, stops the
 watchdog beat, and every page says "LiDAR not available" until the plug is back. Then it
-reconnects and tracks again. Proven on the Pi 2026-09-20. `record`, `live`, and `check` do not
+reconnects and tracks again. Proven on the Pi 2026-09-20.
+The final-review source fix also turns Lights only on and clears a held water test.
+After reconnect, water stays off until a fresh operator action permits it.
+This new water-off latch has local test proof only; it still needs deployment to the Pi.
+`record`, `live`, and `check` do not
 do this; they fail loudly, which is what you want from a recording.
 
 ### Aiming it at the real strip

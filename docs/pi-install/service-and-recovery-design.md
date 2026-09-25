@@ -9,6 +9,9 @@ Use the [checked Pi state](current-state-2026-09-25.md) and the [source note](..
 NetworkManager owns the private Wi-Fi connection profile.
 The show service does not create, stop, or restart that profile.
 Wi-Fi stays available if the show fails.
+The AP uses unlimited autoconnect retries (`0`).
+The installer saves and then disables competing `wlan0` Wi-Fi autoconnect states.
+These source changes still need a checked update on the installed Pi.
 The private network address and passphrase belong to Tasks 3 and 4.
 
 The boot order is lock cleanup, then OLA, then the show.
@@ -124,12 +127,12 @@ Save the fault log before reboot if the journal uses memory only.
 Run these read-only checks from PowerShell on Windows:
 
 ```powershell
-ssh pi@water-jets 'systemctl status water-jet-show.service olad.service water-jet-ola-lock-cleanup.service NetworkManager.service --no-pager --lines=20'
-ssh pi@water-jets 'systemctl show water-jet-show.service -p ActiveState -p SubState -p MainPID -p Result -p NRestarts -p ExecMainStatus -p Restart -p RestartUSec -p StartLimitIntervalUSec -p StartLimitBurst'
-ssh pi@water-jets 'systemctl cat water-jet-show.service water-jet-ola-lock-cleanup.service olad.service'
-ssh pi@water-jets 'sudo journalctl -b -u water-jet-show.service -u olad.service -u water-jet-ola-lock-cleanup.service --no-pager -n 200'
-ssh pi@water-jets 'sudo journalctl --disk-usage; sudo journalctl --list-boots; systemd-analyze cat-config systemd/journald.conf'
-ssh pi@water-jets 'curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8080/system-data'
+ssh pi@10.42.0.1 'systemctl status water-jet-show.service olad.service water-jet-ola-lock-cleanup.service NetworkManager.service --no-pager --lines=20'
+ssh pi@10.42.0.1 'systemctl show water-jet-show.service -p ActiveState -p SubState -p MainPID -p Result -p NRestarts -p ExecMainStatus -p Restart -p RestartUSec -p StartLimitIntervalUSec -p StartLimitBurst'
+ssh pi@10.42.0.1 'systemctl cat water-jet-show.service water-jet-ola-lock-cleanup.service olad.service'
+ssh -t pi@10.42.0.1 'sudo journalctl -b -u water-jet-show.service -u olad.service -u water-jet-ola-lock-cleanup.service --no-pager -n 200'
+ssh -t pi@10.42.0.1 'sudo journalctl --disk-usage; sudo journalctl --list-boots; systemd-analyze cat-config systemd/journald.conf'
+ssh pi@10.42.0.1 'curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8080/system-data'
 ```
 
 Use process state and fresh `/system-data` responses as health evidence.
@@ -152,8 +155,8 @@ Fix the cause before these commands.
 Run them from PowerShell on Windows:
 
 ```powershell
-ssh pi@water-jets 'sudo systemctl reset-failed water-jet-show.service'
-ssh pi@water-jets 'sudo systemctl start water-jet-show.service'
+ssh -t pi@10.42.0.1 'sudo systemctl reset-failed water-jet-show.service'
+ssh -t pi@10.42.0.1 'sudo systemctl start water-jet-show.service'
 ```
 
 Run the health checks again.

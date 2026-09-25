@@ -125,6 +125,45 @@ for target in /etc/systemd/system/water-jet-show.service /etc/systemd/system/wat
         printf 'ABSENT %s\n' "$target" >> "$backup/files.txt"
     fi
 done
+python3 - "$backup" <<'PY'
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+def read_field(uuid, field):
+    return subprocess.run(
+        ['nmcli', '-g', field, 'connection', 'show', 'uuid', uuid],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+# Save all original states before the first NetworkManager target change.
+# Unbound Wi-Fi profiles can also claim wlan0. Other interfaces stay unchanged.
+uuids = subprocess.run(
+    ['nmcli', '-g', 'UUID', 'connection', 'show'],
+    check=True, capture_output=True, text=True,
+).stdout.splitlines()
+competing = []
+for uuid in uuids:
+    if read_field(uuid, 'connection.type') not in ('802-11-wireless', 'wifi'):
+        continue
+    if read_field(uuid, 'connection.interface-name') not in ('', '--', 'wlan0'):
+        continue
+    autoconnect = read_field(uuid, 'connection.autoconnect')
+    if autoconnect not in ('yes', 'no'):
+        raise SystemExit('Unknown Wi-Fi autoconnect state. No network change ran.')
+    competing.append({'uuid': uuid, 'autoconnect': autoconnect})
+with (Path(sys.argv[1]) / 'wifi-autoconnect-before.json').open('x') as stream:
+    json.dump(competing, stream)
+    stream.flush()
+    os.fsync(stream.fileno())
+for item in competing:
+    subprocess.run(
+        ['nmcli', 'connection', 'modify', 'uuid', item['uuid'],
+         'connection.autoconnect', 'no'], check=True,
+    )
+PY
 install -o root -g root -m 0600 "$stage/water-jets-ap.nmconnection" "$profile"
 cmp --silent "$stage/water-jets-ap.nmconnection" "$profile"
 rm -- "$stage/water-jets-ap.nmconnection"
@@ -160,6 +199,7 @@ systemd-analyze verify /etc/systemd/system/water-jet-show.service /etc/systemd/s
 systemctl show olad -p Requires -p After
 systemctl show water-jet-show -p ExecStart -p Restart -p RestartUSec -p StartLimitIntervalUSec -p StartLimitBurst
 nmcli connection load "$profile"
+nmcli connection modify water-jets-ap connection.autoconnect-retries 0
 nmcli connection up water-jets-ap
 ip -4 -o addr show dev eth0 | grep -Fq ' 10.0.10.204/24 '
 nmcli -f all connection show netplan-eth0 > "$backup/ethernet-after.txt"
