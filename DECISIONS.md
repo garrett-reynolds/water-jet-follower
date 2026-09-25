@@ -1,5 +1,21 @@
 # Decisions
 
+## [2026-09-25] Keep Pi Wi-Fi separate from safe show recovery
+
+Use a NetworkManager profile for private Wi-Fi and one `water-jet-show.service`
+system service for the show. Run it as `pi` from `/home/pi` with full data paths
+and `--lights-only` on every start. Allow five start attempts in five minutes
+with `Restart=on-failure` and a five-second delay. A person must repair and reset
+a failed start limit. Use a root oneshot for stale USB locks before OLA at boot.
+Use the system journal and the existing health page. Do not add a software watchdog.
+
+This design keeps Wi-Fi available when the show fails and prevents a new show
+process from restoring live water on its own. Software cannot prove water off
+after DMX, OLA, Enttec, or Pi power loss. The 24 V contactor stays out of scope.
+Outcome: design settled in [issue 43](https://github.com/garrett-reynolds/water-jet-follower/issues/43).
+No Pi or app change was made. Real-rig proof remains open.
+See [service and recovery design](docs/pi-install/service-and-recovery-design.md).
+
 ## [2026-09-19] Use three selectable idle water and colour animations
 
 The settings profile now selects roll, ripple, or pulse water and chase, fade, or
