@@ -148,7 +148,7 @@ class Wave:
                 heights[jet] = max(heights[jet], strength * cfg.hill_peak)
                 if strength > owner_strength[jet]:
                     owner_strength[jet] = strength
-                    colours[jet] = colour
+                    colours[jet] = lerp_colour(cfg.base_colour, colour, strength)
 
         if not tracks:
             water_mode = cfg.idle_water_animation

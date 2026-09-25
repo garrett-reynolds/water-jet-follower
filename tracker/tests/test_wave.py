@@ -276,6 +276,18 @@ class TestColour(unittest.TestCase):
         _, colours = wave.Wave(self.cfg).heights_and_colours(frame_of(), 0.0)
         self.assertEqual(set(colours), {tuple(self.cfg.base_colour)})
 
+    def test_base_colour_outside_a_walker_hill(self):
+        pitch = wave.jet_pitch(self.cfg)
+        _, colours = wave.Wave(self.cfg).heights_and_colours(
+            frame_of(track(s=10 * pitch, speed=0.0)), 0.0)
+        self.assertEqual(colours[0], tuple(self.cfg.base_colour))
+
+    def test_shoulder_colour_blends_from_base_by_hill_strength(self):
+        pitch = wave.jet_pitch(self.cfg)
+        _, colours = wave.Wave(self.cfg).heights_and_colours(
+            frame_of(track(s=10 * pitch, speed=0.0)), 0.0)
+        self.assertEqual(colours[9], (0, 0, 181, 0))
+
     def test_slow_walker_is_the_slow_colour(self):
         pitch = wave.jet_pitch(self.cfg)
         _, colours = wave.Wave(self.cfg).heights_and_colours(
@@ -288,6 +300,14 @@ class TestColour(unittest.TestCase):
         _, colours = wave.Wave(cfg).heights_and_colours(
             frame_of(track(s=10 * pitch, speed=cfg.fast_speed)), 0.0)
         self.assertEqual(colours[10], tuple(cfg.fast_colour))
+
+    def test_tallest_overlapping_hill_owns_the_colour(self):
+        cfg = self.cfg
+        pitch = wave.jet_pitch(cfg)
+        _, colours = wave.Wave(cfg).heights_and_colours(
+            frame_of(track(id=1, s=10 * pitch, speed=0.0),
+                     track(id=2, s=12 * pitch, speed=cfg.fast_speed)), 0.0)
+        self.assertEqual(colours[10], tuple(cfg.slow_colour))
 
     def test_speed_is_smoothed_not_followed_instantly(self):
         """Raw tracker speed jitters; the colour must not strobe with it."""
