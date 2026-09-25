@@ -1,7 +1,7 @@
 # Pi service and recovery design
 
 Date: 2026-09-25. Decision: [issue 43](https://github.com/garrett-reynolds/water-jet-follower/issues/43).
-This is a design only. No Pi setting or app code changed.
+The design is installed on the Pi. The final hardening update was checked on the real Pi.
 Use the [checked Pi state](current-state-2026-09-25.md) and the [source note](../research/2026-09-25-pi-offline-wifi-systemd.md).
 
 ## Owners and start order
@@ -11,7 +11,7 @@ The show service does not create, stop, or restart that profile.
 Wi-Fi stays available if the show fails.
 The AP uses unlimited autoconnect retries (`0`).
 The installer saves and then disables competing `wlan0` Wi-Fi autoconnect states.
-These source changes still need a checked update on the installed Pi.
+The installed Pi has these values. AP recovery passed after NetworkManager released and retook `wlan0`.
 The private network address and passphrase belong to Tasks 3 and 4.
 
 The boot order is lock cleanup, then OLA, then the show.

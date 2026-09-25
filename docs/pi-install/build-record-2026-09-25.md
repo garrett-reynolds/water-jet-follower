@@ -1,6 +1,6 @@
 # Pi offline install record
 
-Date: 2026-09-25. Checked at 15:39 UTC.
+Date: 2026-09-25. Initial install checked at 15:39 UTC. Final update checked at 16:57 UTC.
 
 The user confirmed that the 24 V module power was off before installation.
 The private Wi-Fi is active.
@@ -9,12 +9,11 @@ This is software evidence. It does not prove physical water off.
 
 ## Installed state
 
-Final review found two changes still needed on the real Pi.
-The source now holds Lights only on and clears a held water test after LiDAR loss.
-The source installer now saves and disables competing Wi-Fi autoconnect states.
-It also sets AP autoconnect retries to `0` (unlimited).
-None of these final-review changes was applied to the Pi in this fix wave.
-The installed-state table below records the earlier install only.
+Commit `9bd986a` is installed on the real Pi.
+LiDAR loss now turns Lights only on and clears a held water test.
+The old site Wi-Fi profile has autoconnect off.
+The private AP has unlimited autoconnect retries.
+Ethernet stayed unchanged.
 
 | Item | Checked result |
 |---|---|
@@ -36,6 +35,30 @@ The installed-state table below records the earlier install only.
 | Viewer | Port 8080 listening on all IPv4 interfaces; `/system-data` returns JSON |
 | Safe start flag | Unit always passes `--lights-only`; API says `lights_only=true` |
 | Other rescue services | NetworkManager, SSH, and Avahi enabled and active |
+
+## Final hardening update
+
+The update saved the prior state in root-only folder
+`/root/water-jet-before-update-20260925TTsCx0f`, mode `0700`.
+It contains the old `run.py`, its hash and mode, the AP values, each competing Wi-Fi
+autoconnect value by UUID, and Ethernet before/after records.
+
+The installed `/home/pi/tracker/run.py` SHA-256 is
+`35f4d2ec745ca277fdfec8f441daf40bfeb5f0568a95e0c0e17dfd086224182e`.
+The old site Wi-Fi profile changed from autoconnect `yes` to `no`.
+`water-jets-ap` changed from retry value `-1` to `0`.
+The Ethernet record matched before and after.
+
+The checked real-Pi results were:
+
+- The AP returned to `water-jets-ap` at `10.42.0.1/24` after NetworkManager released and retook `wlan0`.
+- A held jet command at DMX `5` was present before LiDAR driver loss.
+- LiDAR driver loss turned Lights only on, cleared the held test, and read back all 512 slots at zero.
+- LiDAR driver return restored tracking but did not restore water.
+- A fresh operator action could command the held test again.
+- The final stop read back all 512 slots at zero.
+- A normal reboot restored the AP, Ethernet, OLA, LiDAR, web page, and show.
+- After reboot, `lights_only=true`, `test_mode=false`, `lidar_ok=true`, and OLA was active.
 
 The private file contains the SSID, password, URL, and SSH command.
 No password is stored in this repo or this record.
@@ -160,7 +183,7 @@ Do not rerun it on this installed Pi to apply the final-review fixes.
 Before an update, save `/home/pi/tracker/run.py` and all affected Wi-Fi autoconnect settings.
 Deploy the reviewed `tracker/run.py`, disable competing Wi-Fi autoconnect, and set
 `water-jets-ap` autoconnect retries to `0` through a separate checked update.
-That update and its real-Pi checks remain open.
+That checked update is complete. Do not rerun the fresh installer on this Pi.
 
 For a fresh install, the new root-only backup contains `wifi-autoconnect-before.json`.
 It records all competing profile UUIDs and their original `yes` or `no` states.
@@ -172,18 +195,20 @@ Do not delete the backup or repeat the install until the partial state is checke
 The saved file must not be overwritten by a retry.
 
 For this recorded install, `netplan-wlan0-wM` originally had autoconnect `yes`.
-The exact rollback above restores that value even after the pending update.
+The exact rollback above restores that value after this update.
 For a later fresh install, restore every UUID and value from its own backup instead.
 The earlier backup does not contain the new JSON file.
 
-## Proof still needed
+## Open proof and recorded exceptions
 
-- Cold boot and safe start with the actual rig.
-- iPad access with the site network and internet removed.
-- Private Wi-Fi SSH access and local-console rescue.
-- Five-start limit, manual recovery, and restart fault tests.
-- Real output-channel and physical water-off checks.
-- A tested password rotation and rollback path.
+Private-Wi-Fi SSH by address and `water-jets.local` passed from a laptop.
+A physical LiDAR cable pull and reconnect also passed with Lights only held on.
+See [the proof record](real-pi-proof-2026-09-25.md).
+
+- Cold boot and physical water-off checks with the full rig wait until the packed jets are set up again.
+- The documented rollback path is not tested.
+- Local-console rescue is not tested. The user chose to skip it.
+- Password rotation is not tested. The user declined to change the password.
 
 The web page runs inside the show process.
 It is down while that process is failed or stopped.

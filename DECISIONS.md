@@ -6,13 +6,15 @@ Final review found that LiDAR reconnect could restore live water or a held jet t
 Turn Lights only on at sensor loss and clear any held test before reconnect.
 Keep tracking and the page alive; require a new operator action to permit water.
 Two tests reproduced nonzero water output after reconnect before the fix.
-The fixed source passes both tests. This change is not yet on the Pi.
+The fixed source passes both tests. Commit `9bd986a` is now on the Pi.
+A real LiDAR driver loss cleared a held water test, sent all zero, and kept Lights only on after reconnect.
 
 Save all competing wlan0 Wi-Fi autoconnect states before changing NetworkManager.
 Disable those profiles' autoconnect and let the AP retry without a limit.
 Priority alone can let an old profile take the radio after AP failure.
 Keep Ethernet unchanged and restore the saved Wi-Fi states on rollback.
-The installer source is updated; the real Pi still needs this hardening.
+The Pi now disables the old site Wi-Fi autoconnect and gives the private AP unlimited retries.
+The AP returned by itself after NetworkManager released and took control of `wlan0` again.
 
 ## [2026-09-25] Fix operator access and keep local rescue
 

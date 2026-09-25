@@ -2,9 +2,8 @@
 
 Date: 2026-09-25.
 Decision: [issue 44](https://github.com/garrett-reynolds/water-jet-follower/issues/44).
-This is a design only.
-No passphrase was made.
-No Pi or Windows setting changed.
+The private Wi-Fi and Windows password record are installed.
+The password stays outside this repo.
 
 ## Fixed access choices
 
@@ -26,7 +25,8 @@ Unbound Wi-Fi profiles also count because they can claim `wlan0`.
 The installer then disables their autoconnect setting.
 It leaves profiles bound to other interfaces and Ethernet unchanged.
 Priority alone does not stop an old Wi-Fi profile from taking the radio after AP failure.
-These final-review changes are source-only until the real Pi is updated.
+The real Pi now has these final-review changes.
+The AP returned by itself after NetworkManager released and retook `wlan0`.
 The show service must not control that profile.
 Use the fixed URL first.
 Use the friendly URL only as a secondary address after the real iPad proves offline mDNS name resolution.

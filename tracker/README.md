@@ -459,7 +459,8 @@ watchdog beat, and every page says "LiDAR not available" until the plug is back.
 reconnects and tracks again. Proven on the Pi 2026-09-20.
 The final-review source fix also turns Lights only on and clears a held water test.
 After reconnect, water stays off until a fresh operator action permits it.
-This new water-off latch has local test proof only; it still needs deployment to the Pi.
+This water-off latch is on the Pi. A real LiDAR driver loss and return passed with
+all 512 DMX slots at zero after loss and Lights only still on after reconnect.
 `record`, `live`, and `check` do not
 do this; they fail loudly, which is what you want from a recording.
 

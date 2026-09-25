@@ -210,13 +210,65 @@ The user opened `http://10.42.0.1:8080/` and reported, "that works great".
 This proves a user-observed cold power boot, isolated iPad access and page service without Ethernet.
 It does not prove the Lights only UI state, physical water-off state, output-channel state, private Wi-Fi SSH, mDNS, LiDAR reconnect, local-console rescue, rollback or password rotation.
 
-## Physical proof still needed
+## Final hardening update and recovery proof
 
-- Prove private Wi-Fi SSH and check the optional `.local` address separately.
-- Perform a real cold power boot with the full rig.
-- Unplug and reconnect the LiDAR.
-- Log in through micro-HDMI and a USB keyboard for local-console rescue.
-- Check the actual output channels and physical water-off state after faults.
-- Test the documented rollback and password rotation paths.
+Commit `9bd986a` was installed on the real Pi with 24 V module power kept off.
+The prior app file and affected Wi-Fi values are in root-only folder
+`/root/water-jet-before-update-20260925TTsCx0f`.
+
+The old site Wi-Fi profile now has autoconnect off.
+The private AP now has unlimited retries.
+NetworkManager released and retook `wlan0` during a controlled fault.
+The AP returned by itself as `water-jets-ap` at `10.42.0.1/24`.
+Ethernet stayed at `10.0.10.204/24`.
+
+The real LiDAR serial driver was unbound and rebound.
+Before loss, OLA held a jet-height test value of `5`.
+During loss, the API reported LiDAR unavailable and Lights only on.
+OLA read back all 512 slots at zero.
+After reconnect, tracking returned, the held test was clear, and Lights only stayed on.
+A fresh operator action could command the test again.
+The final stop read back all 512 slots at zero.
+
+A normal reboot then passed.
+The installed source hash stayed correct.
+The AP and Ethernet returned.
+The show recovered through its normal OLA readiness retry.
+The final API state was `lights_only=true`, `test_mode=false`, `lidar_ok=true`,
+LiDAR `16.72` Hz, and OLA active.
+Fresh zero proof again read back all 512 slots at zero.
+
+## User-observed private access and physical LiDAR cable proof
+
+The user kept the 24 V module power switch off for these checks.
+A laptop joined the private `water-jets` network.
+`ssh pi@10.42.0.1` connected successfully.
+The Pi returned `water-jets` from `hostname`.
+After that session ended, `ssh pi@water-jets.local` also connected successfully.
+
+The user then pulled the physical LiDAR USB cable from the powered USB hub.
+The control page reported that LiDAR was not available.
+At `13:18:58 EDT`, `/system-data` reported show PID `1205`, `lights_only=true`,
+`test_mode=false`, `lidar_ok=false`, `scan_hz=0.0`, and `olad_active=true`.
+
+The user reconnected the same cable and waited for recovery.
+At `13:22:42 EDT`, `/system-data` reported the same show PID `1205`,
+`lights_only=true`, `test_mode=false`, `lidar_ok=true`, `scan_hz=13.4`, and
+`olad_active=true`.
+
+This proves private-Wi-Fi SSH by address, mDNS SSH by `water-jets.local`, and physical
+LiDAR cable loss and return without a show-process restart.
+Lights only stayed on through the physical reconnect.
+This does not prove physical water off because the 24 V module power was off.
+
+## Open proof and recorded exceptions
+
+- Perform a real cold power boot with the full rig and check physical water-off after faults.
+  The jets are packed, so this work is blocked until the next full setup.
+- Test the documented rollback path.
+- Local-console rescue through micro-HDMI and a USB keyboard was not tested.
+  The user chose to skip it because the installed Pi is intended to run headless.
+- Password rotation was not tested.
+  The user declined to change the password.
 
 Do not call the full rig install-ready until those required checks are settled.

@@ -33,9 +33,10 @@ The show and control page start at boot with Lights only forced on. Open
 `http://10.42.0.1:8080/` and use `ssh pi@10.42.0.1` on that network. Ethernet remains a
 rescue path when a known LAN is present.
 
-Final review fixes are tested in the source but are not yet on the Pi.
-They keep water off after LiDAR reconnect and stop old Wi-Fi profiles taking `wlan0`.
-Deploy those fixes and repeat the checks before calling the final build complete.
+The final-review fixes are on the Pi.
+LiDAR loss now turns Lights only on, clears a held water test, and keeps water off after reconnect.
+The old site Wi-Fi cannot take `wlan0`, and the private AP retries without a limit.
+Real LiDAR driver recovery, AP recovery, a normal reboot, and fresh all-zero readback passed.
 See the [install record](docs/pi-install/build-record-2026-09-25.md).
 
 ## Open tickets
@@ -78,6 +79,14 @@ is step 3 below.
 
 ## Done since the last update
 
+- **2026-09-25:** commit `9bd986a` was installed on the Pi. The root-only before-copy is
+  `/root/water-jet-before-update-20260925TTsCx0f`. AP recovery, LiDAR driver loss and return,
+  held-test clearing, a fresh operator action, final all-zero readback, and a normal reboot
+  passed. Private-Wi-Fi SSH by address and `water-jets.local` then passed from the laptop.
+  A physical LiDAR cable pull and reconnect kept Lights only on and restored tracking without
+  restarting the show. The remaining #46 checks are full-rig physical water-off proof when the
+  packed jets are next set up and a rollback test. Garrett skipped local-console proof and
+  declined password rotation.
 - **2026-09-25:** private Wi-Fi, boot services, stale OLA-lock cleanup, safe restart, and
   start limiting were installed on the real Pi. App-crash recovery, OLA-fault refusal,
   manual recovery, AP restart, and normal reboot passed with 24 V power off. Garrett then
