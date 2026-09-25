@@ -1,5 +1,14 @@
 # Decisions
 
+## [2026-09-25] Serialize settings profile changes and saves
+
+The threaded settings server can run two complete profile requests at once.
+An older request can finish its file write after a newer request and erase the
+newer idle start colour on disk. Use one re-entrant lock in `SettingsControl`
+across profile reads, validation, live config changes, undo history, and the
+save. The lock also lets Reset call Apply safely. A controlled two-thread test
+now saves the newer idle start and idle end colours.
+
 ## [2026-09-25] Blend live hills and use one shared idle colour palette
 
 Live hill pixels blend from the base colour to the speed colour by hill strength.

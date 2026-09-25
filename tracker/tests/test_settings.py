@@ -9,7 +9,9 @@ import io
 import json
 import os
 import tempfile
+import threading
 import unittest
+from unittest import mock
 
 from tracker import geometry
 from tracker.config import Config
@@ -384,6 +386,63 @@ class TestProfileFile(unittest.TestCase):
         self.assertTrue(load_profile(fresh, self.path))
         self.assertEqual((fresh.idle_start_colour, fresh.idle_end_colour),
                          ((10, 20, 30, 40), (50, 60, 70, 80)))
+
+    def test_later_apply_cannot_be_overwritten_by_earlier_save(self):
+        control = SettingsControl(Config(), profile_path=self.path)
+        older = control.profile()
+        older["settings"]["idle_start_colour"] = [10, 0, 0, 0]
+        newer = control.profile()
+        newer["settings"]["idle_start_colour"] = [20, 0, 0, 0]
+        newer["settings"]["idle_end_colour"] = [0, 30, 0, 0]
+        older_write_paused = threading.Event()
+        release_older_write = threading.Event()
+        newer_started = threading.Event()
+        newer_done = threading.Event()
+        errors = []
+
+        def delayed_save(profile, path):
+            if profile["settings"]["idle_start_colour"] == (10, 0, 0, 0):
+                older_write_paused.set()
+                if not release_older_write.wait(5):
+                    raise TimeoutError("older save was not released")
+            save_profile(profile, path)
+
+        def run_apply(profile, started=None, done=None):
+            if started is not None:
+                started.set()
+            try:
+                control.apply(profile)
+            except Exception as exc:
+                errors.append(exc)
+            finally:
+                if done is not None:
+                    done.set()
+
+        first = threading.Thread(target=run_apply, args=(older,))
+        second = threading.Thread(target=run_apply,
+                                  args=(newer, newer_started, newer_done))
+        with mock.patch("tracker.settings.save_profile", side_effect=delayed_save):
+            try:
+                first.start()
+                self.assertTrue(older_write_paused.wait(5))
+                second.start()
+                self.assertTrue(newer_started.wait(5))
+                # Without the lock, the second save finishes while the first waits.
+                newer_done.wait(0.5)
+            finally:
+                release_older_write.set()
+                first.join(5)
+                if second.ident is not None:
+                    second.join(5)
+
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(control.cfg.idle_start_colour, (20, 0, 0, 0))
+        fresh = Config()
+        self.assertTrue(load_profile(fresh, self.path))
+        self.assertEqual(fresh.idle_start_colour, (20, 0, 0, 0))
+        self.assertEqual(fresh.idle_end_colour, (0, 30, 0, 0))
 
     def test_old_single_colour_saved_profile_is_ignored(self):
         profile = profile_for(Config())

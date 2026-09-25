@@ -182,6 +182,7 @@ class SettingsControl:
     def __init__(self, cfg, send_frame=None, zero_output=None, run_command=None,
                  profile_path=None):
         self.cfg = cfg
+        self._profile_lock = threading.RLock()
         self.send_frame = send_frame
         self.zero_output = zero_output
         # Every applied profile is written here. Only the show sets it; the tests
@@ -208,42 +209,48 @@ class SettingsControl:
         self._reset = profile_for(Config())
 
     def profile(self):
-        return profile_for(self.cfg)
+        with self._profile_lock:
+            return profile_for(self.cfg)
 
     def defaults(self):
-        return deepcopy(self._reset)
+        with self._profile_lock:
+            return deepcopy(self._reset)
 
     def apply(self, profile, unlock_height_max=False):
-        clean = validate_profile(profile)
-        if clean["height_max"] != self.cfg.height_max and not unlock_height_max:
-            raise PermissionError("unlock the hard maximum before changing it")
-        previous = self.profile()
-        _set_profile(self.cfg, clean)
-        self._undo.append(previous)
-        # Live-apply sends a profile per edit burst, so the stack is bounded.
-        del self._undo[:-UNDO_DEPTH]
-        return self._persist()
+        with self._profile_lock:
+            clean = validate_profile(profile)
+            if clean["height_max"] != self.cfg.height_max and not unlock_height_max:
+                raise PermissionError("unlock the hard maximum before changing it")
+            previous = self.profile()
+            _set_profile(self.cfg, clean)
+            self._undo.append(previous)
+            # Live-apply sends a profile per edit burst, so the stack is bounded.
+            del self._undo[:-UNDO_DEPTH]
+            return self._persist()
 
     def undo(self):
-        if not self._undo:
-            raise ValueError("nothing to undo")
-        _set_profile(self.cfg, validate_profile(self._undo.pop()))
-        return self._persist()
+        with self._profile_lock:
+            if not self._undo:
+                raise ValueError("nothing to undo")
+            _set_profile(self.cfg, validate_profile(self._undo.pop()))
+            return self._persist()
 
     def _persist(self):
-        profile = self.profile()
-        if self.profile_path:
-            try:
-                save_profile(profile, self.profile_path)
-            except OSError as exc:
-                # The change is live either way; the page must not report a failure
-                # for a full disk. Say so on the console instead.
-                print(f"settings: could not write {self.profile_path}: {exc}",
-                      file=sys.stderr)
-        return profile
+        with self._profile_lock:
+            profile = self.profile()
+            if self.profile_path:
+                try:
+                    save_profile(profile, self.profile_path)
+                except OSError as exc:
+                    # The change is live either way; the page must not report a failure
+                    # for a full disk. Say so on the console instead.
+                    print(f"settings: could not write {self.profile_path}: {exc}",
+                          file=sys.stderr)
+            return profile
 
     def reset(self):
-        return self.apply(deepcopy(self._reset), unlock_height_max=True)
+        with self._profile_lock:
+            return self.apply(deepcopy(self._reset), unlock_height_max=True)
 
     def set_lights_only(self, enabled):
         if not isinstance(enabled, bool):
