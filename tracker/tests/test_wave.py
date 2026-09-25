@@ -400,12 +400,51 @@ class TestIdleAnimations(unittest.TestCase):
         self.assertEqual(colours[0], (0, 0, 64, 0))
         self.assertEqual(colours[-1], (0, 0, 0, 0))
 
-    def test_idle_colour_sets_the_chase_colour(self):
+    def test_chase_moves_the_shared_palette_across_the_strip(self):
         cfg = config_20()
         cfg.idle_colour_animation = "chase"
-        cfg.idle_colour = (50, 10, 0, 0)
-        _, colours = wave.Wave(cfg).heights_and_colours(frame_of(), 0)
-        self.assertEqual(colours[0], (50, 10, 0, 0))
+        cfg.idle_start_colour = (10, 20, 30, 40)
+        cfg.idle_end_colour = (110, 120, 130, 140)
+        cfg.idle_brightness = 255
+        _, start = wave.Wave(cfg).heights_and_colours(frame_of(), 0)
+        _, later = wave.Wave(cfg).heights_and_colours(frame_of(), 2)
+        self.assertEqual(start[0], cfg.idle_end_colour)
+        self.assertEqual(start[-1], cfg.idle_start_colour)
+        self.assertEqual(later[0], cfg.idle_start_colour)
+        self.assertNotEqual(later[5], cfg.idle_start_colour)
+
+    def test_fade_moves_all_pixels_from_start_to_end_and_back(self):
+        cfg = config_20()
+        cfg.idle_colour_animation = "fade"
+        cfg.idle_start_colour = (10, 20, 30, 40)
+        cfg.idle_end_colour = (110, 120, 130, 140)
+        cfg.idle_brightness = 255
+        frames = [wave.Wave(cfg).heights_and_colours(frame_of(), t)[1]
+                  for t in (0, 2, 4, 8)]
+        self.assertEqual([colours[0] for colours in frames],
+                         [(10, 20, 30, 40), (60, 70, 80, 90),
+                          (110, 120, 130, 140), (10, 20, 30, 40)])
+        self.assertTrue(all(len(set(colours)) == 1 for colours in frames))
+
+    def test_breathe_blends_then_scales_the_palette(self):
+        cfg = config_20()
+        cfg.idle_colour_animation = "breathe"
+        cfg.idle_start_colour = (100, 40, 20, 10)
+        cfg.idle_end_colour = (200, 140, 120, 110)
+        cfg.idle_brightness = 255
+        colours = [wave.Wave(cfg).heights_and_colours(frame_of(), t)[1][0]
+                   for t in (0, 2, 4)]
+        self.assertEqual(colours, [(20, 8, 4, 2), (90, 54, 42, 36),
+                                   (200, 140, 120, 110)])
+
+    def test_idle_brightness_caps_each_channel_after_palette_and_pulse(self):
+        cfg = config_20()
+        cfg.idle_colour_animation = "breathe"
+        cfg.idle_start_colour = (0, 0, 0, 0)
+        cfg.idle_end_colour = (200, 100, 80, 70)
+        cfg.idle_brightness = 64
+        _, colours = wave.Wave(cfg).heights_and_colours(frame_of(), 4)
+        self.assertEqual(colours[0], (64, 64, 64, 64))
 
     def test_idle_seconds_sets_cycle_speed(self):
         cfg = config_20()

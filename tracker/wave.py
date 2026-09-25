@@ -201,13 +201,16 @@ class Wave:
         phase = (now % cfg.idle_seconds) / cfg.idle_seconds
         amount = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
         if mode == "fade":
-            colours[:] = [lerp_colour(cfg.idle_colour, cfg.fast_colour, amount)] * cfg.jet_count
+            colours[:] = [lerp_colour(cfg.idle_start_colour,
+                                      cfg.idle_end_colour, amount)] * cfg.jet_count
         elif mode == "breathe":
-            colours[:] = [lerp_colour((0, 0, 0, 0), cfg.idle_colour,
+            palette_colour = lerp_colour(cfg.idle_start_colour,
+                                         cfg.idle_end_colour, amount)
+            colours[:] = [lerp_colour((0, 0, 0, 0), palette_colour,
                                       0.2 + 0.8 * amount)] * cfg.jet_count
         elif mode == "chase":
             centre = phase * (cfg.jet_count - 1)
-            colours[:] = [lerp_colour((0, 0, 0, 0), cfg.idle_colour,
+            colours[:] = [lerp_colour(cfg.idle_start_colour, cfg.idle_end_colour,
                                       hill_profile(jet - centre, cfg.hill_jets))
                           for jet in range(cfg.jet_count)]
         colours[:] = [tuple(min(cfg.idle_brightness, value) for value in colour)

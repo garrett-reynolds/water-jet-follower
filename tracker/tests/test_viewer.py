@@ -198,6 +198,14 @@ class TestSettingsMap(unittest.TestCase):
         self.assertNotIn('type="color"', page)
         self.assertNotIn('id="base_colour_0"', page)
 
+    def test_settings_page_uses_one_wheel_for_both_idle_endpoints(self):
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode("utf-8")
+        self.assertIn('<option value="idle_start_colour">Idle start</option>', page)
+        self.assertIn('<option value="idle_end_colour">Idle end</option>', page)
+        self.assertNotIn('<option value="idle_colour">', page)
+        self.assertEqual(page.count('id="colour_wheel"'), 1)
+
     def test_idle_height_follows_the_editable_hard_maximum(self):
         with urlopen(self.base + "/settings") as response:
             page = response.read().decode("utf-8")

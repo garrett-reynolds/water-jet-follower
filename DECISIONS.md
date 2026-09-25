@@ -1,5 +1,15 @@
 # Decisions
 
+## [2026-09-25] Blend live hills and use one shared idle colour palette
+
+Live hill pixels blend from the base colour to the speed colour by hill strength.
+This keeps the hill edge in the base colour while the centre reaches the active colour.
+Chase, Fade, and Breathe use the same two RGBW idle colours.
+The idle start defaults to black. The idle end defaults to the prior blue.
+Breathe blends the palette first and then scales it from 20 percent to 100 percent.
+The idle brightness limit applies last to each channel.
+Strict profile version 5 replaces the single idle colour with both endpoints.
+
 ## [2026-09-25] Hold water off after sensor loss and protect private Wi-Fi
 
 Final review found that LiDAR reconnect could restore live water or a held jet test.

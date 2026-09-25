@@ -24,7 +24,13 @@ class TestProfiles(unittest.TestCase):
         self.control = SettingsControl(self.cfg)
 
     def test_profile_is_versioned(self):
-        self.assertEqual(profile_for(self.cfg)["version"], PROFILE_VERSION)
+        self.assertEqual(profile_for(self.cfg)["version"], 5)
+
+    def test_profile_has_two_idle_rgbw_colours_and_no_old_colour(self):
+        settings = profile_for(self.cfg)["settings"]
+        self.assertEqual(settings["idle_start_colour"], (0, 0, 0, 0))
+        self.assertEqual(settings["idle_end_colour"], (0, 0, 255, 0))
+        self.assertNotIn("idle_colour", settings)
 
     def test_apply_is_all_or_nothing(self):
         profile = profile_for(self.cfg)
@@ -104,13 +110,23 @@ class TestProfiles(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.control.apply(profile)
 
-    def test_idle_speed_and_colour_are_validated(self):
+    def test_idle_speed_and_both_colours_are_validated(self):
         profile = profile_for(self.cfg)
         profile["settings"]["idle_seconds"] = 3.5
-        profile["settings"]["idle_colour"] = [12, 34, 56, 7]
+        profile["settings"]["idle_start_colour"] = [12, 34, 56, 7]
+        profile["settings"]["idle_end_colour"] = [87, 65, 43, 21]
         self.control.apply(profile)
         self.assertEqual(self.cfg.idle_seconds, 3.5)
-        self.assertEqual(self.cfg.idle_colour, (12, 34, 56, 7))
+        self.assertEqual(self.cfg.idle_start_colour, (12, 34, 56, 7))
+        self.assertEqual(self.cfg.idle_end_colour, (87, 65, 43, 21))
+
+    def test_bad_idle_endpoint_rejects_the_whole_profile(self):
+        for endpoint in ("idle_start_colour", "idle_end_colour"):
+            profile = profile_for(self.cfg)
+            profile["settings"][endpoint] = [0, 0, 256, 0]
+            with self.assertRaises(ValueError):
+                self.control.apply(profile)
+            self.assertEqual(self.cfg.hill_peak, 30)
 
     def test_idle_height_must_stay_inside_the_water_limits(self):
         profile = profile_for(self.cfg)
@@ -357,6 +373,32 @@ class TestProfileFile(unittest.TestCase):
         self.assertEqual(fresh.hill_peak, 22)
         self.assertEqual(fresh.height_max, 156)
         self.assertEqual(fresh.strip_start, fresh.strip_points[0])
+
+    def test_both_idle_colours_survive_a_restart(self):
+        control = SettingsControl(Config(), profile_path=self.path)
+        profile = profile_for(control.cfg)
+        profile["settings"]["idle_start_colour"] = [10, 20, 30, 40]
+        profile["settings"]["idle_end_colour"] = [50, 60, 70, 80]
+        control.apply(profile)
+        fresh = Config()
+        self.assertTrue(load_profile(fresh, self.path))
+        self.assertEqual((fresh.idle_start_colour, fresh.idle_end_colour),
+                         ((10, 20, 30, 40), (50, 60, 70, 80)))
+
+    def test_old_single_colour_saved_profile_is_ignored(self):
+        profile = profile_for(Config())
+        profile["version"] = 4
+        profile["settings"]["idle_colour"] = [255, 0, 0, 0]
+        del profile["settings"]["idle_start_colour"]
+        del profile["settings"]["idle_end_colour"]
+        os.makedirs(os.path.dirname(self.path))
+        with open(self.path, "w") as file:
+            json.dump(profile, file)
+        fresh = Config()
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertFalse(load_profile(fresh, self.path))
+        self.assertIn("version", err.getvalue())
+        self.assertEqual(fresh.idle_end_colour, (0, 0, 255, 0))
 
     def test_undo_and_reset_write_too(self):
         control = SettingsControl(Config(), profile_path=self.path)

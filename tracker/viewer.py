@@ -340,7 +340,7 @@ summary:focus-visible { outline:3px solid #f3b61f; outline-offset:2px; border-ra
       <label><span><input id="reverse_jets" type="checkbox"> Reverse jet order</span></label>
     </div></details></section>
     <section><details open><summary><h2>Colours</h2></summary>
-      <label>Set colour for<select id="colour_mode"><option value="base_colour">Base</option><option value="slow_colour">Slow person</option><option value="fast_colour">Fast person</option><option value="idle_colour">Idle animation</option></select></label>
+      <label>Set colour for<select id="colour_mode"><option value="base_colour">Base</option><option value="slow_colour">Slow person</option><option value="fast_colour">Fast person</option><option value="idle_start_colour">Idle start</option><option value="idle_end_colour">Idle end</option></select></label>
       <div class="colour-control"><canvas id="colour_wheel" width="180" height="180" aria-label="Colour wheel"></canvas>
         <div class="colour-sliders">
           <label class="slider"><span>Colour level <output id="colour_value_out"></output></span><input id="colour_value" type="range" min="0" max="255" value="255"></label>

@@ -10,7 +10,7 @@ from tracker import dmx
 from tracker.config import Config
 
 
-PROFILE_VERSION = 4
+PROFILE_VERSION = 5
 EDITABLE = (
     "strip_points", "roi_x_min", "roi_x_max", "roi_y_min", "roi_y_max",
     "jet_count", "height_min", "hill_peak", "height_max",
@@ -18,7 +18,7 @@ EDITABLE = (
     "slow_colour", "fast_colour", "slow_speed", "fast_speed",
     "jet_enabled", "reverse_jets", "idle_water_animation",
     "idle_colour_animation", "idle_brightness",
-    "idle_seconds", "idle_height", "idle_colour",
+    "idle_seconds", "idle_height", "idle_start_colour", "idle_end_colour",
 )
 
 # The only two commands the settings page may run on the Pi. The sudoers rule in
@@ -106,7 +106,8 @@ def validate_profile(profile):
             raise ValueError(
                 f"path point {index + 1} at ({x:.2f}, {y:.2f}) is outside the active area")
 
-    for name in ("base_colour", "slow_colour", "fast_colour", "idle_colour"):
+    for name in ("base_colour", "slow_colour", "fast_colour",
+                 "idle_start_colour", "idle_end_colour"):
         colour = values[name]
         if not isinstance(colour, (list, tuple)) or len(colour) != 4:
             raise ValueError(f"{name} must contain RGBW")

@@ -136,7 +136,8 @@ class Config:
     idle_brightness: int = 64            # limit for every idle RGBW channel
     idle_seconds: float = 8.0            # seconds for one complete idle cycle
     idle_height: int = 15                # peak DMX height for idle water
-    idle_colour: tuple = (0, 0, 255, 0) # RGBW used by idle colour animations
+    idle_start_colour: tuple = (0, 0, 0, 0) # shared idle RGBW palette start
+    idle_end_colour: tuple = (0, 0, 255, 0) # prior blue idle colour
 
     # Colour. Slow is blue, fast is white, on a dim base - the wave decision.
     # RGBW, 0-255 each.
