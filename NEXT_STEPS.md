@@ -1,6 +1,6 @@
 # Next steps
 
-Last updated 2026-09-21.
+Last updated 2026-09-25.
 
 ## Where the plan actually lives
 
@@ -28,9 +28,10 @@ movable point. Do not propose connecting the second module unless Garrett change
 | Power | Pi's own supply plus a **powered USB hub** for the LiDAR — not optional, see `DECISIONS.md` |
 | Cost to finish | CAD $1,780.67 before tax, duty, and shipping |
 
-Reach the Pi with `ssh pi@water-jets` (key-based, no password). OLA's web UI is at
-`http://water-jets:9090`. The scan viewer is at `http://water-jets:8080/` while
-`tracker.run live` is running.
+The Pi now provides private Wi-Fi `water-jets` at `10.42.0.1` without a site network.
+The show and control page start at boot with Lights only forced on. Open
+`http://10.42.0.1:8080/` and use `ssh pi@10.42.0.1` on that network. Ethernet remains a
+rescue path when a known LAN is present.
 
 ## Open tickets
 
@@ -72,6 +73,12 @@ is step 3 below.
 
 ## Done since the last update
 
+- **2026-09-25:** private Wi-Fi, boot services, stale OLA-lock cleanup, safe restart, and
+  start limiting were installed on the real Pi. App-crash recovery, OLA-fault refusal,
+  manual recovery, AP restart, and normal reboot passed with 24 V power off. Garrett then
+  shut down the Pi, removed Ethernet, cold-booted the Pi alone, joined `water-jets` from the
+  iPad, and opened `http://10.42.0.1:8080/`. Issue #46 keeps the remaining full-rig and
+  recovery-path proof. Issue #47 keeps the final operator runbook.
 - **2026-09-21:** #37 built, deployed, checked on the iPad, and closed (active area). #38
   built (Pi power control), sudoers rule installed, Shut down checked from the iPad, closed.
   #39 (folding boxes, profile kept across restarts) built, deployed, checked, closed.
@@ -173,15 +180,11 @@ scope on purpose. The pages themselves did not change. Ticket #25 holds the foll
 - `data/crossing.jsonl` is now on the laptop too (git ignores it), so the replay above runs
   without the Pi. Re-run the `/test` critique against a `localhost` URL target, not
   `tracker/viewer.py`: the file slug belongs to the `/settings` run and would mix the trends.
-- **Pi state at close (2026-09-21, afternoon):** the Pi is **powered off**; Garrett shut it
-  down from the iPad's Shut down Pi button after installing the sudoers rule. On power-up
-  **no show runs** (no boot service yet); start it with the `setsid nohup` line below. Before
-  the shutdown it ran LIVE at cap 40 with the #39 files. Since 2026-09-21 every
-  applied profile is written to `~/data/profile.json` and read back on start, so a restart
-  keeps the settings. Deployed 2026-09-21; the pre-restart profile was re-applied so
-  `~/data/profile.json` exists (cap 40). Checked on the Pi the same day: after a restart
-  `~/show.log` reads `show: settings restored from data/profile.json` and the page loads.
-  That run (PID 17505) ended with the shutdown.
+- **Pi state at close (2026-09-25):** the Pi cold-booted with Ethernet removed, advertised
+  `water-jets`, and served the control page to the iPad at `http://10.42.0.1:8080/`.
+  `water-jet-show.service` starts at boot and on every restart passes `--lights-only`.
+  NetworkManager owns the private Wi-Fi. Systemd owns the show and its five-start limit.
+  The 24 V switch stayed off throughout the install and fault tests.
 - **Settings boxes fold (2026-09-21):** each `/settings` box collapses from its title row and
   the browser remembers which are closed (`localStorage`). Garrett checked the folding on the
   iPad; the remembered state on the iPad is not yet eyeballed.
@@ -241,20 +244,19 @@ expect to update #34's test assertions when the spans change).
    24 V switch, Start test on `/test`: the yellow box must read "Holding jet N at H (cm)", and
    Stop test must clear it. `test_jet` refuses while lights-only is on, so this needs water.
    (#23, the first two jets not reacting, was debris; closed.)
-3. **iPad as the only control surface.** Garrett asked for the app to be functional on the
-   iPad. The pages are now touch-sized and reachable at `http://water-jets.local:8080/`. Still
-   open: starting and stopping `show` needs SSH from the laptop. The pages work in iPad
-   Safari (checked 2026-09-20). Decide whether a start/stop control belongs on the Pi (a
-   service plus a button) before charting anything.
+3. ~~**iPad as the only control surface.**~~ The fixed page
+   `http://10.42.0.1:8080/` works on the iPad with Ethernet removed. The Pi starts the show
+   service itself. `water-jets.local` remains secondary until offline name lookup is proved.
 
-Restart the show from the laptop, in PowerShell:
+Recover the show from the laptop, in PowerShell, only after the cause is fixed:
 
 ```
-ssh pi@water-jets "pkill -f '^/home/pi/wj-venv/bin/python -m tracker'"
-ssh pi@water-jets "cd ~ && setsid nohup ~/wj-venv/bin/python -m tracker.run show --baseline data/baseline.json > ~/show.log 2>&1 < /dev/null & disown"
+ssh pi@10.42.0.1 "sudo systemctl reset-failed water-jet-show.service"
+ssh pi@10.42.0.1 "sudo systemctl start water-jet-show.service"
 ```
 
-The old `pkill -f 'python -m tracker'` also kills the SSH shell that runs it; use the anchored form.
+Every service start forces Lights only on. Keep 24 V power off while the output state is
+uncertain. Do not reset the start limit in a loop.
 
 ## Do next, in order
 
@@ -451,8 +453,8 @@ Once the calibration lands, the show is real and #10 unblocks.
 
 ## Check this first, next time you are at the bench
 
-The Pi is reachable as `pi@water-jets`. The settings page is at
-`http://water-jets.local:8080/settings` while the show runs. The 20-point layout was confirmed
+Join `water-jets`. The Pi is reachable as `pi@10.42.0.1`. The settings page is at
+`http://10.42.0.1:8080/settings` while the show runs. The 20-point layout was confirmed
 in the browser on 2026-09-19. Since 2026-09-21 the last applied profile is kept in
 `~/data/profile.json` on the Pi and comes back on restart; Save JSON and Load JSON remain for
 copies.
