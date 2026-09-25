@@ -204,7 +204,7 @@ The user unplugged Ethernet.
 The user removed and restored Pi power.
 The user joined the `water-jets` network from the iPad with the private local Wi-Fi record.
 The iPad used the private network without the site network.
-Its successful join and page access prove that the client got a usable DHCP network setup.
+The successful join and page access prove a usable private IP path.
 The user opened `http://10.42.0.1:8080/` and reported, "that works great".
 
 This proves a user-observed cold power boot, isolated iPad access and page service without Ethernet.
@@ -213,6 +213,7 @@ It does not prove the Lights only UI state, physical water-off state, output-cha
 ## Physical proof still needed
 
 - Prove private Wi-Fi SSH and check the optional `.local` address separately.
+- Perform a real cold power boot with the full rig.
 - Unplug and reconnect the LiDAR.
 - Log in through micro-HDMI and a USB keyboard for local-console rescue.
 - Check the actual output channels and physical water-off state after faults.
