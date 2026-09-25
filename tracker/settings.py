@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import threading
+from contextlib import contextmanager
 from copy import deepcopy
 
 from tracker import dmx
@@ -203,6 +204,7 @@ class SettingsControl:
         # by an explicit resume, never by a page closing.
         self.test_mode = False
         self._manual_frame = None
+        self._manual_routing = None
         # The held jet test, {"jet", "height"}, so a reloaded page can show it.
         self.held = None
         self._undo = []
@@ -215,6 +217,12 @@ class SettingsControl:
     def defaults(self):
         with self._profile_lock:
             return deepcopy(self._reset)
+
+    @contextmanager
+    def output_settings(self):
+        """Keep one applied profile in place while an output frame is built."""
+        with self._profile_lock:
+            yield (self.cfg.jet_count, self.cfg.reverse_jets)
 
     def apply(self, profile, unlock_height_max=False):
         with self._profile_lock:
@@ -271,6 +279,7 @@ class SettingsControl:
             raise ValueError("test_mode must be true or false")
         all_zero = self._zero_if_possible()
         self._manual_frame = None
+        self._manual_routing = None
         self.held = None
         self.test_mode = enabled
         return {"enabled": self.test_mode, "all_zero": all_zero}
@@ -287,6 +296,7 @@ class SettingsControl:
             raise RuntimeError("ALL OFF is not available in this run mode")
         result = bool(self.zero_output())
         self._manual_frame = None
+        self._manual_routing = None
         self.held = None
         self.test_mode = True
         return result
@@ -305,6 +315,7 @@ class SettingsControl:
             raise RuntimeError("Zero could not be verified. The Pi stays up. "
                                "Cut the 24 V first, then try again.")
         self._manual_frame = None
+        self._manual_routing = None
         self.held = None
         self.test_mode = True
         self.run_command(list(POWER_COMMANDS[action]))
@@ -313,6 +324,10 @@ class SettingsControl:
         return {"action": action, "all_zero": True}
 
     def test_jet(self, jet, height=None):
+        with self.output_settings() as routing:
+            return self._test_jet(jet, height, routing)
+
+    def _test_jet(self, jet, height, routing):
         if self.send_frame is None:
             raise RuntimeError("jet test is not available in this run mode")
         if self.lights_only:
@@ -329,7 +344,7 @@ class SettingsControl:
         if not self.cfg.height_min <= height <= self.cfg.height_max:
             raise ValueError(
                 f"test height must be from {self.cfg.height_min} to {self.cfg.height_max}")
-        output = self.cfg.jet_count - 1 - jet if self.cfg.reverse_jets else jet
+        output = routing[0] - 1 - jet if routing[1] else jet
         module = output // dmx.NOZZLES_PER_HD_MODULE + 1
         nozzle = output % dmx.NOZZLES_PER_HD_MODULE + 1
         base = dmx.channel_for(nozzle, dmx.RED, module=module)
@@ -338,9 +353,15 @@ class SettingsControl:
             frame[base - 1 + offset] = dmx.clamp(value)
         frame[base + 3] = dmx.clamp(height, high=self.cfg.height_max)
         self._manual_frame = frame
+        self._manual_routing = routing
         self.held = {"jet": jet, "height": height}
         self.send_frame(frame)
         return dict(self.held)
+
+    def output_routing(self):
+        """The routing used to build a held test, or the current show routing."""
+        with self.output_settings() as routing:
+            return self._manual_routing or routing
 
     def output_frame(self, normal_frame):
         """Return a held jet-test frame, a blank frame in test mode, or the normal

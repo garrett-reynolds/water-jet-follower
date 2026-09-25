@@ -12,6 +12,7 @@ from contextlib import nullcontext
 import os
 import subprocess
 import sys
+import threading
 import time
 
 from tracker import geometry, scanfile, settings, viewer
@@ -265,9 +266,30 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
     """
     from tracker.settings import SettingsControl
     from tracker.wave import Wave
+    from tracker import dmx
 
     state = viewer.State()
-    control = SettingsControl(cfg, send_frame=send_frame, zero_output=zero_output,
+    output_lock = threading.Lock()
+
+    def send_and_preview(frame, routing=None):
+        with control.output_settings() as current_routing:
+            routing = routing or control.output_routing()
+            with output_lock:
+                sent = send_frame(frame)
+                if sent is not False:
+                    state.set_output(frame, routing, jet_count=current_routing[0])
+                return sent
+
+    def zero_and_preview():
+        with control.output_settings() as routing:
+            with output_lock:
+                verified = zero_output()
+                if verified:
+                    state.set_output(dmx.blank_frame(), routing)
+                return verified
+
+    control = SettingsControl(cfg, send_frame=send_and_preview,
+                              zero_output=zero_and_preview,
                               run_command=run_command,
                               profile_path=getattr(args, "profile", None))
     control.set_lights_only(args.lights_only)
@@ -319,22 +341,26 @@ def _show_loop(source, cfg, baseline, label, args, send_frame, zero_output,
 
             heights, colours = wave.heights_and_colours(frame, timestamp)
             now = time.time()
-            if control.test_mode:
-                # Live output is off. Keep the heartbeat and olad's buffer alive by
-                # re-sending the held test frame (or zeros) on the resend cadence.
-                heights = [0] * len(heights)
-                if now - last_sent >= cfg.resend_seconds:
-                    _send_with_heartbeat(send_frame, control.output_frame(None),
-                                         heartbeat)
+            # Choose the mode, final frame, and its routing under one profile lock.
+            with control.output_settings() as routing:
+                if control.test_mode:
+                    # Live output is off. Keep the heartbeat and olad's buffer alive by
+                    # re-sending the held test frame (or zeros) on the resend cadence.
+                    heights = [0] * len(heights)
+                    if now - last_sent >= cfg.resend_seconds:
+                        routing = control.output_routing()
+                        _send_with_heartbeat(
+                            lambda output: send_and_preview(output, routing),
+                            control.output_frame(None), heartbeat)
+                        last_sent = now
+                # Re-send on a change or on the heartbeat, whichever comes first.
+                elif now - last_sent >= cfg.resend_seconds or any(heights):
+                    live_frame = wave.frame(frame, timestamp,
+                                            lights_only=control.lights_only)
+                    _send_with_heartbeat(
+                        lambda output: send_and_preview(output, routing),
+                        control.output_frame(live_frame), heartbeat)
                     last_sent = now
-            # Re-send on a change or on the heartbeat, whichever comes first.
-            elif now - last_sent >= cfg.resend_seconds or any(heights):
-                live_frame = wave.frame(frame, timestamp,
-                                        lights_only=control.lights_only)
-                _send_with_heartbeat(send_frame,
-                                     control.output_frame(live_frame),
-                                     heartbeat)
-                last_sent = now
             peak_height = max(peak_height, max(heights) if heights else 0)
 
             elapsed = max(1e-6, time.time() - started)
