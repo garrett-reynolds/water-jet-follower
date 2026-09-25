@@ -1,5 +1,15 @@
 # Decisions
 
+## [2026-09-25] Preview the last accepted output on the Live map
+
+Save each accepted 512-slot show or test command at the send boundary.
+Save zero on the map after a verified zero action. Decode RGBW and height
+back into logical Jet order, even when output routing is reversed. The
+`/state` route publishes `pixel_colours` and `heights` as a command preview.
+The Live map adds white to each screen RGB channel, caps it at 255, and keeps
+an outline around a black Pixel. A lost state poll clears the old preview.
+This shows what the show commanded; it does not prove what the hardware did.
+
 ## [2026-09-25] Raise a zero colour level when the wheel is used
 
 When an operator picks a wheel colour at Colour level 0, set the level to 255

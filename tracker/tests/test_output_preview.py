@@ -1,0 +1,137 @@
+"""The Live map shows the last accepted output command."""
+
+import array
+import json
+import shutil
+import subprocess
+import unittest
+from types import SimpleNamespace
+from unittest import mock
+
+from tracker import dmx, run
+from tracker.config import Config
+from tracker.viewer import PAGE, State
+
+
+class TestOutputState(unittest.TestCase):
+    def test_reverse_routing_decodes_to_logical_pixel_order(self):
+        cfg = Config(jet_count=2, reverse_jets=True)
+        state = State()
+        frame = dmx.blank_frame()
+        frame[0:5] = array.array("B", [1, 2, 3, 4, 5])
+        frame[5:10] = array.array("B", [10, 20, 30, 40, 50])
+
+        state.set_output(frame, cfg)
+        frame[5:10] = array.array("B", [0, 0, 0, 0, 0])
+
+        self.assertEqual(state.get()["pixel_colours"],
+                         [[10, 20, 30, 40], [1, 2, 3, 4]])
+        self.assertEqual(state.get()["heights"], [50, 5])
+
+
+class TestShowOutputPreview(unittest.TestCase):
+    def test_show_modes_held_test_and_verified_zero_follow_sent_output(self):
+        cfg = Config(viewer_host="127.0.0.1", viewer_port=0,
+                     idle_water_animation="pulse", idle_seconds=2,
+                     idle_height=20, base_colour=(7, 8, 9, 10),
+                     resend_seconds=0)
+        views = []
+        sent = []
+        control = None
+        state = None
+
+        class Server:
+            def shutdown(self):
+                pass
+
+        def serve(live_state, _cfg, live_control):
+            nonlocal control, state
+            control, state = live_control, live_state
+            return Server()
+
+        def source():
+            yield 1.0, []
+            views.append(state.get())
+            control.set_lights_only(True)
+            yield 1.0, []
+            views.append(state.get())
+            control.set_lights_only(False)
+            control.set_test_mode(True)
+            views.append(state.get())
+            control.test_jet(2, 30)
+            views.append(state.get())
+            control.all_off()
+            views.append(state.get())
+            yield 1.0, []
+            views.append(state.get())
+
+        def send(frame):
+            sent.append(list(frame))
+            return True
+
+        def zero():
+            sent.append(list(dmx.blank_frame()))
+            return True
+
+        with mock.patch.object(run.viewer, "serve", serve):
+            run._show_loop(source(), cfg, None, "test",
+                           SimpleNamespace(lights_only=False), send, zero)
+
+        self.assertEqual(views[0]["heights"], [20] * cfg.jet_count)
+        self.assertEqual(views[0]["pixel_colours"], [[7, 8, 9, 10]] * cfg.jet_count)
+        self.assertEqual(views[1]["heights"], [0] * cfg.jet_count)
+        self.assertEqual(views[1]["pixel_colours"], [[7, 8, 9, 10]] * cfg.jet_count)
+        self.assertEqual(views[2]["pixel_colours"], [[0, 0, 0, 0]] * cfg.jet_count)
+        self.assertEqual(views[3]["heights"][2], 30)
+        self.assertEqual(views[3]["pixel_colours"][2], list(cfg.slow_colour))
+        self.assertEqual(views[4]["heights"], [0] * cfg.jet_count)
+        self.assertEqual(views[4]["pixel_colours"], [[0, 0, 0, 0]] * cfg.jet_count)
+        self.assertEqual(views[5]["pixel_colours"], views[4]["pixel_colours"])
+
+
+class TestLiveBrowserPreview(unittest.TestCase):
+    def test_pixel_fill_uses_white_caps_values_and_keeps_black_visible(self):
+        if not shutil.which("node"):
+            self.skipTest("Node.js is needed for Live browser behavior")
+        page_script = PAGE.split("<script>", 1)[1].split("</script>", 1)[0]
+        browser_script = """
+const vm=require('node:vm');
+const arcs=[],outlines=[];
+const ctx={fillStyle:'',strokeStyle:'',lineWidth:1,
+  fillRect(){},beginPath(){this.arcPending=false},moveTo(){},lineTo(){},
+  stroke(){if(this.arcPending)outlines.push({colour:this.strokeStyle,radius:this.lastRadius})},
+  strokeRect(){},setLineDash(){},fillText(){},
+  arc(x,y,r){this.lastRadius=r;this.arcPending=true},
+  fill(){arcs.push({colour:this.fillStyle,radius:this.lastRadius})}};
+const canvas={width:800,height:600,getContext(){return ctx}};
+const hud={textContent:''},position={className:'',textContent:''};
+const nodes={c:canvas,hud,position};
+const context=vm.createContext({document:{getElementById:id=>nodes[id]},
+  window:{innerWidth:800,innerHeight:600,addEventListener(){}},
+  setTimeout(){},fetch:async()=>{throw Error('offline')}});
+vm.runInContext(process.argv[2].replace(/fit\\(\\); poll\\(\\);\\s*$/, ''),context);
+vm.runInContext(`CFG={roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2,
+  strip_points:[[0.5,0.5],[1.5,0.5]],jet_count:2,height_max:40};
+  FRAME={pixel_colours:[[0,0,0,0],[250,10,20,20]],heights:[0,40],
+  fg:[],bg:[],legs:[],tracks:[],clusters:[],detections:[],hz:16};draw();`,context);
+const before=arcs.slice();
+vm.runInContext('poll()',context).then(()=>{
+  console.log(JSON.stringify({before,outlines,frame:vm.runInContext('FRAME',context),
+    position:position.className,arcs:arcs.length}));
+});
+"""
+        run_result = subprocess.run(["node", "-", page_script], input=browser_script,
+                                    capture_output=True, text=True)
+        self.assertEqual(run_result.returncode, 0, run_result.stderr)
+        result = json.loads(run_result.stdout)
+        self.assertEqual(result["before"][0], {"colour": "rgb(0, 0, 0)", "radius": 2.5})
+        self.assertEqual(result["before"][1], {"colour": "rgb(255, 30, 40)",
+                                                "radius": 11.5})
+        self.assertEqual(result["before"][2]["colour"], "#ff0")
+        self.assertEqual(result["outlines"][0], {"colour": "#bbc", "radius": 2.5})
+        self.assertIsNone(result["frame"])
+        self.assertEqual(result["position"], "stale")
+
+
+if __name__ == "__main__":
+    unittest.main()

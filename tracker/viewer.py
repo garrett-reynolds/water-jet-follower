@@ -12,7 +12,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from tracker import geometry, system
+from tracker import dmx, geometry, system
 from tracker.config import Config
 from tracker.settings import SettingsControl
 
@@ -24,6 +24,7 @@ class State:
         self._lock = threading.Lock()
         self._frame = {"t": 0, "tracks": [], "clusters": [], "legs": [],
                        "detections": [], "fg": [], "bg": [], "hz": 0.0}
+        self._output = None
 
     def set(self, frame):
         with self._lock:
@@ -31,7 +32,21 @@ class State:
 
     def get(self):
         with self._lock:
-            return self._frame
+            return dict(self._frame, **self._output) if self._output else self._frame
+
+    def set_output(self, frame, cfg):
+        """Save the last accepted command in logical Jet order for the Live map."""
+        if len(frame) != dmx.UNIVERSE_SIZE:
+            raise ValueError("output preview needs a full 512-slot frame")
+        colours = []
+        heights = []
+        for jet in range(cfg.jet_count):
+            output = cfg.jet_count - 1 - jet if cfg.reverse_jets else jet
+            base = output * dmx.CHANNELS_PER_NOZZLE
+            colours.append(list(frame[base:base + 4]))
+            heights.append(frame[base + dmx.HEIGHT])
+        with self._lock:
+            self._output = {"pixel_colours": colours, "heights": heights}
 
 
 PAGE = """<!doctype html>
@@ -124,11 +139,17 @@ function draw() {
   // so the hill is visible. Without this every jet is the same dot and the only
   // thing the page can tell you is that something is happening.
   const H = FRAME.heights || [];
+  const pixels = FRAME.pixel_colours || [];
   for (let j = 0; j < CFG.jet_count; j++) {
     const x = path[j][0], y = path[j][1];
     const h = H[j] || 0;
     const up = CFG.height_max > 0 ? Math.min(1, h / CFG.height_max) : 0;
-    dot(ctx, t, x, y, 2.5 + 9 * up, up > 0 ? '#4cf' : '#2a6');
+    const pixel = pixels[j];
+    const colour = pixel
+      ? 'rgb(' + [0, 1, 2].map(i => Math.min(255, pixel[i] + pixel[3])).join(', ') + ')'
+      : (up > 0 ? '#4cf' : '#2a6');
+    dot(ctx, t, x, y, 2.5 + 9 * up, colour);
+    ctx.strokeStyle = '#bbc'; ctx.lineWidth = 1; ctx.stroke();
     if (h > 0) {
       ctx.fillStyle = '#9ef'; ctx.font = '10px monospace';
       ctx.fillText(h, t.sx(x) - 6, t.sy(y) - 14);
@@ -202,6 +223,8 @@ async function poll() {
     FRAME = await r.json();
     draw();
   } catch (e) {
+    FRAME = null;
+    draw();
     document.getElementById('hud').textContent = 'lost the Pi: ' + e;
     const position = document.getElementById('position');
     position.className = 'stale';
