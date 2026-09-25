@@ -60,6 +60,9 @@ PIXEL_MAP_JS = """
 function pixelScreenColour(pixel) {
   return 'rgb(' + [0, 1, 2].map(i => Math.min(255, pixel[i] + pixel[3])).join(', ') + ')';
 }
+function pixelMapRadius(up) {
+  return 7 + 9 * up;
+}
 """
 
 
@@ -161,8 +164,9 @@ function draw() {
     const up = CFG.height_max > 0 ? Math.min(1, h / CFG.height_max) : 0;
     const pixel = pixels[j];
     const colour = pixel ? pixelScreenColour(pixel) : (up > 0 ? '#4cf' : '#2a6');
-    dot(ctx, t, x, y, 2.5 + 9 * up, colour);
-    ctx.strokeStyle = '#bbc'; ctx.lineWidth = 1; ctx.stroke();
+    dot(ctx, t, x, y, pixelMapRadius(up), colour);
+    ctx.strokeStyle = '#092f35'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = '#e9fffa'; ctx.lineWidth = 1; ctx.stroke();
     if (h > 0) {
       ctx.fillStyle = '#9ef'; ctx.font = '10px monospace';
       ctx.fillText(h, t.sx(x) - 6, t.sy(y) - 14);
@@ -461,7 +465,7 @@ function draw(){
     const q=xy(p),h=(liveFrame?.heights||[])[i]||0;
     const up=profile.settings.height_max>0?Math.min(1,h/profile.settings.height_max):0;
     const pixel=(liveFrame?.pixel_colours||[])[i];
-    const radius=4+9*up;
+    const radius=pixelMapRadius(up);
     ctx.fillStyle=pixel?pixelScreenColour(pixel):'#45dce7';
     ctx.beginPath();ctx.arc(...q,radius,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#092f35';ctx.lineWidth=3;ctx.stroke();
