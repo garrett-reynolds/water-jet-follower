@@ -1,5 +1,30 @@
 # Decisions
 
+## [2026-09-25] Fix operator access and keep local rescue
+
+Use NetworkManager profile `water-jets-ap` for Wi-Fi network `water-jets`.
+Use WPA2 Personal with a strong passphrase and Pi address `10.42.0.1/24`.
+Use `http://10.42.0.1:8080/` and `ssh pi@10.42.0.1` as the primary paths.
+Keep `http://water-jets.local:8080/` secondary until the real iPad proves offline name access.
+Keep Ethernet unchanged for rescue on a known LAN.
+Use a local micro-HDMI display and USB keyboard when no network works.
+
+Task 4 will make a random 16-character passphrase from an unambiguous upper-case,
+lower-case, and digit alphabet with all three types present.
+Save it only in `C:\Users\garrett.reynolds\.water-jets\wifi-passphrase.txt` and the
+Pi's root-owned NetworkManager connection file.
+Limit the Windows directory and file to Garrett's account and `SYSTEM`.
+The private record will include the network name, passphrase, primary URL, and SSH command.
+Rotation must prove iPad page and SSH access before removing the old record.
+
+Fixed access avoids a need for site internet or local name lookup.
+The iPad's No Internet notice does not prove a page fault.
+The 24 V power switch remains the physical water stop.
+Network rescue is not a water stop.
+Outcome: design settled in [issue 44](https://github.com/garrett-reynolds/water-jet-follower/issues/44).
+No secret was made and no Pi or Windows setting changed.
+See [operator access and rescue](docs/pi-install/operator-access-and-rescue.md).
+
 ## [2026-09-25] Keep Pi Wi-Fi separate from safe show recovery
 
 Use a NetworkManager profile for private Wi-Fi and one `water-jet-show.service`
