@@ -1,0 +1,19 @@
+[Unit]
+Description=Water jet follower show
+Wants=NetworkManager.service olad.service
+After=NetworkManager.service olad.service network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=exec
+User=pi
+WorkingDirectory=/home/pi
+ExecStart=/home/pi/wj-venv/bin/python -u -m tracker.run show --baseline /home/pi/data/baseline.json --profile /home/pi/data/profile.json --lights-only
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Clear stale OLA USB serial locks
+Before=olad.service
+
+[Service]
+Type=oneshot
+User=root
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/water-jet-clear-ola-locks
+StandardOutput=journal
+StandardError=journal
