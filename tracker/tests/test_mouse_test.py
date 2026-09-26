@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import time
 import unittest
+from html.parser import HTMLParser
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from unittest import mock
@@ -129,10 +130,176 @@ class TestMouseTestHTTP(unittest.TestCase):
         self.assertNotIn('href="/test"', page)
         self.assertNotIn('href="/settings"', page)
         self.assertNotIn('href="/system"', page)
-        for path in ("/test", "/settings", "/system"):
+        for path in ("/test", "/system"):
             with self.assertRaises(HTTPError) as raised:
                 urlopen(self.base + path)
             self.assertEqual(raised.exception.code, 404)
+
+    def test_settings_edit_changes_the_next_real_wave_preview(self):
+        # Break caught: Mouse Test blocks Settings or applies edits to a copy
+        # that the real Wave never reads.
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode()
+        self.assertIn("MOUSE TEST", page)
+        with urlopen(self.base + "/settings-data") as response:
+            profile = json.load(response)["profile"]
+        profile["settings"]["jet_enabled"] = [False, True]
+        body = json.dumps({"profile": profile}).encode()
+        with urlopen(Request(self.base + "/settings/apply", data=body,
+                             headers={"Content-Type": "application/json"})) as response:
+            self.assertEqual(json.load(response)["settings"]["jet_enabled"],
+                             [False, True])
+        self.post(1, 0, 1)
+        frame = self.state_frame()
+        self.assertEqual(frame["heights"], [0, 30])
+        self.assertEqual(frame["pixel_colours"],
+                         [[0, 0, 0, 0], [0, 0, 255, 0]])
+
+    def test_shrinking_active_area_clears_the_existing_walker(self):
+        # Break caught: an old Walker keeps the Wave active after Settings
+        # moves the active-area edge past it.
+        self.post(1.5, 0, 1)
+        self.assertEqual(len(self.state_frame()["tracks"]), 1)
+        with urlopen(self.base + "/settings-data") as response:
+            profile = json.load(response)["profile"]
+        profile["settings"]["roi_x_max"] = 1.2
+        body = json.dumps({"profile": profile}).encode()
+        with urlopen(Request(self.base + "/settings/apply", data=body)):
+            pass
+        frame = self.state_frame()
+        self.assertEqual(frame["tracks"], [])
+        self.assertEqual(frame["heights"], [0, 0])
+
+    def test_settings_rejects_a_non_boolean_safety_unlock(self):
+        # Break caught: malformed input opens the hard height limit.
+        with urlopen(self.base + "/settings-data") as response:
+            profile = json.load(response)["profile"]
+        profile["settings"]["height_max"] = 31
+        body = json.dumps({"profile": profile,
+                           "unlock_height_max": "yes"}).encode()
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(Request(self.base + "/settings/apply", data=body))
+        self.assertEqual(raised.exception.code, 400)
+        with urlopen(self.base + "/settings-data") as response:
+            saved = json.load(response)["profile"]
+        self.assertEqual(saved["settings"]["height_max"], 40)
+
+    def test_settings_page_hides_hardware_actions_and_server_refuses_them(self):
+        # Break caught: the local preview offers a live hardware control.
+        class Controls(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.buttons = {}
+                self.links = []
+
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == "button" and "id" in attrs:
+                    self.buttons[attrs["id"]] = attrs
+                if tag == "a":
+                    self.links.append(attrs.get("href"))
+
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode()
+        controls = Controls()
+        controls.feed(page)
+        self.assertIn("MOUSE TEST", page)
+        for action in ("lights", "all-off"):
+            self.assertIn("hidden", controls.buttons[action])
+            self.assertIn("disabled", controls.buttons[action])
+        self.assertNotIn("/test", controls.links)
+        self.assertNotIn("/system", controls.links)
+        for action in ("/actions/test-mode", "/actions/test-jet",
+                       "/actions/all-off", "/actions/lights-only",
+                       "/actions/reboot", "/actions/shutdown"):
+            with self.subTest(action=action):
+                with self.assertRaises(HTTPError) as raised:
+                    urlopen(Request(self.base + action, data=b"{}"))
+                self.assertEqual(raised.exception.code, 404)
+
+    def test_settings_map_hover_pauses_for_edits_and_clears_on_leave(self):
+        # Break caught: Settings hover sends no Walker, or an edit drag sends
+        # Walker moves, or a leave lets a queued move restore that Walker.
+        if not shutil.which("node"):
+            self.skipTest("Node.js is needed for browser behavior")
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode()
+        script = page.split("<script>", 1)[1].split("</script>", 1)[0]
+        browser = r"""
+const vm=require('node:vm');
+const script=process.argv[2].replace(/init\(\);pollState\(\);\s*$/, '');
+const calls=[],listeners={},timers=new Map(),nodes={};
+let now=1000,nextTimer=1;
+const canvas={width:800,height:600,
+  getBoundingClientRect:()=>({left:10,top:20,width:800,height:600}),
+  setPointerCapture(){},addEventListener:(name,fn)=>listeners[name]=fn};
+nodes.path=canvas;
+const element=id=>nodes[id]||(nodes[id]={value:'',hidden:false,
+  addEventListener(){},classList:{toggle(){}}});
+const context=vm.createContext({
+  document:{getElementById:element,querySelector:()=>({addEventListener(){}}),
+    querySelectorAll:()=>[]},window:{},devicePixelRatio:1,
+  performance:{timeOrigin:1000000,now:()=>now},
+  setTimeout(fn,delay){const id=nextTimer++;timers.set(id,{fn,delay});return id},
+  clearTimeout(id){timers.delete(id)},
+  fetch:async(path,options)=>{calls.push({path,method:options.method,
+    body:options.body&&JSON.parse(options.body)});return {ok:true}}
+});
+vm.runInContext(script,context);
+vm.runInContext(`profile={settings:{strip_points:[[0,0],[1,0]],jet_count:2,
+  roi_x_min:-1,roi_x_max:2,roi_y_min:-1,roi_y_max:1}};
+  roi={xmin:-2,xmax:3,ymin:-2,ymax:2};draw=()=>{};dirty=()=>{};`,context);
+const xy=(x,y)=>vm.runInContext(`xy([${x},${y}])`,context);
+function emit(name,x,y){const e={clientX:10+x,clientY:20+y,pointerId:1};
+  canvas['on'+name]?.(e);listeners[name]?.(e)}
+async function drain(){await vm.runInContext(
+  'typeof mousePending === "undefined" ? Promise.resolve() : mousePending',context)}
+(async()=>{
+  let [x,y]=xy(0.5,0.5);emit('pointermove',x,y);await drain();
+  const hover=calls.slice();
+  now=1100;[x,y]=xy(0,0);emit('pointerdown',x,y);
+  [x,y]=xy(0.3,0);emit('pointermove',x,y);await drain();
+  const duringJet=calls.slice();
+  const editedPoint=vm.runInContext('profile.settings.strip_points[0]',context);
+  emit('pointerup',x,y);
+  now=1200;[x,y]=xy(0.6,0.4);emit('pointermove',x,y);await drain();
+  const afterJet=calls.slice();
+  now=1300;[x,y]=xy(-1,-1);emit('pointerdown',x,y);
+  [x,y]=xy(-1.2,-1.1);emit('pointermove',x,y);await drain();
+  const duringCorner=calls.slice();
+  const editedArea=vm.runInContext(
+    '[profile.settings.roi_x_min,profile.settings.roi_y_min]',context);
+  emit('pointerup',x,y);
+  now=1400;[x,y]=xy(0.7,0.4);emit('pointermove',x,y);
+  now=1410;[x,y]=xy(0.8,0.4);emit('pointermove',x,y);
+  const queued=timers.size;
+  emit('pointerleave',x,y);
+  now=1500;for(const [id,timer] of [...timers]){timers.delete(id);timer.fn()}
+  await drain();
+  console.log(JSON.stringify({hover,duringJet,editedPoint,afterJet,
+    duringCorner,editedArea,queued,calls}));
+})().catch(e=>{console.error(e);process.exitCode=1});
+"""
+        result = subprocess.run(["node", "-", script], input=browser,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        seen = json.loads(result.stdout)
+        self.assertEqual([call["method"] for call in seen["hover"]], ["POST"])
+        self.assertEqual(seen["hover"][0]["path"], "/mouse")
+        self.assertAlmostEqual(seen["hover"][0]["body"]["x"], 0.5)
+        self.assertAlmostEqual(seen["hover"][0]["body"]["y"], 0.5)
+        self.assertEqual([call["method"] for call in seen["duringJet"]],
+                         ["POST", "DELETE"])
+        self.assertAlmostEqual(seen["editedPoint"][0], 0.3)
+        self.assertEqual([call["method"] for call in seen["afterJet"]],
+                         ["POST", "DELETE", "POST"])
+        self.assertEqual([call["method"] for call in seen["duringCorner"]],
+                         ["POST", "DELETE", "POST", "DELETE"])
+        self.assertEqual(seen["editedArea"], [-1.2, -1.1])
+        self.assertEqual(seen["queued"], 1)
+        self.assertEqual([call["method"] for call in seen["calls"]],
+                         ["POST", "DELETE", "POST", "DELETE", "POST", "DELETE"])
+        self.assertAlmostEqual(seen["calls"][-2]["body"]["x"], 0.7)
 
 
 class TestMouseTestPreviewClock(unittest.TestCase):

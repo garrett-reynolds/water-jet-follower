@@ -579,6 +579,48 @@ for(const d of document.querySelectorAll('details')){const key='fold:'+d.querySe
 init();pollState();
 </script></body></html>"""
 
+MOUSE_SETTINGS_JS = MOUSE_JS.replace(
+    "const mouseCanvas = document.getElementById('c');",
+    "const mouseCanvas = $('path');")\
+    .replace("  if (!CFG) return;",
+             "  if (!profile || !roi || dragging || dragCorner !== null) return;")\
+    .replace("  const box = mouseCanvas.getBoundingClientRect(), map = transform(mouseCanvas);\n"
+             "  const sx = (event.clientX - box.left) * mouseCanvas.width / box.width;\n"
+             "  const sy = (event.clientY - box.top) * mouseCanvas.height / box.height;\n"
+             "  mouseQueued = {x: map.wx(sx), y: map.wy(sy),\n",
+             "  const box = mouseCanvas.getBoundingClientRect();\n"
+             "  if (!box.width || !box.height) return;\n"
+             "  const sx = (event.clientX - box.left) * mouseCanvas.width / "
+             "devicePixelRatio / box.width;\n"
+             "  const sy = (event.clientY - box.top) * mouseCanvas.height / "
+             "devicePixelRatio / box.height;\n"
+             "  const [x, y] = world(sx, sy);\n"
+             "  if (!Number.isFinite(x) || !Number.isFinite(y)) return;\n"
+             "  mouseQueued = {x, y,\n")
+MOUSE_SETTINGS_JS += """
+// An edit owns the pointer until it ends. Drop any queued Walker before it moves.
+mouseCanvas.addEventListener('pointerdown', () => {
+  if (!dragging && dragCorner === null) return;
+  mouseQueued = null;
+  if (mouseTimer !== null) clearTimeout(mouseTimer);
+  mouseTimer = null;
+  mouseLastSent = -Infinity;
+  mouseRequest('DELETE');
+});
+"""
+
+MOUSE_SETTINGS_PAGE = SETTINGS_PAGE.replace(
+    '<header><h1>Water and light control</h1><nav><a href="/test">Test jets</a>'
+    '<a href="/system">System</a><a href="/">Live viewer</a></nav></header>',
+    '<header><h1>Water and light control</h1><strong>MOUSE TEST</strong>'
+    '<nav><a href="/">Mouse viewer</a></nav></header>')\
+    .replace('Reboot and shut down are on the <a href="/system">System</a> page.',
+             'This local preview does not send to hardware.')\
+    .replace('<button id="lights">', '<button id="lights" hidden disabled>')\
+    .replace('<button id="all-off" class="danger">',
+             '<button id="all-off" class="danger" hidden disabled>')\
+    .replace('init();pollState();', MOUSE_SETTINGS_JS + '\ninit();pollState();')
+
 TEST_PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Water jet test</title>
@@ -726,6 +768,7 @@ def make_handler(state, cfg, control=None, mouse_test=None):
     view = Config()
     if mouse_test is None:
         control = control or SettingsControl(cfg)
+    settings_control = control if mouse_test is None else SettingsControl(cfg)
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, body, content_type, status=200):
@@ -746,7 +789,8 @@ def make_handler(state, cfg, control=None, mouse_test=None):
 
         def do_GET(self):                       # noqa: N802 - http.server's name
             if mouse_test is not None and self.path not in (
-                    "/", "/index.html", "/state", "/config"):
+                    "/", "/index.html", "/state", "/config",
+                    "/settings", "/settings-data"):
                 self.send_error(404)
                 return
             if self.path.startswith("/state"):
@@ -773,10 +817,10 @@ def make_handler(state, cfg, control=None, mouse_test=None):
                 }), "application/json")
             elif self.path == "/settings-data":
                 self._json({
-                    "profile": control.profile(),
-                    "default_profile": control.defaults(),
-                    "lights_only": control.lights_only,
-                    "test_mode": control.test_mode,
+                    "profile": settings_control.profile(),
+                    "default_profile": settings_control.defaults(),
+                    "lights_only": settings_control.lights_only,
+                    "test_mode": settings_control.test_mode,
                     # The map's view frame. Built from the defaults and padded,
                     # not from the live area: a shrunken active area must still
                     # leave room on the map to drag its corners back out.
@@ -784,7 +828,8 @@ def make_handler(state, cfg, control=None, mouse_test=None):
                             "ymin": view.roi_y_min - 1, "ymax": view.roi_y_max + 1},
                 })
             elif self.path == "/settings":
-                self._send(SETTINGS_PAGE, "text/html; charset=utf-8")
+                self._send(MOUSE_SETTINGS_PAGE if mouse_test is not None
+                           else SETTINGS_PAGE, "text/html; charset=utf-8")
             elif self.path == "/test":
                 self._send(TEST_PAGE, "text/html; charset=utf-8")
             elif self.path == "/system":
@@ -800,6 +845,24 @@ def make_handler(state, cfg, control=None, mouse_test=None):
         def do_POST(self):                     # noqa: N802 - http.server's name
             try:
                 if mouse_test is not None:
+                    if self.path in ("/settings/apply", "/settings/undo",
+                                     "/settings/reset"):
+                        body = self._body()
+                        if not isinstance(body, dict):
+                            raise ValueError("settings input must be a JSON object")
+                        if self.path == "/settings/apply":
+                            unlock = body.get("unlock_height_max", False)
+                            if not isinstance(unlock, bool):
+                                raise ValueError("unlock_height_max must be a boolean")
+                            result = mouse_test.edit_settings(
+                                lambda: settings_control.apply(
+                                    body.get("profile"), unlock))
+                        elif self.path == "/settings/undo":
+                            result = mouse_test.edit_settings(settings_control.undo)
+                        else:
+                            result = mouse_test.edit_settings(settings_control.reset)
+                        self._json(result)
+                        return
                     if self.path != "/mouse":
                         self._json({"error": "unknown action"}, 404)
                         return
