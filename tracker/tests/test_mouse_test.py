@@ -128,7 +128,8 @@ class TestMouseTestHTTP(unittest.TestCase):
             page = response.read().decode()
         self.assertIn("MOUSE TEST", page)
         self.assertNotIn('href="/test"', page)
-        self.assertNotIn('href="/settings"', page)
+        # Break caught: the start page gives no way to open the safe Settings map.
+        self.assertIn('href="/settings"', page)
         self.assertNotIn('href="/system"', page)
         for path in ("/test", "/system"):
             with self.assertRaises(HTTPError) as raised:
@@ -296,10 +297,65 @@ async function drain(){await vm.runInContext(
         self.assertEqual([call["method"] for call in seen["duringCorner"]],
                          ["POST", "DELETE", "POST", "DELETE"])
         self.assertEqual(seen["editedArea"], [-1.2, -1.1])
-        self.assertEqual(seen["queued"], 1)
         self.assertEqual([call["method"] for call in seen["calls"]],
-                         ["POST", "DELETE", "POST", "DELETE", "POST", "DELETE"])
-        self.assertAlmostEqual(seen["calls"][-2]["body"]["x"], 0.7)
+                         ["POST", "DELETE", "POST", "DELETE", "POST", "POST",
+                          "DELETE"])
+        self.assertAlmostEqual(seen["calls"][-3]["body"]["x"], 0.7)
+        self.assertAlmostEqual(seen["calls"][-2]["body"]["x"], 0.8)
+
+    def test_settings_drag_cancel_restores_hover_for_point_and_corner(self):
+        # Break caught: pointercancel leaves either drag flag set, so later
+        # hover moves cannot reach the Walker.
+        if not shutil.which("node"):
+            self.skipTest("Node.js is needed for browser behavior")
+        with urlopen(self.base + "/settings") as response:
+            page = response.read().decode()
+        script = page.split("<script>", 1)[1].split("</script>", 1)[0]
+        browser = r"""
+const vm=require('node:vm');
+const script=process.argv[2].replace(/init\(\);pollState\(\);\s*$/, '');
+async function run(kind){
+  const calls=[],listeners={},nodes={};
+  let now=1000;
+  const canvas={width:800,height:600,
+    getBoundingClientRect:()=>({left:10,top:20,width:800,height:600}),
+    setPointerCapture(){},addEventListener:(name,fn)=>listeners[name]=fn};
+  nodes.path=canvas;
+  const element=id=>nodes[id]||(nodes[id]={value:'',hidden:false,
+    addEventListener(){},classList:{toggle(){}}});
+  const context=vm.createContext({
+    document:{getElementById:element,querySelector:()=>({addEventListener(){}}),
+      querySelectorAll:()=>[]},window:{},devicePixelRatio:1,
+    performance:{timeOrigin:1000000,now:()=>now},
+    setTimeout:()=>1,clearTimeout(){},
+    fetch:async(path,options)=>{calls.push({path,method:options.method,
+      body:options.body&&JSON.parse(options.body)});return {ok:true}}
+  });
+  vm.runInContext(script,context);
+  vm.runInContext(`profile={settings:{strip_points:[[0,0],[1,0]],jet_count:2,
+    roi_x_min:-1,roi_x_max:2,roi_y_min:-1,roi_y_max:1}};
+    roi={xmin:-2,xmax:3,ymin:-2,ymax:2};draw=()=>{};dirty=()=>{};`,context);
+  const xy=(x,y)=>vm.runInContext(`xy([${x},${y}])`,context);
+  function emit(name,x,y){const e={clientX:10+x,clientY:20+y,pointerId:1};
+    canvas['on'+name]?.(e);listeners[name]?.(e)}
+  let [x,y]=xy(0.5,0.5);emit('pointermove',x,y);
+  [x,y]=kind==='point'?xy(0,0):xy(-1,-1);
+  emit('pointerdown',x,y);emit('pointercancel',x,y);
+  now=1100;[x,y]=xy(0.5,0.5);emit('pointermove',x,y);
+  await vm.runInContext('mousePending',context);
+  return {kind,calls,state:vm.runInContext('[dragging,dragCorner]',context)};
+}
+(async()=>console.log(JSON.stringify(await Promise.all([
+  run('point'),run('corner')]))))().catch(e=>{console.error(e);process.exitCode=1});
+"""
+        result = subprocess.run(["node", "-", script], input=browser,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for seen in json.loads(result.stdout):
+            with self.subTest(kind=seen["kind"]):
+                self.assertEqual(seen["state"], [False, None])
+                self.assertEqual([call["method"] for call in seen["calls"]],
+                                 ["POST", "DELETE", "POST"])
 
 
 class TestMouseTestPreviewClock(unittest.TestCase):
@@ -424,7 +480,9 @@ class TestMouseTestCommand(unittest.TestCase):
 
 
 class TestMouseTestBrowser(unittest.TestCase):
-    def test_rapid_move_sends_latest_and_leave_cancels_queued_move(self):
+    def test_fast_out_and_back_preserves_every_move_before_leave(self):
+        # Break caught: a newer move replaces an older pending move, so a
+        # fast trip out and back never reaches the real Wave.
         if not shutil.which("node"):
             self.skipTest("Node.js is needed for browser behavior")
         from tracker.viewer import MOUSE_PAGE
@@ -449,37 +507,28 @@ const t=vm.runInContext('transform(document.getElementById("c"))',context);
 function move(x){handlers.pointermove({clientX:10+t.sx(x),clientY:20+t.sy(0.5)})}
 (async()=>{
   move(0.5);
-  now=1020;move(2.1);
-  const queued=timers.size;
-  now=1050;
-  for(const [id,timer] of [...timers]){timers.delete(id);timer.fn()}
-  await vm.runInContext('mousePending',context);
-  const afterFlush=calls.slice();
-  now=1060;move(1.5);
-  const queuedBeforeLeave=timers.size;
+  now=1010;move(2.1);
+  now=1020;move(0.5);
   handlers.pointerleave();
-  const timersAfterLeave=timers.size;
-  now=1110;
+  now=1100;
   for(const [id,timer] of [...timers]){timers.delete(id);timer.fn()}
   await vm.runInContext('mousePending',context);
-  console.log(JSON.stringify({queued,afterFlush,queuedBeforeLeave,
-    timersAfterLeave,calls}));
+  console.log(JSON.stringify({calls}));
 })().catch(e=>{console.error(e);process.exitCode=1});
 """
         result = subprocess.run(["node", "-", script], input=browser,
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         seen = json.loads(result.stdout)
-        self.assertEqual(seen["queued"], 1)
-        self.assertEqual([call["method"] for call in seen["afterFlush"]],
-                         ["POST", "POST"])
-        self.assertAlmostEqual(seen["afterFlush"][1]["body"]["x"], 2.1)
-        self.assertEqual(seen["queuedBeforeLeave"], 1)
-        self.assertEqual(seen["timersAfterLeave"], 0)
         self.assertEqual([call["method"] for call in seen["calls"]],
-                         ["POST", "POST", "DELETE"])
+                         ["POST", "POST", "POST", "DELETE"])
+        self.assertEqual([round(call["body"]["x"], 1)
+                          for call in seen["calls"][:3]], [0.5, 2.1, 0.5])
+        self.assertLess(seen["calls"][0]["body"]["t"],
+                        seen["calls"][1]["body"]["t"])
 
-    def test_pointer_maps_world_moves_at_bounded_rate_and_leaves(self):
+    def test_pointer_maps_each_world_move_and_leaves(self):
+        # Break caught: rapid repeated moves disappear before they reach /mouse.
         if not shutil.which("node"):
             self.skipTest("Node.js is needed for browser behavior")
         from tracker.viewer import MOUSE_PAGE
@@ -515,10 +564,13 @@ vm.runInContext(`CFG={roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2};`,context
         self.assertEqual(result.returncode, 0, result.stderr)
         seen = json.loads(result.stdout)
         self.assertEqual(seen["mark"], "MOUSE TEST")
-        self.assertEqual(len(seen["calls"]), 2)
+        self.assertEqual(len(seen["calls"]), 3)
         self.assertEqual(seen["calls"][0]["path"], "/mouse")
         self.assertEqual(seen["calls"][0]["method"], "POST")
         self.assertAlmostEqual(seen["calls"][0]["body"]["x"], 1.5)
         self.assertAlmostEqual(seen["calls"][0]["body"]["y"], 0.5)
         self.assertEqual(seen["calls"][0]["body"]["t"], 1001)
-        self.assertEqual(seen["calls"][1], {"path": "/mouse", "method": "DELETE"})
+        self.assertEqual(seen["calls"][1]["method"], "POST")
+        self.assertLess(seen["calls"][0]["body"]["t"],
+                        seen["calls"][1]["body"]["t"])
+        self.assertEqual(seen["calls"][2], {"path": "/mouse", "method": "DELETE"})

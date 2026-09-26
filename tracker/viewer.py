@@ -257,10 +257,9 @@ fit(); poll();
 
 
 MOUSE_JS = """
-// Keep requests in order, so a leave always clears the last move.
+// Keep every move in order, so a fast trip out and back reaches the Wave.
 const mouseCanvas = document.getElementById('c');
-let mousePending = Promise.resolve(), mouseLastSent = -Infinity;
-let mouseQueued = null, mouseTimer = null;
+let mousePending = Promise.resolve(), mouseLastTime = -Infinity;
 function mouseRequest(method, body) {
   mousePending = mousePending.catch(() => {}).then(() => fetch('/mouse', {
     method: method,
@@ -268,39 +267,26 @@ function mouseRequest(method, body) {
     body: body ? JSON.stringify(body) : undefined
   }));
 }
-function sendQueuedMouse() {
-  mouseTimer = null;
-  if (!mouseQueued) return;
-  const move = mouseQueued;
-  mouseQueued = null;
-  mouseLastSent = performance.now();
-  mouseRequest('POST', move);
-}
 mouseCanvas.addEventListener('pointermove', event => {
   if (!CFG) return;
   const now = performance.now();
   const box = mouseCanvas.getBoundingClientRect(), map = transform(mouseCanvas);
   const sx = (event.clientX - box.left) * mouseCanvas.width / box.width;
   const sy = (event.clientY - box.top) * mouseCanvas.height / box.height;
-  mouseQueued = {x: map.wx(sx), y: map.wy(sy),
-                 t: (performance.timeOrigin + now) / 1000};
-  if (mouseTimer !== null) return;
-  const wait = Math.max(0, 50 - (now - mouseLastSent));
-  if (wait === 0) sendQueuedMouse();
-  else mouseTimer = setTimeout(sendQueuedMouse, wait);
+  const t = Math.max((performance.timeOrigin + now) / 1000,
+                     mouseLastTime + 0.000001);
+  mouseLastTime = t;
+  mouseRequest('POST', {x: map.wx(sx), y: map.wy(sy), t});
 });
 mouseCanvas.addEventListener('pointerleave', () => {
-  mouseQueued = null;
-  if (mouseTimer !== null) clearTimeout(mouseTimer);
-  mouseTimer = null;
-  mouseLastSent = -Infinity;
   mouseRequest('DELETE');
 });
 """
 MOUSE_PAGE = (PAGE.replace('<div id="hud">',
                            '<div id="mouse-mode">MOUSE TEST</div>\n<div id="hud">')
               .replace('<nav><a href="/test">Test jets</a><a id="settings-link" '
-                       'href="/settings">Settings</a><a href="/system">System</a></nav>', '')
+                       'href="/settings">Settings</a><a href="/system">System</a></nav>',
+                       '<nav><a id="settings-link" href="/settings">Settings</a></nav>')
               .replace('fit(); poll();', MOUSE_JS + '\nfit(); poll();')
               .replace('  #position {',
                        '  #mouse-mode { position:fixed; top:8px; left:50%; '
@@ -573,7 +559,7 @@ $('add-point').onclick=()=>{readForm();const p=profile.settings.strip_points, a=
 $('remove-point').onclick=()=>{readForm();if(profile.settings.strip_points.length<=2)return status('The path needs at least two points.',true);profile.settings.strip_points.splice(selected,1);selected=Math.max(0,selected-1);dirty()};
 const canvas=$('path');canvas.onwheel=e=>{e.preventDefault();setZoom(e.deltaY<0?zoom*1.2:zoom/1.2)};canvas.onpointerdown=e=>{const r=canvas.getBoundingClientRect();const k=nearestCorner(e.clientX-r.left,e.clientY-r.top);if(k!==null){dragCorner=k;canvas.setPointerCapture(e.pointerId);draw();return}const n=nearest(e.clientX-r.left,e.clientY-r.top);if(n!==null){selected=n;if(zoom>1)viewCentre=profile.settings.strip_points[selected];dragging=true;canvas.setPointerCapture(e.pointerId);draw()}};
 canvas.onpointermove=e=>{const r=canvas.getBoundingClientRect();if(dragCorner!==null){moveCorner(dragCorner,world(e.clientX-r.left,e.clientY-r.top));dirty();return}if(!dragging)return;profile.settings.strip_points[selected]=clampToArea(world(e.clientX-r.left,e.clientY-r.top));dirty()};
-canvas.onpointerup=()=>{dragging=false;if(dragCorner!==null){dragCorner=null;draw()}};window.onresize=size;
+canvas.onpointerup=()=>{dragging=false;if(dragCorner!==null){dragCorner=null;draw()}};canvas.onpointercancel=canvas.onpointerup;window.onresize=size;
 // Each box remembers whether it was open, per browser, so the iPad keeps the layout you chose.
 for(const d of document.querySelectorAll('details')){const key='fold:'+d.querySelector('h2').textContent;try{if(localStorage.getItem(key)==='closed')d.open=false}catch(e){}d.ontoggle=()=>{try{localStorage.setItem(key,d.open?'open':'closed')}catch(e){}}}
 init();pollState();
@@ -586,25 +572,21 @@ MOUSE_SETTINGS_JS = MOUSE_JS.replace(
              "  if (!profile || !roi || dragging || dragCorner !== null) return;")\
     .replace("  const box = mouseCanvas.getBoundingClientRect(), map = transform(mouseCanvas);\n"
              "  const sx = (event.clientX - box.left) * mouseCanvas.width / box.width;\n"
-             "  const sy = (event.clientY - box.top) * mouseCanvas.height / box.height;\n"
-             "  mouseQueued = {x: map.wx(sx), y: map.wy(sy),\n",
+             "  const sy = (event.clientY - box.top) * mouseCanvas.height / box.height;\n",
              "  const box = mouseCanvas.getBoundingClientRect();\n"
              "  if (!box.width || !box.height) return;\n"
              "  const sx = (event.clientX - box.left) * mouseCanvas.width / "
              "devicePixelRatio / box.width;\n"
              "  const sy = (event.clientY - box.top) * mouseCanvas.height / "
-             "devicePixelRatio / box.height;\n"
+             "devicePixelRatio / box.height;\n")\
+    .replace("  mouseRequest('POST', {x: map.wx(sx), y: map.wy(sy), t});\n",
              "  const [x, y] = world(sx, sy);\n"
              "  if (!Number.isFinite(x) || !Number.isFinite(y)) return;\n"
-             "  mouseQueued = {x, y,\n")
+             "  mouseRequest('POST', {x, y, t});\n")
 MOUSE_SETTINGS_JS += """
-// An edit owns the pointer until it ends. Drop any queued Walker before it moves.
+// An edit owns the pointer until it ends. Clear the Walker before it moves.
 mouseCanvas.addEventListener('pointerdown', () => {
   if (!dragging && dragCorner === null) return;
-  mouseQueued = null;
-  if (mouseTimer !== null) clearTimeout(mouseTimer);
-  mouseTimer = null;
-  mouseLastSent = -Infinity;
   mouseRequest('DELETE');
 });
 """
