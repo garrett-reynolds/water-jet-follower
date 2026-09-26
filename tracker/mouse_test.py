@@ -43,8 +43,7 @@ class MouseTest:
             last = self._last
             if last is not None and timestamp <= last[2]:
                 raise ValueError("t must increase with each move")
-            if not (self.cfg.roi_x_min <= x <= self.cfg.roi_x_max
-                    and self.cfg.roi_y_min <= y <= self.cfg.roi_y_max):
+            if not self._inside(x, y):
                 self._clear(self.clock())
                 return None
             if last is None:
@@ -68,6 +67,24 @@ class MouseTest:
             self._track = track
             self._publish(self._last_move_at, [track])
             return track
+
+    def _inside(self, x, y):
+        return (self.cfg.roi_x_min <= x <= self.cfg.roi_x_max
+                and self.cfg.roi_y_min <= y <= self.cfg.roi_y_max)
+
+    def edit_settings(self, edit):
+        """Apply a local profile edit and refresh one consistent Wave frame."""
+        with self._lock:
+            result = edit()
+            if self._track is not None:
+                x, y = self._track["x"], self._track["y"]
+                if not self._inside(x, y):
+                    self._clear(self.clock())
+                    return result
+                projection = geometry.strip_projection(x, y, self.cfg)
+                self._track = dict(self._track, **projection)
+            self._publish(self.clock(), [self._track] if self._track else [])
+            return result
 
     def tick(self):
         """Refresh Wave and stop pointer speed when no new move arrives."""

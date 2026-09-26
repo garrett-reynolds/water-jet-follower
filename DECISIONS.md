@@ -1,5 +1,13 @@
 # Decisions
 
+## [2026-09-26] Let the local Mouse Test use the Settings map
+
+The first Mouse Test kept Settings closed. Open Settings for local profile edits
+and map hover. Send hover to the same one-Walker controller and real Wave.
+Pause Walker input while a Jet point or active-area corner is dragged. Keep
+hardware actions closed and bind the server to loopback only. This lets a
+profile edit change the next safe preview without a DMX sender.
+
 ## [2026-09-26] Keep the Mouse Test Walker local and free of output senders
 
 Run Mouse Test only through an explicit `mouse-test` command on the local
