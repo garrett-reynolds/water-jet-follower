@@ -411,7 +411,8 @@ const vm=require('node:vm');
 const arcs=[],outlines=[],requests=[],clears=[];
 const ctx={fillStyle:'',strokeStyle:'',lineWidth:1,
   fillRect(){clears.push(this.fillStyle)},beginPath(){this.arcPending=false},moveTo(){},lineTo(){},
-  stroke(){if(this.arcPending)outlines.push({colour:this.strokeStyle,radius:this.lastRadius})},
+  stroke(){if(this.arcPending)outlines.push({colour:this.strokeStyle,radius:this.lastRadius,
+    width:this.lineWidth})},
   strokeRect(){},setLineDash(){},fillText(){},
   arc(x,y,r){this.lastRadius=r;this.arcPending=true},
   fill(){arcs.push({colour:this.fillStyle,radius:this.lastRadius})}};
@@ -441,11 +442,16 @@ vm.runInContext('poll()',context).then(()=>{
                                     capture_output=True, text=True)
         self.assertEqual(run_result.returncode, 0, run_result.stderr)
         result = json.loads(run_result.stdout)
-        self.assertEqual(result["before"][0], {"colour": "rgb(0, 0, 0)", "radius": 2.5})
+        self.assertEqual(result["before"][0], {"colour": "rgb(0, 0, 0)", "radius": 7})
         self.assertEqual(result["before"][1], {"colour": "rgb(255, 30, 40)",
-                                                "radius": 11.5})
+                                                "radius": 16})
         self.assertEqual(result["before"][2]["colour"], "#ff0")
-        self.assertEqual(result["outlines"][0], {"colour": "#bbc", "radius": 2.5})
+        self.assertEqual(result["outlines"], [
+            {"colour": "#092f35", "radius": 7, "width": 3},
+            {"colour": "#e9fffa", "radius": 7, "width": 1},
+            {"colour": "#092f35", "radius": 16, "width": 3},
+            {"colour": "#e9fffa", "radius": 16, "width": 1},
+        ])
         self.assertEqual(result["requests"], ["/config", "/state"])
         self.assertEqual(result["clears"], ["#111", "#111"])
         self.assertIsNone(result["frame"])

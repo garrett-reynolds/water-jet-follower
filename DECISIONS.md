@@ -1,5 +1,14 @@
 # Decisions
 
+## [2026-09-26] Keep the Mouse Test Walker local and free of output senders
+
+Run Mouse Test only through an explicit `mouse-test` command on the local
+loopback address. Give it one mouse input route and no settings or hardware
+routes. Use the real Strip projection and Wave rules to fill the usual viewer
+preview fields. Keep all DMX senders and hardware callbacks out of this mode.
+This gives a safe way to see Walker speed, Jet height, and Pixel colour with
+no water or lights connected.
+
 ## [2026-09-25] Keep held output routing separate from the current preview count
 
 Check the show mode under the profile lock before choosing a frame and its

@@ -60,6 +60,9 @@ PIXEL_MAP_JS = """
 function pixelScreenColour(pixel) {
   return 'rgb(' + [0, 1, 2].map(i => Math.min(255, pixel[i] + pixel[3])).join(', ') + ')';
 }
+function pixelMapRadius(up) {
+  return 7 + 9 * up;
+}
 """
 
 
@@ -109,7 +112,9 @@ function transform(c) {
   return {
     scale: scale,
     sx: (x) => (x - x0) * scale + (c.width - w * scale) / 2,
-    sy: (y) => c.height - ((y - y0) * scale + (c.height - h * scale) / 2)
+    sy: (y) => c.height - ((y - y0) * scale + (c.height - h * scale) / 2),
+    wx: (x) => x0 + (x - (c.width - w * scale) / 2) / scale,
+    wy: (y) => y0 + (c.height - y - (c.height - h * scale) / 2) / scale
   };
 }
 
@@ -161,8 +166,9 @@ function draw() {
     const up = CFG.height_max > 0 ? Math.min(1, h / CFG.height_max) : 0;
     const pixel = pixels[j];
     const colour = pixel ? pixelScreenColour(pixel) : (up > 0 ? '#4cf' : '#2a6');
-    dot(ctx, t, x, y, 2.5 + 9 * up, colour);
-    ctx.strokeStyle = '#bbc'; ctx.lineWidth = 1; ctx.stroke();
+    dot(ctx, t, x, y, pixelMapRadius(up), colour);
+    ctx.strokeStyle = '#092f35'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = '#e9fffa'; ctx.lineWidth = 1; ctx.stroke();
     if (h > 0) {
       ctx.fillStyle = '#9ef'; ctx.font = '10px monospace';
       ctx.fillText(h, t.sx(x) - 6, t.sy(y) - 14);
@@ -248,6 +254,59 @@ async function poll() {
 fit(); poll();
 </script></body></html>
 """
+
+
+MOUSE_JS = """
+// Keep requests in order, so a leave always clears the last move.
+const mouseCanvas = document.getElementById('c');
+let mousePending = Promise.resolve(), mouseLastSent = -Infinity;
+let mouseQueued = null, mouseTimer = null;
+function mouseRequest(method, body) {
+  mousePending = mousePending.catch(() => {}).then(() => fetch('/mouse', {
+    method: method,
+    headers: {'Content-Type': 'application/json'},
+    body: body ? JSON.stringify(body) : undefined
+  }));
+}
+function sendQueuedMouse() {
+  mouseTimer = null;
+  if (!mouseQueued) return;
+  const move = mouseQueued;
+  mouseQueued = null;
+  mouseLastSent = performance.now();
+  mouseRequest('POST', move);
+}
+mouseCanvas.addEventListener('pointermove', event => {
+  if (!CFG) return;
+  const now = performance.now();
+  const box = mouseCanvas.getBoundingClientRect(), map = transform(mouseCanvas);
+  const sx = (event.clientX - box.left) * mouseCanvas.width / box.width;
+  const sy = (event.clientY - box.top) * mouseCanvas.height / box.height;
+  mouseQueued = {x: map.wx(sx), y: map.wy(sy),
+                 t: (performance.timeOrigin + now) / 1000};
+  if (mouseTimer !== null) return;
+  const wait = Math.max(0, 50 - (now - mouseLastSent));
+  if (wait === 0) sendQueuedMouse();
+  else mouseTimer = setTimeout(sendQueuedMouse, wait);
+});
+mouseCanvas.addEventListener('pointerleave', () => {
+  mouseQueued = null;
+  if (mouseTimer !== null) clearTimeout(mouseTimer);
+  mouseTimer = null;
+  mouseLastSent = -Infinity;
+  mouseRequest('DELETE');
+});
+"""
+MOUSE_PAGE = (PAGE.replace('<div id="hud">',
+                           '<div id="mouse-mode">MOUSE TEST</div>\n<div id="hud">')
+              .replace('<nav><a href="/test">Test jets</a><a id="settings-link" '
+                       'href="/settings">Settings</a><a href="/system">System</a></nav>', '')
+              .replace('fit(); poll();', MOUSE_JS + '\nfit(); poll();')
+              .replace('  #position {',
+                       '  #mouse-mode { position:fixed; top:8px; left:50%; '
+                       'transform:translateX(-50%); z-index:2; padding:8px 14px; '
+                       'background:#6b2c00; color:#fff; border:2px solid #f90; '
+                       'font:bold 20px monospace; }\n  #position {', 1))
 
 
 # The settings and test pages share one look. Keep the shared rules here so the
@@ -461,7 +520,7 @@ function draw(){
     const q=xy(p),h=(liveFrame?.heights||[])[i]||0;
     const up=profile.settings.height_max>0?Math.min(1,h/profile.settings.height_max):0;
     const pixel=(liveFrame?.pixel_colours||[])[i];
-    const radius=4+9*up;
+    const radius=pixelMapRadius(up);
     ctx.fillStyle=pixel?pixelScreenColour(pixel):'#45dce7';
     ctx.beginPath();ctx.arc(...q,radius,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#092f35';ctx.lineWidth=3;ctx.stroke();
@@ -661,9 +720,12 @@ poll();
 """
 
 
-def make_handler(state, cfg, control=None):
+def make_handler(state, cfg, control=None, mouse_test=None):
+    if mouse_test is not None and control is not None:
+        raise ValueError("Mouse Test cannot use show control")
     view = Config()
-    control = control or SettingsControl(cfg)
+    if mouse_test is None:
+        control = control or SettingsControl(cfg)
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, body, content_type, status=200):
@@ -683,6 +745,10 @@ def make_handler(state, cfg, control=None):
             return json.loads(self.rfile.read(length) or b"{}")
 
         def do_GET(self):                       # noqa: N802 - http.server's name
+            if mouse_test is not None and self.path not in (
+                    "/", "/index.html", "/state", "/config"):
+                self.send_error(404)
+                return
             if self.path.startswith("/state"):
                 frame = state.get()
                 if frame.get("lidar_ok") is False:
@@ -692,7 +758,8 @@ def make_handler(state, cfg, control=None):
                 else:
                     # The control's truth rides along so a reloaded test page
                     # shows a held jet instead of a calm banner.
-                    frame = dict(frame, test_mode=control.test_mode, held=control.held)
+                    if mouse_test is None:
+                        frame = dict(frame, test_mode=control.test_mode, held=control.held)
                     self._send(json.dumps(frame), "application/json")
             elif self.path.startswith("/config"):
                 self._send(json.dumps({
@@ -725,12 +792,23 @@ def make_handler(state, cfg, control=None):
             elif self.path == "/system-data":
                 self._json(system.snapshot(state, control))
             elif self.path in ("/", "/index.html"):
-                self._send(PAGE, "text/html; charset=utf-8")
+                self._send(MOUSE_PAGE if mouse_test is not None else PAGE,
+                           "text/html; charset=utf-8")
             else:
                 self.send_error(404)
 
         def do_POST(self):                     # noqa: N802 - http.server's name
             try:
+                if mouse_test is not None:
+                    if self.path != "/mouse":
+                        self._json({"error": "unknown action"}, 404)
+                        return
+                    body = self._body()
+                    if not isinstance(body, dict):
+                        raise ValueError("mouse input must be a JSON object")
+                    self._json({"track": mouse_test.move(body.get("x"), body.get("y"),
+                                                         body.get("t"))})
+                    return
                 body = self._body()
                 if self.path == "/settings/apply":
                     result = control.apply(body.get("profile"),
@@ -756,17 +834,43 @@ def make_handler(state, cfg, control=None):
             except (ValueError, PermissionError, RuntimeError) as exc:
                 self._json({"error": str(exc)}, 400)
 
+        def do_DELETE(self):                   # noqa: N802 - http.server's name
+            if mouse_test is None or self.path != "/mouse":
+                self._json({"error": "unknown action"}, 404)
+                return
+            mouse_test.clear()
+            self._json({"cleared": True})
+
         def log_message(self, *args):
             pass                                # the tracker owns the console
 
     return Handler
 
 
-def serve(state, cfg, control=None):
+def serve(state, cfg, control=None, mouse_test=None):
     """Start the viewer on a daemon thread and return the server."""
-    server = ThreadingHTTPServer((cfg.viewer_host, cfg.viewer_port),
-                                 make_handler(state, cfg, control))
+    bind_host = "127.0.0.1" if mouse_test is not None else cfg.viewer_host
+    server = ThreadingHTTPServer((bind_host, cfg.viewer_port),
+                                 make_handler(state, cfg, control, mouse_test))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    print(f"viewer: http://water-jets.local:{cfg.viewer_port}/")
+    if mouse_test is not None:
+        stop_preview = threading.Event()
+
+        def refresh_preview():
+            while not stop_preview.wait(0.05):
+                mouse_test.tick()
+
+        preview_thread = threading.Thread(target=refresh_preview, daemon=True)
+        preview_thread.start()
+        shutdown_server = server.shutdown
+
+        def shutdown_with_preview():
+            stop_preview.set()
+            shutdown_server()
+            preview_thread.join()
+
+        server.shutdown = shutdown_with_preview
+    host = "127.0.0.1" if mouse_test is not None else "water-jets.local"
+    print(f"viewer: http://{host}:{server.server_port}/")
     return server
