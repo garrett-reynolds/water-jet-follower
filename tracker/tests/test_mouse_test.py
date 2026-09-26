@@ -62,6 +62,14 @@ class TestMouseTestHTTP(unittest.TestCase):
         self.assertEqual(frame["pixel_colours"],
                          [[32, 32, 94, 32], [128, 128, 255, 128]])
 
+    def test_disabled_jet_stays_off_in_output_preview(self):
+        self.cfg.jet_enabled = (False, True)
+        self.post(1, 0, 1)
+        frame = self.state_frame()
+        self.assertEqual(frame["heights"], [0, 30])
+        self.assertEqual(frame["pixel_colours"],
+                         [[0, 0, 0, 0], [0, 0, 255, 0]])
+
     def test_clear_removes_walker_and_restores_no_walker_preview(self):
         self.post(0, 0, 1)
         with urlopen(Request(self.base + "/mouse", method="DELETE")) as response:

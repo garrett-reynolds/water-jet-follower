@@ -22,7 +22,7 @@ class MouseTest:
         frame = {"t": timestamp, "tracks": tracks, "clusters": [], "legs": [],
                  "detections": [], "fg": [], "bg": [], "hz": 0.0,
                  "source": "mouse test"}
-        heights, colours = self.wave.heights_and_colours(frame, timestamp)
+        heights, colours = self.wave.output_values(frame, timestamp)
         frame["heights"] = heights
         frame["pixel_colours"] = [list(colour) for colour in colours]
         self.state.set(frame)

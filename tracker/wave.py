@@ -216,6 +216,18 @@ class Wave:
         colours[:] = [tuple(min(cfg.idle_brightness, value) for value in colour)
                       for colour in colours]
 
+    def output_values(self, tracker_frame, now):
+        """Logical Jet values after the same enabled-Jet rule used by output."""
+        heights, colours = self.heights_and_colours(tracker_frame, now)
+        enabled = tuple(self.cfg.jet_enabled)
+        if len(enabled) != self.cfg.jet_count:
+            enabled = (True,) * self.cfg.jet_count
+        for jet, on in enumerate(enabled):
+            if not on:
+                heights[jet] = 0
+                colours[jet] = (0, 0, 0, 0)
+        return heights, colours
+
     def frame(self, tracker_frame, now, lights_only=False):
         """The full 512-slot DMX frame for one scan.
 
@@ -224,20 +236,15 @@ class Wave:
         water moving at all.
         """
         cfg = self.cfg
-        heights, colours = self.heights_and_colours(tracker_frame, now)
+        heights, colours = self.output_values(tracker_frame, now)
         frame = dmx.blank_frame()
 
-        enabled = tuple(cfg.jet_enabled)
-        if len(enabled) != cfg.jet_count:
-            enabled = (True,) * cfg.jet_count
         for jet in range(cfg.jet_count):
             output = cfg.jet_count - 1 - jet if cfg.reverse_jets else jet
             module = output // dmx.NOZZLES_PER_HD_MODULE + 1
             nozzle = output % dmx.NOZZLES_PER_HD_MODULE + 1
             base = dmx.channel_for(nozzle, dmx.RED, dmx.NOZZLES_PER_HD_MODULE,
                                    module)
-            if not enabled[jet]:
-                continue
             red, green, blue, white = colours[jet]
             frame[base - 1] = dmx.clamp(red)
             frame[base + 0] = dmx.clamp(green)
