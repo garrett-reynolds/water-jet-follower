@@ -112,7 +112,9 @@ function transform(c) {
   return {
     scale: scale,
     sx: (x) => (x - x0) * scale + (c.width - w * scale) / 2,
-    sy: (y) => c.height - ((y - y0) * scale + (c.height - h * scale) / 2)
+    sy: (y) => c.height - ((y - y0) * scale + (c.height - h * scale) / 2),
+    wx: (x) => x0 + (x - (c.width - w * scale) / 2) / scale,
+    wy: (y) => y0 + (c.height - y - (c.height - h * scale) / 2) / scale
   };
 }
 
@@ -252,6 +254,45 @@ async function poll() {
 fit(); poll();
 </script></body></html>
 """
+
+
+MOUSE_JS = """
+// Keep requests in order, so a leave always clears the last move.
+const mouseCanvas = document.getElementById('c');
+let mousePending = Promise.resolve(), mouseLastSent = -Infinity;
+function mouseRequest(method, body) {
+  mousePending = mousePending.catch(() => {}).then(() => fetch('/mouse', {
+    method: method,
+    headers: {'Content-Type': 'application/json'},
+    body: body ? JSON.stringify(body) : undefined
+  }));
+}
+mouseCanvas.addEventListener('pointermove', event => {
+  if (!CFG) return;
+  const now = performance.now();
+  if (now - mouseLastSent < 50) return;
+  mouseLastSent = now;
+  const box = mouseCanvas.getBoundingClientRect(), map = transform(mouseCanvas);
+  const sx = (event.clientX - box.left) * mouseCanvas.width / box.width;
+  const sy = (event.clientY - box.top) * mouseCanvas.height / box.height;
+  mouseRequest('POST', {x: map.wx(sx), y: map.wy(sy),
+                        t: (performance.timeOrigin + now) / 1000});
+});
+mouseCanvas.addEventListener('pointerleave', () => {
+  mouseLastSent = -Infinity;
+  mouseRequest('DELETE');
+});
+"""
+MOUSE_PAGE = (PAGE.replace('<div id="hud">',
+                           '<div id="mouse-mode">MOUSE TEST</div>\n<div id="hud">')
+              .replace('<nav><a href="/test">Test jets</a><a id="settings-link" '
+                       'href="/settings">Settings</a><a href="/system">System</a></nav>', '')
+              .replace('fit(); poll();', MOUSE_JS + '\nfit(); poll();')
+              .replace('  #position {',
+                       '  #mouse-mode { position:fixed; top:8px; left:50%; '
+                       'transform:translateX(-50%); z-index:2; padding:8px 14px; '
+                       'background:#6b2c00; color:#fff; border:2px solid #f90; '
+                       'font:bold 20px monospace; }\n  #position {', 1))
 
 
 # The settings and test pages share one look. Keep the shared rules here so the
@@ -665,9 +706,12 @@ poll();
 """
 
 
-def make_handler(state, cfg, control=None):
+def make_handler(state, cfg, control=None, mouse_test=None):
+    if mouse_test is not None and control is not None:
+        raise ValueError("Mouse Test cannot use show control")
     view = Config()
-    control = control or SettingsControl(cfg)
+    if mouse_test is None:
+        control = control or SettingsControl(cfg)
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, body, content_type, status=200):
@@ -687,6 +731,10 @@ def make_handler(state, cfg, control=None):
             return json.loads(self.rfile.read(length) or b"{}")
 
         def do_GET(self):                       # noqa: N802 - http.server's name
+            if mouse_test is not None and self.path not in (
+                    "/", "/index.html", "/state", "/config"):
+                self.send_error(404)
+                return
             if self.path.startswith("/state"):
                 frame = state.get()
                 if frame.get("lidar_ok") is False:
@@ -696,7 +744,8 @@ def make_handler(state, cfg, control=None):
                 else:
                     # The control's truth rides along so a reloaded test page
                     # shows a held jet instead of a calm banner.
-                    frame = dict(frame, test_mode=control.test_mode, held=control.held)
+                    if mouse_test is None:
+                        frame = dict(frame, test_mode=control.test_mode, held=control.held)
                     self._send(json.dumps(frame), "application/json")
             elif self.path.startswith("/config"):
                 self._send(json.dumps({
@@ -729,12 +778,21 @@ def make_handler(state, cfg, control=None):
             elif self.path == "/system-data":
                 self._json(system.snapshot(state, control))
             elif self.path in ("/", "/index.html"):
-                self._send(PAGE, "text/html; charset=utf-8")
+                self._send(MOUSE_PAGE if mouse_test is not None else PAGE,
+                           "text/html; charset=utf-8")
             else:
                 self.send_error(404)
 
         def do_POST(self):                     # noqa: N802 - http.server's name
             try:
+                if mouse_test is not None:
+                    if self.path != "/mouse":
+                        self._json({"error": "unknown action"}, 404)
+                        return
+                    body = self._body()
+                    self._json({"track": mouse_test.move(body.get("x"), body.get("y"),
+                                                         body.get("t"))})
+                    return
                 body = self._body()
                 if self.path == "/settings/apply":
                     result = control.apply(body.get("profile"),
@@ -760,17 +818,25 @@ def make_handler(state, cfg, control=None):
             except (ValueError, PermissionError, RuntimeError) as exc:
                 self._json({"error": str(exc)}, 400)
 
+        def do_DELETE(self):                   # noqa: N802 - http.server's name
+            if mouse_test is None or self.path != "/mouse":
+                self._json({"error": "unknown action"}, 404)
+                return
+            mouse_test.clear()
+            self._json({"cleared": True})
+
         def log_message(self, *args):
             pass                                # the tracker owns the console
 
     return Handler
 
 
-def serve(state, cfg, control=None):
+def serve(state, cfg, control=None, mouse_test=None):
     """Start the viewer on a daemon thread and return the server."""
     server = ThreadingHTTPServer((cfg.viewer_host, cfg.viewer_port),
-                                 make_handler(state, cfg, control))
+                                 make_handler(state, cfg, control, mouse_test))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    print(f"viewer: http://water-jets.local:{cfg.viewer_port}/")
+    host = "127.0.0.1" if mouse_test is not None else "water-jets.local"
+    print(f"viewer: http://{host}:{server.server_port}/")
     return server

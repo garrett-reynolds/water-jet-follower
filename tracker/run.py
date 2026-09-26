@@ -163,6 +163,26 @@ def cmd_replay(args):
     return _track_loop(source, cfg, baseline, os.path.basename(args.scan))
 
 
+def cmd_mouse_test(args):
+    """Run one local test Walker in the viewer with no hardware output path."""
+    from tracker.mouse_test import MouseTest
+
+    cfg = _load_config(args)
+    cfg.viewer_host = "127.0.0.1"
+    state = viewer.State()
+    server = viewer.serve(state, cfg, mouse_test=MouseTest(cfg, state))
+    print("mouse test: local preview only")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nmouse test: stopping")
+    finally:
+        server.shutdown()
+        server.server_close()
+    return 0
+
+
 def cmd_merge(args):
     """Two one-person clips -> one two-person clip. See tracker/merge.py."""
     from tracker import merge as merge_module
@@ -522,6 +542,10 @@ def build_parser():
     replay.add_argument("--speed", type=float, default=1.0)
     replay.add_argument("--loop", action="store_true")
     replay.set_defaults(func=cmd_replay)
+
+    mouse_test = subparsers.add_parser(
+        "mouse-test", help="local mouse Walker and Wave preview; no hardware output")
+    mouse_test.set_defaults(func=cmd_mouse_test)
 
     merge = subparsers.add_parser(
         "merge", help="build a two-person clip from two one-person clips")
