@@ -260,6 +260,7 @@ MOUSE_JS = """
 // Keep requests in order, so a leave always clears the last move.
 const mouseCanvas = document.getElementById('c');
 let mousePending = Promise.resolve(), mouseLastSent = -Infinity;
+let mouseQueued = null, mouseTimer = null;
 function mouseRequest(method, body) {
   mousePending = mousePending.catch(() => {}).then(() => fetch('/mouse', {
     method: method,
@@ -267,18 +268,31 @@ function mouseRequest(method, body) {
     body: body ? JSON.stringify(body) : undefined
   }));
 }
+function sendQueuedMouse() {
+  mouseTimer = null;
+  if (!mouseQueued) return;
+  const move = mouseQueued;
+  mouseQueued = null;
+  mouseLastSent = performance.now();
+  mouseRequest('POST', move);
+}
 mouseCanvas.addEventListener('pointermove', event => {
   if (!CFG) return;
   const now = performance.now();
-  if (now - mouseLastSent < 50) return;
-  mouseLastSent = now;
   const box = mouseCanvas.getBoundingClientRect(), map = transform(mouseCanvas);
   const sx = (event.clientX - box.left) * mouseCanvas.width / box.width;
   const sy = (event.clientY - box.top) * mouseCanvas.height / box.height;
-  mouseRequest('POST', {x: map.wx(sx), y: map.wy(sy),
-                        t: (performance.timeOrigin + now) / 1000});
+  mouseQueued = {x: map.wx(sx), y: map.wy(sy),
+                 t: (performance.timeOrigin + now) / 1000};
+  if (mouseTimer !== null) return;
+  const wait = Math.max(0, 50 - (now - mouseLastSent));
+  if (wait === 0) sendQueuedMouse();
+  else mouseTimer = setTimeout(sendQueuedMouse, wait);
 });
 mouseCanvas.addEventListener('pointerleave', () => {
+  mouseQueued = null;
+  if (mouseTimer !== null) clearTimeout(mouseTimer);
+  mouseTimer = null;
   mouseLastSent = -Infinity;
   mouseRequest('DELETE');
 });
@@ -790,6 +804,8 @@ def make_handler(state, cfg, control=None, mouse_test=None):
                         self._json({"error": "unknown action"}, 404)
                         return
                     body = self._body()
+                    if not isinstance(body, dict):
+                        raise ValueError("mouse input must be a JSON object")
                     self._json({"track": mouse_test.move(body.get("x"), body.get("y"),
                                                          body.get("t"))})
                     return
@@ -838,6 +854,23 @@ def serve(state, cfg, control=None, mouse_test=None):
                                  make_handler(state, cfg, control, mouse_test))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
+    if mouse_test is not None:
+        stop_preview = threading.Event()
+
+        def refresh_preview():
+            while not stop_preview.wait(0.05):
+                mouse_test.tick()
+
+        preview_thread = threading.Thread(target=refresh_preview, daemon=True)
+        preview_thread.start()
+        shutdown_server = server.shutdown
+
+        def shutdown_with_preview():
+            stop_preview.set()
+            shutdown_server()
+            preview_thread.join()
+
+        server.shutdown = shutdown_with_preview
     host = "127.0.0.1" if mouse_test is not None else "water-jets.local"
     print(f"viewer: http://{host}:{server.server_port}/")
     return server

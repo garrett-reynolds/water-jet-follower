@@ -2,21 +2,27 @@
 
 import math
 import threading
+import time
 
 from tracker import geometry
 from tracker.wave import Wave
 
 
 class MouseTest:
-    def __init__(self, cfg, state):
+    STOP_AFTER = 0.15
+
+    def __init__(self, cfg, state, clock=None):
         self.cfg = cfg
         self.state = state
+        self.clock = clock or time.time
         self.wave = Wave(cfg)
         self._lock = threading.Lock()
         self._last = None
+        self._last_move_at = None
+        self._track = None
         self._distance = 0.0
         self._seen = 0
-        self._publish(0.0, [])
+        self._publish(self.clock(), [])
 
     def _publish(self, timestamp, tracks):
         frame = {"t": timestamp, "tracks": tracks, "clusters": [], "legs": [],
@@ -39,7 +45,7 @@ class MouseTest:
                 raise ValueError("t must increase with each move")
             if not (self.cfg.roi_x_min <= x <= self.cfg.roi_x_max
                     and self.cfg.roi_y_min <= y <= self.cfg.roi_y_max):
-                self._clear(timestamp)
+                self._clear(self.clock())
                 return None
             if last is None:
                 vx = vy = 0.0
@@ -58,15 +64,28 @@ class MouseTest:
                      "seen": True, "times_seen": self._seen,
                      "dist_travelled": self._distance, "kind": "mouse"}
             self._last = (x, y, timestamp)
-            self._publish(timestamp, [track])
+            self._last_move_at = self.clock()
+            self._track = track
+            self._publish(self._last_move_at, [track])
             return track
+
+    def tick(self):
+        """Refresh Wave and stop pointer speed when no new move arrives."""
+        with self._lock:
+            now = self.clock()
+            if (self._track is not None and self._last_move_at is not None
+                    and now - self._last_move_at >= self.STOP_AFTER):
+                self._track = dict(self._track, vx=0.0, vy=0.0, speed=0.0)
+            self._publish(now, [self._track] if self._track is not None else [])
 
     def _clear(self, timestamp):
         self._last = None
+        self._last_move_at = None
+        self._track = None
         self._distance = 0.0
         self._seen = 0
         self._publish(timestamp, [])
 
     def clear(self):
         with self._lock:
-            self._clear(self._last[2] if self._last is not None else 0.0)
+            self._clear(self.clock())
