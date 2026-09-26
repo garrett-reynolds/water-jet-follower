@@ -37,6 +37,10 @@ class MouseTest:
             last = self._last
             if last is not None and timestamp <= last[2]:
                 raise ValueError("t must increase with each move")
+            if not (self.cfg.roi_x_min <= x <= self.cfg.roi_x_max
+                    and self.cfg.roi_y_min <= y <= self.cfg.roi_y_max):
+                self._clear(timestamp)
+                return None
             if last is None:
                 vx = vy = 0.0
                 self._distance = 0.0
@@ -57,10 +61,12 @@ class MouseTest:
             self._publish(timestamp, [track])
             return track
 
+    def _clear(self, timestamp):
+        self._last = None
+        self._distance = 0.0
+        self._seen = 0
+        self._publish(timestamp, [])
+
     def clear(self):
         with self._lock:
-            timestamp = self._last[2] if self._last is not None else 0.0
-            self._last = None
-            self._distance = 0.0
-            self._seen = 0
-            self._publish(timestamp, [])
+            self._clear(self._last[2] if self._last is not None else 0.0)

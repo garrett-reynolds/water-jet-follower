@@ -833,7 +833,8 @@ def make_handler(state, cfg, control=None, mouse_test=None):
 
 def serve(state, cfg, control=None, mouse_test=None):
     """Start the viewer on a daemon thread and return the server."""
-    server = ThreadingHTTPServer((cfg.viewer_host, cfg.viewer_port),
+    bind_host = "127.0.0.1" if mouse_test is not None else cfg.viewer_host
+    server = ThreadingHTTPServer((bind_host, cfg.viewer_port),
                                  make_handler(state, cfg, control, mouse_test))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

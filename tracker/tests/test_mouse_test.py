@@ -73,6 +73,17 @@ class TestMouseTestHTTP(unittest.TestCase):
         for name in ("fg", "bg", "legs", "clusters", "detections"):
             self.assertEqual(frame[name], [])
 
+    def test_move_outside_active_area_clears_walker(self):
+        self.post(0, 0, 1)
+        result = self.post(2.1, 0, 2)  # inside map pad; outside active area
+        self.assertIsNone(result["track"])
+        frame = self.state_frame()
+        self.assertEqual(frame["tracks"], [])
+        self.assertEqual(frame["heights"], [0, 0])
+        self.assertEqual(frame["pixel_colours"], [[0, 0, 40, 0]] * 2)
+        self.post(1, 0, 3)
+        self.assertEqual(self.state_frame()["tracks"][0]["speed"], 0)
+
     def test_normal_viewer_has_no_mouse_input(self):
         state = State()
         server = serve(state, self.cfg)
@@ -103,6 +114,18 @@ class TestMouseTestHTTP(unittest.TestCase):
 
 
 class TestMouseTestCommand(unittest.TestCase):
+    def test_direct_mouse_server_binds_only_to_loopback(self):
+        from tracker.mouse_test import MouseTest
+
+        cfg = Config(viewer_host="0.0.0.0", viewer_port=0)
+        state = State()
+        server = serve(state, cfg, mouse_test=MouseTest(cfg, state))
+        try:
+            self.assertEqual(server.server_address[0], "127.0.0.1")
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_mouse_handler_rejects_show_control(self):
         from tracker.mouse_test import MouseTest
 
