@@ -1,5 +1,15 @@
 # Decisions
 
+## [2026-09-25] Give the Pi its own Wi-Fi and restart with water off
+
+The installed Pi will always make its own private Wi-Fi network. The iPad will use
+that network to open the control pages when the site has no network or internet.
+
+The web app and show process will start on boot and restart after a software fault.
+Every boot and automatic restart will start with water forced off. An operator must
+use the control page to resume live water. The system must not restore live water by
+itself after a fault.
+
 ## [2026-09-19] Use three selectable idle water and colour animations
 
 The settings profile now selects roll, ripple, or pulse water and chase, fade, or
@@ -1163,4 +1173,3 @@ knows and can use `--height-max` when the water has been off for a while.
 gone when they exit. They are tracking checks with no DMX; the show is the only command that
 drives water, so it is the only one that keeps settings. `check`, `record`, and `baseline`
 have no settings page at all.
-
