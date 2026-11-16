@@ -127,10 +127,10 @@ class TestMouseTestHTTP(unittest.TestCase):
         with urlopen(self.base + "/") as response:
             page = response.read().decode()
         self.assertIn("MOUSE TEST", page)
-        self.assertNotIn('href="/test"', page)
+        self.assertNotRegex(page, r'href="/?test"')
         # Break caught: the start page gives no way to open the safe Settings map.
-        self.assertIn('href="/settings"', page)
-        self.assertNotIn('href="/system"', page)
+        self.assertIn('href="settings"', page)
+        self.assertNotRegex(page, r'href="/?system"')
         for path in ("/test", "/system"):
             with self.assertRaises(HTTPError) as raised:
                 urlopen(self.base + path)
@@ -286,7 +286,7 @@ async function drain(){await vm.runInContext(
         self.assertEqual(result.returncode, 0, result.stderr)
         seen = json.loads(result.stdout)
         self.assertEqual([call["method"] for call in seen["hover"]], ["POST"])
-        self.assertEqual(seen["hover"][0]["path"], "/mouse")
+        self.assertEqual(seen["hover"][0]["path"], "mouse")
         self.assertAlmostEqual(seen["hover"][0]["body"]["x"], 0.5)
         self.assertAlmostEqual(seen["hover"][0]["body"]["y"], 0.5)
         self.assertEqual([call["method"] for call in seen["duringJet"]],
@@ -565,7 +565,7 @@ vm.runInContext(`CFG={roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2};`,context
         seen = json.loads(result.stdout)
         self.assertEqual(seen["mark"], "MOUSE TEST")
         self.assertEqual(len(seen["calls"]), 3)
-        self.assertEqual(seen["calls"][0]["path"], "/mouse")
+        self.assertEqual(seen["calls"][0]["path"], "mouse")
         self.assertEqual(seen["calls"][0]["method"], "POST")
         self.assertAlmostEqual(seen["calls"][0]["body"]["x"], 1.5)
         self.assertAlmostEqual(seen["calls"][0]["body"]["y"], 0.5)
@@ -573,4 +573,4 @@ vm.runInContext(`CFG={roi_x_min:0,roi_x_max:2,roi_y_min:0,roi_y_max:2};`,context
         self.assertEqual(seen["calls"][1]["method"], "POST")
         self.assertLess(seen["calls"][0]["body"]["t"],
                         seen["calls"][1]["body"]["t"])
-        self.assertEqual(seen["calls"][2], {"path": "/mouse", "method": "DELETE"})
+        self.assertEqual(seen["calls"][2], {"path": "mouse", "method": "DELETE"})

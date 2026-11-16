@@ -603,6 +603,17 @@ MOUSE_SETTINGS_PAGE = SETTINGS_PAGE.replace(
              '<button id="all-off" class="danger" hidden disabled>')\
     .replace('init();pollState();', MOUSE_SETTINGS_JS + '\ninit();pollState();')
 
+
+def _relative(page):
+    """Address the server relative to the page, so Mouse Test also works behind a
+    proxy that serves it under a path prefix (the Workshop's /c/<id>/)."""
+    return (page.replace("fetch('/", "fetch('").replace("api('/", "api('")
+            .replace('href="/"', 'href="./"').replace('href="/', 'href="'))
+
+
+MOUSE_PAGE = _relative(MOUSE_PAGE)
+MOUSE_SETTINGS_PAGE = _relative(MOUSE_SETTINGS_PAGE)
+
 TEST_PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Water jet test</title>
