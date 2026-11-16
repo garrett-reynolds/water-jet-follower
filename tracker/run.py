@@ -169,6 +169,10 @@ def cmd_mouse_test(args):
 
     cfg = _load_config(args)
     cfg.viewer_host = "127.0.0.1"
+    # A host that runs this as a service (the Workshop) gives the port as PORT.
+    # --viewer-port still wins. Only Mouse Test reads it: it sends nothing.
+    if not args.viewer_port and os.environ.get("PORT"):
+        cfg.viewer_port = int(os.environ["PORT"])
     state = viewer.State()
     server = viewer.serve(state, cfg, mouse_test=MouseTest(cfg, state))
     print("mouse test: local preview only")
