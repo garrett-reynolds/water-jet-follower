@@ -12,7 +12,7 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from tracker import dmx, geometry, system
+from tracker import dmx, geometry
 from tracker.config import Config
 from tracker.settings import SettingsControl
 
@@ -828,6 +828,8 @@ def make_handler(state, cfg, control=None, mouse_test=None):
             elif self.path == "/system":
                 self._send(SYSTEM_PAGE, "text/html; charset=utf-8")
             elif self.path == "/system-data":
+                # Imported here: the Workshop's Mouse Test copy leaves system.py out.
+                from tracker import system
                 self._json(system.snapshot(state, control))
             elif self.path in ("/", "/index.html"):
                 self._send(MOUSE_PAGE if mouse_test is not None else PAGE,
