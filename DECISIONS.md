@@ -1282,3 +1282,24 @@ gone when they exit. They are tracking checks with no DMX; the show is the only 
 drives water, so it is the only one that keeps settings. `check`, `record`, and `baseline`
 have no settings page at all.
 
+
+## [2026-11-16] Mouse Test runs as a hosted demo on the Workshop
+
+**Chosen:** the Workshop (project-showcase, a separate Pi with no water hardware) runs a
+copy built by `deploy/workshop/build.py`: only the modules Mouse Test needs, standard
+library only, started as `/usr/bin/python3 -m tracker.run mouse-test` with the port in
+`PORT` (`--viewer-port` still wins). Its nginx route serves it under `/c/water-jet-follower/`
+and strips that prefix, so the two Mouse Test pages now address the server with relative
+paths (`state`, `settings`, `./`). The show's own pages keep their root paths.
+
+**Why:** the Workshop runs nothing that can touch hardware or power. The built copy leaves
+out `system.py` (reboot and shutdown), `lidar.py` and `heartbeat.py`; `viewer.py` now
+imports `system` only when `/system-data` is asked for. Mouse Test already serves no Test or
+System page and its Settings control has no sender, zero, power command or profile file.
+`tracker/tests/test_workshop.py` runs the built copy with the hardware libraries and program
+launches blocked, calls every page and action, and checks nothing was tried and nothing was
+written.
+
+**Ruled out:** stripping the prefix only in nginx (it already does; the browser still asked
+for `/state` at the site root) and rewriting every page to relative paths (the show's pages
+are only served at the root of their own Pi).
