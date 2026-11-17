@@ -96,6 +96,8 @@ PAGE = """<!doctype html>
 <script>
 """ + PIXEL_MAP_JS + """
 let CFG = null, FRAME = null, polls = 0;
+// Pixels kept free at the bottom of the canvas, under the map (Mouse Test draws the jets there).
+let SIDE_VIEW = 0;
 
 function fit() {
   const c = document.getElementById('c');
@@ -107,14 +109,15 @@ function transform(c) {
   const pad = 0.25;   // a little room around the active area, so its edge is visible
   const x0 = CFG.roi_x_min - pad, y0 = CFG.roi_y_min - pad;
   const w = CFG.roi_x_max - CFG.roi_x_min + pad * 2, h = CFG.roi_y_max - CFG.roi_y_min + pad * 2;
-  const scale = Math.min(c.width / w, c.height / h) * 0.92;
+  const ch = c.height - SIDE_VIEW;
+  const scale = Math.min(c.width / w, ch / h) * 0.92;
   // +x right, +y up
   return {
     scale: scale,
     sx: (x) => (x - x0) * scale + (c.width - w * scale) / 2,
-    sy: (y) => c.height - ((y - y0) * scale + (c.height - h * scale) / 2),
+    sy: (y) => ch - ((y - y0) * scale + (ch - h * scale) / 2),
     wx: (x) => x0 + (x - (c.width - w * scale) / 2) / scale,
-    wy: (y) => y0 + (c.height - y - (c.height - h * scale) / 2) / scale
+    wy: (y) => y0 + (ch - y - (ch - h * scale) / 2) / scale
   };
 }
 
@@ -256,6 +259,84 @@ fit(); poll();
 """
 
 
+JET_SIDE_VIEW_JS = r"""
+// Mouse Test has no water to look at, so it draws a side view of the jets under the map:
+// each column is as tall as the height sent to that jet, in the colour of that jet's light.
+function sideViewSize() {
+  const h = window.innerHeight;
+  return h > 0 ? Math.round(Math.min(260, Math.max(150, h * 0.3))) : 0;
+}
+SIDE_VIEW = sideViewSize();
+window.addEventListener('resize', () => { SIDE_VIEW = sideViewSize(); });
+const drawMap = draw;
+draw = function () { drawMap(); drawJetSideView(); };
+
+function drawJetSideView() {
+  if (!CFG || !FRAME) return;
+  const c = document.getElementById('c'), ctx = c.getContext('2d');
+  const top = c.height - SIDE_VIEW, n = CFG.jet_count;
+  const H = FRAME.heights || [], pixels = FRAME.pixel_colours || [];
+  ctx.save();
+  ctx.fillStyle = '#0a0f12'; ctx.fillRect(0, top, c.width, SIDE_VIEW);
+  ctx.strokeStyle = '#2a3a40'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, top + 0.5); ctx.lineTo(c.width, top + 0.5); ctx.stroke();
+  ctx.fillStyle = '#9ab'; ctx.font = '12px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('WATER JETS, side view (a model: Mouse Test sends no water)', 12, top + 18);
+  const floor = c.height - 30;              // top of the basin
+  const room = floor - (top + 44);          // the tallest column stops under the title
+  const margin = Math.max(40, c.width * 0.08);
+  const step = (c.width - margin * 2) / n;
+  const width = Math.max(6, Math.min(30, step * 0.45));
+  const now = performance.now() / 1000;
+  ctx.fillStyle = '#0d2633';
+  ctx.fillRect(margin - step * 0.2, floor, c.width - margin * 2 + step * 0.4, 10);
+  ctx.textAlign = 'center';
+  for (let j = 0; j < n; j++) {
+    const x = margin + step * (j + 0.5);
+    const up = CFG.height_max > 0 ? Math.min(1, (H[j] || 0) / CFG.height_max) : 0;
+    const pixel = pixels[j];
+    const lit = pixel && pixel[0] + pixel[1] + pixel[2] + pixel[3] > 0;
+    const rgb = lit ? [0, 1, 2].map(i => Math.min(255, pixel[i] + pixel[3])) : [51, 70, 77];
+    const colour = 'rgb(' + rgb.join(', ') + ')';
+    const spray = 'rgba(' + rgb.map(v => Math.round((v + 255) / 2)).join(', ') + ', 0.85)';
+    const tall = up * room;
+    if (tall > 1) {
+      // the stream: lit from the nozzle, paler at the top where it breaks up
+      const g = ctx.createLinearGradient(0, floor, 0, floor - tall);
+      g.addColorStop(0, colour); g.addColorStop(1, spray);
+      ctx.shadowColor = colour; ctx.shadowBlur = 18; ctx.fillStyle = g;
+      ctx.fillRect(x - width / 2, floor - tall, width, tall);
+      ctx.beginPath(); ctx.arc(x, floor - tall, width / 2, Math.PI, 0); ctx.fill();
+      ctx.shadowBlur = 0;
+      // a faint edge, so the water height shows even when the light is dim
+      ctx.strokeStyle = 'rgba(200, 235, 255, 0.35)'; ctx.lineWidth = 1;
+      ctx.strokeRect(x - width / 2, floor - tall, width, tall);
+      // drops falling off the top
+      ctx.fillStyle = spray;
+      for (let k = 0; k < 3; k++) {
+        const phase = (now * 1.4 + k / 3 + j * 0.13) % 1;
+        ctx.globalAlpha = 1 - phase;
+        ctx.beginPath();
+        ctx.arc(x + (k - 1) * width * 0.6 * phase, floor - tall - width / 2 - 10 * Math.sin(phase * Math.PI),
+                2, 0, 6.2832);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#9ef'; ctx.font = '10px monospace';
+      ctx.fillText(H[j], x, floor - tall - width / 2 - 16);
+    }
+    // the nozzle and its light
+    ctx.shadowColor = colour; ctx.shadowBlur = lit ? 12 : 0; ctx.fillStyle = colour;
+    ctx.beginPath(); ctx.ellipse(x, floor + 2, width * 0.6, 4, 0, 0, 6.2832); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#789'; ctx.font = '11px monospace';
+    ctx.fillText(String(j), x, c.height - 6);   // numbered from 0, as the jet= box and the map labels
+  }
+  ctx.restore();
+}
+"""
+
+
 MOUSE_JS = """
 // Keep every move in order, so a fast trip out and back reaches the Wave.
 const mouseCanvas = document.getElementById('c');
@@ -287,7 +368,7 @@ MOUSE_PAGE = (PAGE.replace('<div id="hud">',
               .replace('<nav><a href="/test">Test jets</a><a id="settings-link" '
                        'href="/settings">Settings</a><a href="/system">System</a></nav>',
                        '<nav><a id="settings-link" href="/settings">Settings</a></nav>')
-              .replace('fit(); poll();', MOUSE_JS + '\nfit(); poll();')
+              .replace('fit(); poll();', MOUSE_JS + JET_SIDE_VIEW_JS + '\nfit(); poll();')
               .replace('  #position {',
                        '  #mouse-mode { position:fixed; top:8px; left:50%; '
                        'transform:translateX(-50%); z-index:2; padding:8px 14px; '

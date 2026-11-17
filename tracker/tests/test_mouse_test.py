@@ -119,6 +119,8 @@ class TestMouseTestHTTP(unittest.TestCase):
                 page = response.read().decode()
             self.assertNotIn("MOUSE TEST", page)
             self.assertNotIn("/mouse", page)
+            # The model of the water is for Mouse Test only; the real viewer keeps its whole map.
+            self.assertNotIn("drawJetSideView", page)
         finally:
             server.shutdown()
             server.server_close()
@@ -127,6 +129,8 @@ class TestMouseTestHTTP(unittest.TestCase):
         with urlopen(self.base + "/") as response:
             page = response.read().decode()
         self.assertIn("MOUSE TEST", page)
+        # With no water to see, Mouse Test draws a side view of the jets: height and light.
+        self.assertIn("drawJetSideView", page)
         self.assertNotRegex(page, r'href="/?test"')
         # Break caught: the start page gives no way to open the safe Settings map.
         self.assertIn('href="settings"', page)

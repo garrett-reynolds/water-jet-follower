@@ -1303,3 +1303,19 @@ written.
 **Ruled out:** stripping the prefix only in nginx (it already does; the browser still asked
 for `/state` at the site root) and rewriting every page to relative paths (the show's pages
 are only served at the root of their own Pi).
+
+
+## [2026-11-17] Mouse Test draws a side view of the water jets
+
+**Chosen:** the Mouse Test page keeps a band under the map and draws each jet there as a
+column of water: as tall as the height sent to it (a fraction of `height_max`), in the colour
+of its light (`pixel_colours`, as the map dots), with the number over it. Jets are numbered
+from 0, as the `jet=` box. The band is in `JET_SIDE_VIEW_JS`, added to `MOUSE_PAGE` only;
+`transform()` leaves `SIDE_VIEW` pixels free, which is 0 on the show's viewer.
+
+**Why:** Garrett asked for it for the Workshop demo: with no water there, a visitor saw only
+dots on a map and could not see the height or the lights change. It draws only what
+`/state` already sends, so it adds no server code.
+
+**Ruled out:** drawing it on the show's viewer too (it would shrink the map on the real rig,
+where the water is visible).
